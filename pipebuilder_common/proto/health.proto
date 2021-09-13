@@ -1,0 +1,10 @@
+syntax = "proto3";
+package health;
+
+message HealthRequest {}
+
+message HealthResponse {}
+
+service Health {
+    rpc Health(HealthRequest) returns (HealthResponse) {}
+}

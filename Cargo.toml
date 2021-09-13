@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "pipebuilder",
+    "pipebuilder_common",
+]

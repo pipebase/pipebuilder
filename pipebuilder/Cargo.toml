@@ -1,0 +1,26 @@
+[package]
+name = "pipebuilder"
+version = "0.1.0"
+authors = ["Li Yu <li.yu.sh0211@gmail.com>"]
+edition = "2018"
+
+[[bin]]
+name = "builder"
+path = "src/builder/server.rs"
+
+[[bin]]
+name = "api"
+path = "src/api/server.rs"
+
+[dependencies]
+chrono = { version = "0.4" }
+pipebuilder_common = { version = "0.1.0", path = "../pipebuilder_common" }
+prost = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+tonic = "0.5"
+tokio = { version = "1.11.0", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1"
+tracing-subscriber = "0.2"
+
+[build-dependencies]
+tonic-build = "0.5"
