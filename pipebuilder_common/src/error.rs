@@ -13,6 +13,8 @@ pub enum ErrorImpl {
     AddrParse(#[from] net::AddrParseError),
     #[error("env exception")]
     Env(#[from] env::VarError),
+    #[error("etcd client exception")]
+    Etcd(#[from] etcd_client::Error),
     #[error("io exception")]
     Io(#[from] io::Error),
     #[error("tonic transport exception")]
@@ -48,5 +50,11 @@ impl From<tonic::transport::Error> for Error {
 impl From<net::AddrParseError> for Error {
     fn from(err: net::AddrParseError) -> Self {
         Error(Box::new(ErrorImpl::AddrParse(err)))
+    }
+}
+
+impl From<etcd_client::Error> for Error {
+    fn from(err: etcd_client::Error) -> Self {
+        Error(Box::new(ErrorImpl::Etcd(err)))
     }
 }

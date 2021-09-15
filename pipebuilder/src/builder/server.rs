@@ -5,7 +5,7 @@ mod config;
 
 use config::Config;
 use pipebuilder_common::{
-    health::health_server::HealthServer, parse_config, read_file, Error, HealthService,
+    health::health_server::HealthServer, open_file, parse_config, Error, HealthService,
     ENV_PIPEBUILDER_CONFIG_FILE,
 };
 use tracing::{info, instrument};
@@ -15,7 +15,7 @@ use tracing::{info, instrument};
 async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt::init();
     info!("read configuration ...");
-    let file = read_file(std::env::var(ENV_PIPEBUILDER_CONFIG_FILE)?)?;
+    let file = open_file(std::env::var(ENV_PIPEBUILDER_CONFIG_FILE)?)?;
     let config = parse_config::<Config>(file)?;
     let node = &config.node;
     let node_id = &node.id;
