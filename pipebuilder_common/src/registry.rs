@@ -1,7 +1,11 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{read_file, Result};
-use etcd_client::{Certificate, Client, ConnectOptions, Identity, TlsOptions};
+use etcd_client::{
+    Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, LeaseGrantResponse,
+    PutOptions, PutResponse, TlsOptions,
+};
 use serde::Deserialize;
+use tracing::info;
 
 use crate::Period;
 
@@ -116,4 +120,42 @@ impl RegistryConfig {
 #[derive(Clone)]
 pub struct Registry {
     client: Client,
+}
+
+impl Registry {
+    pub async fn put<K, V>(
+        &mut self,
+        key: K,
+        value: V,
+        options: Option<PutOptions>,
+    ) -> Result<PutResponse>
+    where
+        K: Into<Vec<u8>>,
+        V: Into<Vec<u8>>,
+    {
+        let resp = self.client.put(key, value, options).await?;
+        Ok(resp)
+    }
+
+    pub async fn get<K>(&mut self, key: K, options: Option<GetOptions>) -> Result<GetResponse>
+    where
+        K: Into<Vec<u8>>,
+    {
+        let resp = self.client.get(key, options).await?;
+        Ok(resp)
+    }
+
+    pub async fn lease_grant(&mut self, ttl: i64) -> Result<LeaseGrantResponse> {
+        let resp = self.client.lease_grant(ttl, None).await?;
+        Ok(resp)
+    }
+
+    pub async fn lease_keep_alive(&mut self, id: i64) -> Result<()> {
+        let (mut keeper, mut stream) = self.client.lease_keep_alive(id).await?;
+        keeper.keep_alive().await?;
+        if let Some(resp) = stream.message().await? {
+            info!("lease {:?} keep alive, new ttl {:?}", resp.id(), resp.ttl());
+        }
+        Ok(())
+    }
 }
