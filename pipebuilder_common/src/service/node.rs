@@ -1,10 +1,11 @@
 use crate::{
-    Period, Register, Result, DEFAULT_NODE_HEARTBEAT_PERIOD, ENV_PIPEBUILDER_EXTERNAL_ADDR,
+    Period, Register, DEFAULT_NODE_HEARTBEAT_PERIOD, ENV_PIPEBUILDER_EXTERNAL_ADDR,
     ENV_PIPEBUILDER_NODE_ID, REGISTER_KEY_BUILDER_NODE_ID_PREFIX,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tracing::error;
 
 #[derive(Clone, Deserialize, Serialize)]
 pub enum NodeRole {
@@ -19,7 +20,7 @@ pub enum NodeStatus {
     InActive,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct NodeConfig {
     pub id: String,
     pub role: NodeRole,
@@ -34,8 +35,10 @@ pub struct NodeState {
     pub id: String,
     // node role
     pub role: NodeRole,
+    // node internal address
+    pub internal_address: String,
     // node external address
-    pub address: String,
+    pub external_address: String,
     // status
     pub status: NodeStatus,
     // timestamp
@@ -47,70 +50,90 @@ pub struct NodeService {
     id: String,
     // node role
     role: NodeRole,
+    // node internal address
+    internal_address: String,
     // node external address
-    address: String,
+    external_address: String,
     // node lease id for ownership of keys
     lease_id: i64,
     // node heartbeat period
     heartbeat_period: Duration,
     // node runtime status
     status: NodeStatus,
-    // etcd register
-    register: Register,
 }
 
 impl NodeService {
-    pub fn new(config: NodeConfig, register: Register, lease_id: i64) -> Self {
+    pub fn new(config: NodeConfig, lease_id: i64) -> Self {
         let id = config.id;
         // environment variable overwrite configuration
         let id = std::env::var(ENV_PIPEBUILDER_NODE_ID).map_or(id, |id| id);
         let role = config.role;
-        let env_external_addr = std::env::var(ENV_PIPEBUILDER_EXTERNAL_ADDR).ok();
-        let config_external_addr = config.external_address;
+        let internal_address = config.internal_address;
+        let env_external_address = std::env::var(ENV_PIPEBUILDER_EXTERNAL_ADDR).ok();
+        let config_external_address = config.external_address;
         // environment variable overwrite configuration
-        let address = match (env_external_addr, config_external_addr) {
-            (Some(external_addr), _) => external_addr,
-            (_, Some(external_addr)) => external_addr,
-            (None, None) => config.internal_address,
+        let external_address = match (env_external_address, config_external_address) {
+            (Some(external_address), _) => external_address,
+            (_, Some(external_address)) => external_address,
+            (None, None) => internal_address.clone(),
         };
         let heartbeat_period = config.heartbeat_period;
         let heartbeat_period = heartbeat_period.unwrap_or(DEFAULT_NODE_HEARTBEAT_PERIOD);
         NodeService {
             id,
             role,
-            address,
+            internal_address,
+            external_address,
             lease_id,
             heartbeat_period: heartbeat_period.into(),
             status: NodeStatus::Active,
-            register,
         }
     }
 
-    fn get_node_state(&self) -> NodeState {
-        let id = self.id.to_owned();
-        let role = self.role.to_owned();
-        let address = self.address.to_owned();
-        let status = self.status.to_owned();
-        let timestamp = Utc::now();
-        NodeState {
-            id,
-            role,
-            address,
-            status,
-            timestamp,
-        }
+    pub fn get_id(&self) -> &String {
+        &self.id
     }
 
-    pub async fn run(&mut self) -> Result<()> {
+    pub fn get_internal_address(&self) -> &String {
+        &self.internal_address
+    }
+
+    pub fn run(&self, mut register: Register) {
         let heartbeat_period = self.heartbeat_period.to_owned();
         let mut interval = tokio::time::interval(heartbeat_period);
-        loop {
-            interval.tick().await;
-            // register or patch local node state
-            let state = self.get_node_state();
-            self.register
-                .put_node_state(REGISTER_KEY_BUILDER_NODE_ID_PREFIX, &state, self.lease_id)
-                .await?;
-        }
+        let id = self.id.to_owned();
+        let role = self.role.to_owned();
+        let internal_address = self.internal_address.to_owned();
+        let external_address = self.external_address.to_owned();
+        let status = self.status.to_owned();
+        let lease_id = self.lease_id;
+        let _ = tokio::spawn(async move {
+            loop {
+                interval.tick().await;
+                // register or patch local node state
+                let timestamp = Utc::now();
+                let state = NodeState {
+                    id: id.clone(),
+                    role: role.clone(),
+                    internal_address: internal_address.clone(),
+                    external_address: external_address.clone(),
+                    status: status.clone(),
+                    timestamp,
+                };
+                match register
+                    .put_node_state(REGISTER_KEY_BUILDER_NODE_ID_PREFIX, &state, lease_id)
+                    .await
+                {
+                    Ok(_) => continue,
+                    Err(e) => {
+                        error!(
+                            "put node state error {:?}, node service stop state patching",
+                            e
+                        );
+                        break;
+                    }
+                }
+            }
+        });
     }
 }

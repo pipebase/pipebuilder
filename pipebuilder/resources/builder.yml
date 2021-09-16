@@ -2,3 +2,7 @@ node:
   id: builder0
   role: Builder
   internal_address: 127.0.0.1:19000
+lease:
+  ttl: 30
+register:
+  endpoints: ["localhost:2379"]

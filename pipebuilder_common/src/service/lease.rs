@@ -1,43 +1,46 @@
-use crate::{Register, Result};
+use crate::Register;
 
 use serde::Deserialize;
 use std::time::Duration;
+use tracing::error;
 
 #[derive(Deserialize)]
 pub struct LeaseConfig {
     // https://etcd.io/docs/v3.5/learning/api/#obtaining-leases
     // ttl in seconds
-    ttl: u64,
+    pub ttl: u64,
 }
 
 pub struct LeaseService {
     lease_id: i64,
     ttl: u64,
-    register: Register,
 }
 
 impl LeaseService {
-    pub async fn new(config: LeaseConfig, mut register: Register) -> Result<Self> {
+    pub fn new(config: LeaseConfig, lease_id: i64) -> Self {
         let ttl = config.ttl;
-        let resp = register.lease_grant(ttl as i64).await?;
-        let lease_id = resp.id();
-        Ok(LeaseService {
-            lease_id,
-            ttl,
-            register,
-        })
+        LeaseService { lease_id, ttl }
     }
 
     pub fn get_lease_id(&self) -> i64 {
         self.lease_id
     }
 
-    pub async fn run(&mut self) -> Result<()> {
+    pub fn run(&self, mut register: Register) {
         // refresh every ttl / 2 second
         let mut refresh_interval = tokio::time::interval(Duration::from_secs(self.ttl / 2));
-        loop {
-            refresh_interval.tick().await;
-            self.register.lease_keep_alive(self.lease_id).await?;
-        }
+        let lease_id = self.lease_id;
+        let _ = tokio::spawn(async move {
+            loop {
+                refresh_interval.tick().await;
+                match register.lease_keep_alive(lease_id).await {
+                    Ok(_) => continue,
+                    Err(e) => {
+                        error!("lease keep alive error {:?}, stop lease renew", e);
+                        break;
+                    }
+                }
+            }
+        });
     }
 }
