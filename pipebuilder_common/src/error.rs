@@ -17,6 +17,8 @@ pub enum ErrorImpl {
     Etcd(#[from] etcd_client::Error),
     #[error("io exception")]
     Io(#[from] io::Error),
+    #[error("json exception")]
+    Json(#[from] serde_json::Error),
     #[error("tonic transport exception")]
     TonicTransport(#[from] tonic::transport::Error),
     #[error("yaml exception")]
@@ -26,6 +28,12 @@ pub enum ErrorImpl {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Error(Box::new(ErrorImpl::Io(err)))
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
+        Error(Box::new(ErrorImpl::Json(err)))
     }
 }
 

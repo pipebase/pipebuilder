@@ -1,8 +1,8 @@
-use pipebuilder_common::{NodeConfig, RegistryConfig};
+use pipebuilder_common::{NodeConfig, RegisterConfig};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct Config {
     pub node: NodeConfig,
-    // pub registry: RegistryConfig,
+    pub register: RegisterConfig,
 }

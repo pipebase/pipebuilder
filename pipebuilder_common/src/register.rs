@@ -1,5 +1,5 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
-use crate::{read_file, Result};
+use crate::{read_file, NodeState, Result};
 use etcd_client::{
     Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, LeaseGrantResponse,
     PutOptions, PutResponse, TlsOptions,
@@ -100,29 +100,29 @@ impl ConnectConfig {
 
 // etcd client config
 #[derive(Deserialize)]
-pub struct RegistryConfig {
+pub struct RegisterConfig {
     // etcd endpoints
     pub endpoints: Vec<String>,
     pub connect: Option<ConnectConfig>,
 }
 
-impl RegistryConfig {
-    pub async fn into_registry(self) -> Result<Registry> {
+impl RegisterConfig {
+    pub async fn into_register(self) -> Result<Register> {
         let connect_opts: Option<ConnectOptions> = match self.connect {
             Some(connect) => Some(connect.into_connect_opts()?),
             None => None,
         };
         let client = Client::connect(self.endpoints, connect_opts).await?;
-        Ok(Registry { client })
+        Ok(Register { client })
     }
 }
 
 #[derive(Clone)]
-pub struct Registry {
+pub struct Register {
     client: Client,
 }
 
-impl Registry {
+impl Register {
     pub async fn put<K, V>(
         &mut self,
         key: K,
@@ -157,5 +157,19 @@ impl Registry {
             info!("lease {:?} keep alive, new ttl {:?}", resp.id(), resp.ttl());
         }
         Ok(())
+    }
+
+    pub async fn put_node_state(
+        &mut self,
+        prefix: &str,
+        state: &NodeState,
+        lease_id: i64,
+    ) -> Result<PutResponse> {
+        let id = &state.id;
+        let value = serde_json::to_vec(state)?;
+        let opts = PutOptions::new().with_lease(lease_id);
+        let key = format!("{}/{}", prefix, id);
+        let resp = self.put(key, value, opts.into()).await?;
+        Ok(resp)
     }
 }
