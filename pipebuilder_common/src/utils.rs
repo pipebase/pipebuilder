@@ -46,3 +46,16 @@ pub fn log_event(event: &Event) -> Result<()> {
     }
     Ok(())
 }
+
+pub fn deserialize_event<T>(event: &Event) -> Result<Option<(EventType, String, T)>> 
+where
+    T: DeserializeOwned
+{
+    if let Some(kv) = event.kv() {
+        let key = kv.key_str()?;
+        let value = kv.value();
+        let value = serde_json::from_slice::<T>(value)?;
+        return Ok(Some((event.event_type(), key.to_owned(), value)))
+    }
+    Ok(None)
+}

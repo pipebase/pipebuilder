@@ -18,4 +18,4 @@ pub use service::*;
 pub use time::*;
 pub use utils::*;
 
-pub use etcd_client::{EventType, WatchStream};
+// pub use etcd_client::WatchStream;
