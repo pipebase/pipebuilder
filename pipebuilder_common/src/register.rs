@@ -1,8 +1,8 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
-use crate::{read_file, NodeState, Result};
+use crate::{read_file, NodeState, Result, REGISTER_KEY_BUILDER_NODE_KEY_PREFIX};
 use etcd_client::{
     Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, LeaseGrantResponse,
-    PutOptions, PutResponse, TlsOptions,
+    PutOptions, PutResponse, TlsOptions, WatchOptions, WatchStream, Watcher,
 };
 use serde::Deserialize;
 use tracing::info;
@@ -169,5 +169,24 @@ impl Register {
         let key = format!("{}/{}", prefix, id);
         let resp = self.put(key, value, opts.into()).await?;
         Ok(resp)
+    }
+
+    pub async fn watch(
+        &mut self,
+        key: &str,
+        options: Option<WatchOptions>,
+    ) -> Result<(Watcher, WatchStream)> {
+        let (watcher, stream) = self.client.watch(key, options).await?;
+        Ok((watcher, stream))
+    }
+
+    pub async fn watch_prefix(&mut self, prefix: &str) -> Result<(Watcher, WatchStream)> {
+        let opts = WatchOptions::new().with_prefix();
+        self.watch(prefix, opts.into()).await
+    }
+
+    pub async fn watch_builders(&mut self) -> Result<(Watcher, WatchStream)> {
+        self.watch_prefix(REGISTER_KEY_BUILDER_NODE_KEY_PREFIX)
+            .await
     }
 }
