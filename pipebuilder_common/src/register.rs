@@ -1,5 +1,5 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
-use crate::{read_file, NodeState, Result, REGISTER_KEY_BUILDER_NODE_KEY_PREFIX};
+use crate::{read_file, NodeState, Result, REGISTER_KEY_PREFIX_BUILDER};
 use etcd_client::{
     Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, LeaseGrantResponse,
     PutOptions, PutResponse, TlsOptions, WatchOptions, WatchStream, Watcher,
@@ -186,7 +186,6 @@ impl Register {
     }
 
     pub async fn watch_builders(&mut self) -> Result<(Watcher, WatchStream)> {
-        self.watch_prefix(REGISTER_KEY_BUILDER_NODE_KEY_PREFIX)
-            .await
+        self.watch_prefix(REGISTER_KEY_PREFIX_BUILDER).await
     }
 }

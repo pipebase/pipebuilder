@@ -1,14 +1,16 @@
-use pipebuilder_common::{EventType, Register, Result, WatchStream};
+use pipebuilder_common::{Register, Result, WatchStream, log_event};
 use tracing::{error, info};
+
+use crate::config::SchedulerConfig;
 
 pub struct SchedulerService {}
 
 impl SchedulerService {
-    pub fn new() -> Self {
+    pub fn new(_config: SchedulerConfig) -> Self {
         SchedulerService {}
     }
 
-    pub async fn run(&self, mut register: Register) {
+    pub fn run(&self, mut register: Register) {
         let _ = tokio::spawn(async move {
             let (watcher, stream) = match register.watch_builders().await {
                 Ok((watcher, stream)) => (watcher, stream),
@@ -33,18 +35,7 @@ impl SchedulerService {
     async fn watch(mut stream: WatchStream) -> Result<()> {
         while let Some(resp) = stream.message().await? {
             for event in resp.events() {
-                if let Some(kv) = event.kv() {
-                    let event = match event.event_type() {
-                        EventType::Delete => "delete",
-                        EventType::Put => "out",
-                    };
-                    info!(
-                        "event: {}, kv: {{{}: {}}}",
-                        event,
-                        kv.key_str()?,
-                        kv.value_str()?
-                    )
-                }
+                log_event(event)?;
             }
         }
         Ok(())

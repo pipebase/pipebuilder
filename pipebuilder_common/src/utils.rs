@@ -1,7 +1,9 @@
 use crate::Result;
+use etcd_client::{Event, EventType};
 use serde::de::DeserializeOwned;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use tracing::info;
 
 pub fn open_file<P>(path: P) -> Result<File>
 where
@@ -28,4 +30,19 @@ where
 {
     let config = serde_yaml::from_reader::<std::fs::File, C>(file)?;
     Ok(config)
+}
+
+pub fn log_event(event: &Event) -> Result<()> {
+    if let Some(kv) = event.kv() {
+        let event = match event.event_type() {
+            EventType::Delete => "delete",
+            EventType::Put => "put",
+        };
+        info!(
+            "[event] type: {}, key: {}",
+            event,
+            kv.key_str()?,
+        );
+    }
+    Ok(())
 }

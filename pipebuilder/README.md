@@ -4,6 +4,10 @@ builder
 ```sh
 RUST_LOG=info PIPEBUILDER_CONFIG_FILE=resources/builder.yml cargo run --bin builder
 ```
+scheduler
+```sh
+RUST_LOG=info PIPEBUILDER_CONFIG_FILE=resources/scheduler.yml cargo run --bin scheduler
+```
 ### Endpoints
 health
 ```sh

@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
     info!("read configuration ...");
     let file = open_file(std::env::var(ENV_PIPEBUILDER_CONFIG_FILE)?)?;
     let config = parse_config::<Config>(file)?;
-    let (node_svc, health_svc) = bootstrap(config.base).await?;
+    let (_, node_svc, health_svc) = bootstrap(config.base).await?;
 
     let node_id = node_svc.get_id().to_owned();
     let internal_address = node_svc.get_internal_address().to_owned();
