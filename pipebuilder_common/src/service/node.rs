@@ -1,6 +1,7 @@
 use crate::{
     Period, Register, DEFAULT_NODE_HEARTBEAT_PERIOD, ENV_PIPEBUILDER_EXTERNAL_ADDR,
-    ENV_PIPEBUILDER_NODE_ID, REGISTER_KEY_BUILDER_NODE_ID_PREFIX,
+    ENV_PIPEBUILDER_NODE_ID, REGISTER_KEY_API_NODE_ID_PREFIX, REGISTER_KEY_BUILDER_NODE_ID_PREFIX,
+    REGISTER_KEY_SCHEDULER_NODE_ID_PREFIX,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,14 @@ pub enum NodeRole {
     Api,
     Builder,
     Scheduler,
+}
+
+pub fn role_prefix(role: NodeRole) -> &'static str {
+    match role {
+        NodeRole::Api => REGISTER_KEY_API_NODE_ID_PREFIX,
+        NodeRole::Builder => REGISTER_KEY_BUILDER_NODE_ID_PREFIX,
+        NodeRole::Scheduler => REGISTER_KEY_SCHEDULER_NODE_ID_PREFIX,
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -121,7 +130,7 @@ impl NodeService {
                     timestamp,
                 };
                 match register
-                    .put_node_state(REGISTER_KEY_BUILDER_NODE_ID_PREFIX, &state, lease_id)
+                    .put_node_state(role_prefix(role.clone()), &state, lease_id)
                     .await
                 {
                     Ok(_) => continue,

@@ -106,23 +106,21 @@ pub struct RegisterConfig {
     pub connect: Option<ConnectConfig>,
 }
 
-impl RegisterConfig {
-    pub async fn into_register(self) -> Result<Register> {
-        let connect_opts: Option<ConnectOptions> = match self.connect {
-            Some(connect) => Some(connect.into_connect_opts()?),
-            None => None,
-        };
-        let client = Client::connect(self.endpoints, connect_opts).await?;
-        Ok(Register { client })
-    }
-}
-
 #[derive(Clone)]
 pub struct Register {
     client: Client,
 }
 
 impl Register {
+    pub async fn new(config: RegisterConfig) -> Result<Register> {
+        let connect_opts: Option<ConnectOptions> = match config.connect {
+            Some(connect) => Some(connect.into_connect_opts()?),
+            None => None,
+        };
+        let client = Client::connect(config.endpoints, connect_opts).await?;
+        Ok(Register { client })
+    }
+
     pub async fn put<K, V>(
         &mut self,
         key: K,

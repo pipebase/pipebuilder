@@ -5,12 +5,16 @@ authors = ["Li Yu <li.yu.sh0211@gmail.com>"]
 edition = "2018"
 
 [[bin]]
-name = "builder"
-path = "src/builder/server.rs"
+name = "api"
+path = "src/api/app.rs"
 
 [[bin]]
-name = "api"
-path = "src/api/server.rs"
+name = "builder"
+path = "src/builder/app.rs"
+
+[[bin]]
+name = "scheduler"
+path = "src/scheduler/app.rs"
 
 [dependencies]
 chrono = { version = "0.4" }

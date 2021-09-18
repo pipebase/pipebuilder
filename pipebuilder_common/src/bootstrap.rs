@@ -1,11 +1,10 @@
-use crate::Config;
-use pipebuilder_common::{
-    health::health_server::HealthServer, HealthService, LeaseConfig, LeaseService, NodeConfig,
-    NodeService, Register, RegisterConfig, Result,
+use crate::{
+    health::health_server::HealthServer, BaseConfig, HealthService, LeaseConfig, LeaseService,
+    NodeConfig, NodeService, Register, RegisterConfig, Result,
 };
 
 pub async fn build_register(config: RegisterConfig) -> Result<Register> {
-    config.into_register().await
+    Register::new(config).await
 }
 
 pub fn build_lease_service(config: LeaseConfig, lease_id: i64) -> LeaseService {
@@ -16,7 +15,7 @@ pub fn build_node_service(config: NodeConfig, lease_id: i64) -> NodeService {
     NodeService::new(config, lease_id)
 }
 
-pub async fn bootstrap(config: Config) -> Result<(NodeService, HealthServer<HealthService>)> {
+pub async fn bootstrap(config: BaseConfig) -> Result<(NodeService, HealthServer<HealthService>)> {
     // build register
     let mut register = build_register(config.register).await?;
     // lease grant
