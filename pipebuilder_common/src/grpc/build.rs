@@ -11,14 +11,14 @@ pub struct BuildResponse {
     pub version: i64,
 }
 #[doc = r" Generated client implementations."]
-pub mod api_client {
+pub mod builder_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     #[derive(Debug, Clone)]
-    pub struct ApiClient<T> {
+    pub struct BuilderClient<T> {
         inner: tonic::client::Grpc<T>,
     }
-    impl ApiClient<tonic::transport::Channel> {
+    impl BuilderClient<tonic::transport::Channel> {
         #[doc = r" Attempt to create a new client by connecting to a given endpoint."]
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
@@ -29,7 +29,7 @@ pub mod api_client {
             Ok(Self::new(conn))
         }
     }
-    impl<T> ApiClient<T>
+    impl<T> BuilderClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::ResponseBody: Body + Send + Sync + 'static,
@@ -40,7 +40,10 @@ pub mod api_client {
             let inner = tonic::client::Grpc::new(inner);
             Self { inner }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> ApiClient<InterceptedService<T, F>>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> BuilderClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
             T: tonic::codegen::Service<
@@ -52,7 +55,7 @@ pub mod api_client {
             <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
                 Into<StdError> + Send + Sync,
         {
-            ApiClient::new(InterceptedService::new(inner, interceptor))
+            BuilderClient::new(InterceptedService::new(inner, interceptor))
         }
         #[doc = r" Compress requests with `gzip`."]
         #[doc = r""]
@@ -78,31 +81,31 @@ pub mod api_client {
                 )
             })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/api.Api/Build");
+            let path = http::uri::PathAndQuery::from_static("/build.Builder/Build");
             self.inner.unary(request.into_request(), path, codec).await
         }
     }
 }
 #[doc = r" Generated server implementations."]
-pub mod api_server {
+pub mod builder_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "Generated trait containing gRPC methods that should be implemented for use with ApiServer."]
+    #[doc = "Generated trait containing gRPC methods that should be implemented for use with BuilderServer."]
     #[async_trait]
-    pub trait Api: Send + Sync + 'static {
+    pub trait Builder: Send + Sync + 'static {
         async fn build(
             &self,
             request: tonic::Request<super::BuildRequest>,
         ) -> Result<tonic::Response<super::BuildResponse>, tonic::Status>;
     }
     #[derive(Debug)]
-    pub struct ApiServer<T: Api> {
+    pub struct BuilderServer<T: Builder> {
         inner: _Inner<T>,
         accept_compression_encodings: (),
         send_compression_encodings: (),
     }
     struct _Inner<T>(Arc<T>);
-    impl<T: Api> ApiServer<T> {
+    impl<T: Builder> BuilderServer<T> {
         pub fn new(inner: T) -> Self {
             let inner = Arc::new(inner);
             let inner = _Inner(inner);
@@ -119,9 +122,9 @@ pub mod api_server {
             InterceptedService::new(Self::new(inner), interceptor)
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for ApiServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for BuilderServer<T>
     where
-        T: Api,
+        T: Builder,
         B: Body + Send + Sync + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
@@ -134,10 +137,10 @@ pub mod api_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/api.Api/Build" => {
+                "/build.Builder/Build" => {
                     #[allow(non_camel_case_types)]
-                    struct BuildSvc<T: Api>(pub Arc<T>);
-                    impl<T: Api> tonic::server::UnaryService<super::BuildRequest> for BuildSvc<T> {
+                    struct BuildSvc<T: Builder>(pub Arc<T>);
+                    impl<T: Builder> tonic::server::UnaryService<super::BuildRequest> for BuildSvc<T> {
                         type Response = super::BuildResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
@@ -176,7 +179,7 @@ pub mod api_server {
             }
         }
     }
-    impl<T: Api> Clone for ApiServer<T> {
+    impl<T: Builder> Clone for BuilderServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -186,7 +189,7 @@ pub mod api_server {
             }
         }
     }
-    impl<T: Api> Clone for _Inner<T> {
+    impl<T: Builder> Clone for _Inner<T> {
         fn clone(&self) -> Self {
             Self(self.0.clone())
         }
@@ -196,7 +199,7 @@ pub mod api_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: Api> tonic::transport::NamedService for ApiServer<T> {
-        const NAME: &'static str = "api.Api";
+    impl<T: Builder> tonic::transport::NamedService for BuilderServer<T> {
+        const NAME: &'static str = "build.Builder";
     }
 }

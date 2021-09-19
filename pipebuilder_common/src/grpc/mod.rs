@@ -1,3 +1,4 @@
 pub mod api;
-pub mod builder;
+pub mod build;
 pub mod health;
+pub mod schedule;

@@ -1,5 +1,5 @@
 syntax = "proto3";
-package api;
+package build;
 
 message BuildRequest {
     // manifest file url
@@ -11,6 +11,6 @@ message BuildResponse {
     int64 version = 1;
 }
 
-service Api {
+service Builder {
     rpc Build(BuildRequest) returns (BuildResponse) {}
 }

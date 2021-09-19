@@ -1,0 +1,17 @@
+syntax = "proto3";
+package schedule;
+
+message ScheduleRequest {}
+
+message BuilderInfo {
+    string builder_id = 1;
+    string builder_addr = 2;
+}
+
+message ScheduleResponse {
+    optional BuilderInfo builder_info = 1;
+}
+
+service Scheduler {
+    rpc Schedule(ScheduleRequest) returns (ScheduleResponse) {}
+}

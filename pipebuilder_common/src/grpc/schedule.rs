@@ -1,24 +1,26 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BuildRequest {
-    /// manifest file url
+pub struct ScheduleRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct BuilderInfo {
     #[prost(string, tag = "1")]
-    pub manifest_url: ::prost::alloc::string::String,
+    pub builder_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub builder_addr: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BuildResponse {
-    /// version: patch number
-    #[prost(int64, tag = "1")]
-    pub version: i64,
+pub struct ScheduleResponse {
+    #[prost(message, optional, tag = "1")]
+    pub builder_info: ::core::option::Option<BuilderInfo>,
 }
 #[doc = r" Generated client implementations."]
-pub mod api_client {
+pub mod scheduler_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     #[derive(Debug, Clone)]
-    pub struct ApiClient<T> {
+    pub struct SchedulerClient<T> {
         inner: tonic::client::Grpc<T>,
     }
-    impl ApiClient<tonic::transport::Channel> {
+    impl SchedulerClient<tonic::transport::Channel> {
         #[doc = r" Attempt to create a new client by connecting to a given endpoint."]
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
@@ -29,7 +31,7 @@ pub mod api_client {
             Ok(Self::new(conn))
         }
     }
-    impl<T> ApiClient<T>
+    impl<T> SchedulerClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::ResponseBody: Body + Send + Sync + 'static,
@@ -40,7 +42,10 @@ pub mod api_client {
             let inner = tonic::client::Grpc::new(inner);
             Self { inner }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> ApiClient<InterceptedService<T, F>>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> SchedulerClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
             T: tonic::codegen::Service<
@@ -52,7 +57,7 @@ pub mod api_client {
             <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
                 Into<StdError> + Send + Sync,
         {
-            ApiClient::new(InterceptedService::new(inner, interceptor))
+            SchedulerClient::new(InterceptedService::new(inner, interceptor))
         }
         #[doc = r" Compress requests with `gzip`."]
         #[doc = r""]
@@ -67,10 +72,10 @@ pub mod api_client {
             self.inner = self.inner.accept_gzip();
             self
         }
-        pub async fn build(
+        pub async fn schedule(
             &mut self,
-            request: impl tonic::IntoRequest<super::BuildRequest>,
-        ) -> Result<tonic::Response<super::BuildResponse>, tonic::Status> {
+            request: impl tonic::IntoRequest<super::ScheduleRequest>,
+        ) -> Result<tonic::Response<super::ScheduleResponse>, tonic::Status> {
             self.inner.ready().await.map_err(|e| {
                 tonic::Status::new(
                     tonic::Code::Unknown,
@@ -78,31 +83,31 @@ pub mod api_client {
                 )
             })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/api.Api/Build");
+            let path = http::uri::PathAndQuery::from_static("/schedule.Scheduler/Schedule");
             self.inner.unary(request.into_request(), path, codec).await
         }
     }
 }
 #[doc = r" Generated server implementations."]
-pub mod api_server {
+pub mod scheduler_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "Generated trait containing gRPC methods that should be implemented for use with ApiServer."]
+    #[doc = "Generated trait containing gRPC methods that should be implemented for use with SchedulerServer."]
     #[async_trait]
-    pub trait Api: Send + Sync + 'static {
-        async fn build(
+    pub trait Scheduler: Send + Sync + 'static {
+        async fn schedule(
             &self,
-            request: tonic::Request<super::BuildRequest>,
-        ) -> Result<tonic::Response<super::BuildResponse>, tonic::Status>;
+            request: tonic::Request<super::ScheduleRequest>,
+        ) -> Result<tonic::Response<super::ScheduleResponse>, tonic::Status>;
     }
     #[derive(Debug)]
-    pub struct ApiServer<T: Api> {
+    pub struct SchedulerServer<T: Scheduler> {
         inner: _Inner<T>,
         accept_compression_encodings: (),
         send_compression_encodings: (),
     }
     struct _Inner<T>(Arc<T>);
-    impl<T: Api> ApiServer<T> {
+    impl<T: Scheduler> SchedulerServer<T> {
         pub fn new(inner: T) -> Self {
             let inner = Arc::new(inner);
             let inner = _Inner(inner);
@@ -119,9 +124,9 @@ pub mod api_server {
             InterceptedService::new(Self::new(inner), interceptor)
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for ApiServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for SchedulerServer<T>
     where
-        T: Api,
+        T: Scheduler,
         B: Body + Send + Sync + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
@@ -134,18 +139,18 @@ pub mod api_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/api.Api/Build" => {
+                "/schedule.Scheduler/Schedule" => {
                     #[allow(non_camel_case_types)]
-                    struct BuildSvc<T: Api>(pub Arc<T>);
-                    impl<T: Api> tonic::server::UnaryService<super::BuildRequest> for BuildSvc<T> {
-                        type Response = super::BuildResponse;
+                    struct ScheduleSvc<T: Scheduler>(pub Arc<T>);
+                    impl<T: Scheduler> tonic::server::UnaryService<super::ScheduleRequest> for ScheduleSvc<T> {
+                        type Response = super::ScheduleResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::BuildRequest>,
+                            request: tonic::Request<super::ScheduleRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).build(request).await };
+                            let fut = async move { (*inner).schedule(request).await };
                             Box::pin(fut)
                         }
                     }
@@ -154,7 +159,7 @@ pub mod api_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = BuildSvc(inner);
+                        let method = ScheduleSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
                             accept_compression_encodings,
@@ -176,7 +181,7 @@ pub mod api_server {
             }
         }
     }
-    impl<T: Api> Clone for ApiServer<T> {
+    impl<T: Scheduler> Clone for SchedulerServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -186,7 +191,7 @@ pub mod api_server {
             }
         }
     }
-    impl<T: Api> Clone for _Inner<T> {
+    impl<T: Scheduler> Clone for _Inner<T> {
         fn clone(&self) -> Self {
             Self(self.0.clone())
         }
@@ -196,7 +201,7 @@ pub mod api_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: Api> tonic::transport::NamedService for ApiServer<T> {
-        const NAME: &'static str = "api.Api";
+    impl<T: Scheduler> tonic::transport::NamedService for SchedulerServer<T> {
+        const NAME: &'static str = "schedule.Scheduler";
     }
 }
