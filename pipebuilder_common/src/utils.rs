@@ -38,24 +38,20 @@ pub fn log_event(event: &Event) -> Result<()> {
             EventType::Delete => "delete",
             EventType::Put => "put",
         };
-        info!(
-            "[event] type: {}, key: {}",
-            event,
-            kv.key_str()?,
-        );
+        info!("[event] type: {}, key: {}", event, kv.key_str()?,);
     }
     Ok(())
 }
 
-pub fn deserialize_event<T>(event: &Event) -> Result<Option<(EventType, String, T)>> 
+pub fn deserialize_event<T>(event: &Event) -> Result<Option<(EventType, String, T)>>
 where
-    T: DeserializeOwned
+    T: DeserializeOwned,
 {
     if let Some(kv) = event.kv() {
         let key = kv.key_str()?;
         let value = kv.value();
         let value = serde_json::from_slice::<T>(value)?;
-        return Ok(Some((event.event_type(), key.to_owned(), value)))
+        return Ok(Some((event.event_type(), key.to_owned(), value)));
     }
     Ok(None)
 }

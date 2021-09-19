@@ -1,6 +1,6 @@
 use crate::{
-    health::health_server::HealthServer, BaseConfig, HealthService, LeaseConfig, LeaseService,
-    NodeConfig, NodeService, Register, RegisterConfig, Result,
+    grpc::health::health_server::HealthServer, BaseConfig, HealthService, LeaseConfig,
+    LeaseService, NodeConfig, NodeService, Register, RegisterConfig, Result,
 };
 use tracing::info;
 
@@ -18,7 +18,12 @@ pub fn build_node_service(config: NodeConfig, lease_id: i64) -> NodeService {
 
 pub async fn bootstrap(
     config: BaseConfig,
-) -> Result<(Register, NodeService, HealthServer<HealthService>)> {
+) -> Result<(
+    Register,
+    NodeService,
+    HealthServer<HealthService>,
+    LeaseService,
+)> {
     info!("bootstrap base service");
     // build register
     let mut register = build_register(config.register).await?;
@@ -34,5 +39,5 @@ pub async fn bootstrap(
     node_svc.run(register.clone());
     let health_svc = HealthServer::new(HealthService::default());
     // run svc
-    Ok((register, node_svc, health_svc))
+    Ok((register, node_svc, health_svc, lease_svc))
 }

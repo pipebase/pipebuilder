@@ -8,7 +8,7 @@ message BuildRequest {
 
 message BuildResponse {
     // version: patch number
-    int64 version = 1;
+    uint64 version = 1;
 }
 
 service Builder {

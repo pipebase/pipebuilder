@@ -7,8 +7,8 @@ pub struct BuildRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BuildResponse {
     /// version: patch number
-    #[prost(int64, tag = "1")]
-    pub version: i64,
+    #[prost(uint64, tag = "1")]
+    pub version: u64,
 }
 #[doc = r" Generated client implementations."]
 pub mod builder_client {
