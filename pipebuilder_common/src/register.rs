@@ -1,8 +1,10 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
-    read_file, BuildSnapshot, NodeState, Result, REGISTER_KEY_PREFIX_BUILDER,
-    REGISTER_KEY_PREFIX_MANIFEST_URL,
+    read_file, BuildSnapshot, BuildStatus, NodeState, Result, VersionBuild,
+    REGISTER_KEY_PREFIX_BUILDER, REGISTER_KEY_PREFIX_MANIFEST_URL,
+    REGISTER_KEY_PREFIX_VERSION_BUILD,
 };
+use chrono::Utc;
 use etcd_client::{
     Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, LeaseGrantResponse,
     LockOptions, LockResponse, PutOptions, PutResponse, TlsOptions, WatchOptions, WatchStream,
@@ -205,10 +207,13 @@ impl Register {
         Ok(())
     }
 
-    async fn do_incr_build_snapshot(&mut self, manifest_url: &str) -> Result<BuildSnapshot> {
+    async fn do_incr_build_snapshot(
+        &mut self,
+        manifest_url: &str,
+    ) -> Result<(PutResponse, BuildSnapshot)> {
         // get current snapshot and incr version
-        let manifest_key = format!("{}/{}", REGISTER_KEY_PREFIX_MANIFEST_URL, manifest_url);
-        let get_resp = self.get(manifest_key.clone(), None).await?;
+        let key = format!("{}/{}", REGISTER_KEY_PREFIX_MANIFEST_URL, manifest_url);
+        let get_resp = self.get(key.clone(), None).await?;
         let new_snapshot = match get_resp.kvs().first() {
             Some(kv) => {
                 let mut snapshot = serde_json::from_slice::<BuildSnapshot>(kv.value())?;
@@ -217,21 +222,50 @@ impl Register {
             }
             None => BuildSnapshot::new(),
         };
-        let new_snapshot_bytes = serde_json::to_vec(&new_snapshot)?;
-        self.put(manifest_key, new_snapshot_bytes, None).await?;
-        Ok(new_snapshot)
+        let value = serde_json::to_vec(&new_snapshot)?;
+        let resp = self.put(key, value, None).await?;
+        Ok((resp, new_snapshot))
     }
 
     pub async fn incr_build_snapshot(
         &mut self,
         manifest_url: &str,
         lease_id: i64,
-    ) -> Result<BuildSnapshot> {
+    ) -> Result<(PutResponse, BuildSnapshot)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
         let lock_resp = self.lock(manifest_url, lock_options.into()).await?;
         let key = lock_resp.key();
-        let result = self.do_incr_build_snapshot(manifest_url).await;
+        let resp = self.do_incr_build_snapshot(manifest_url).await;
         self.unlock(manifest_url, key).await?;
-        result
+        resp
+    }
+
+    pub async fn do_put_version_build_state(
+        &mut self,
+        id: &str,
+        version: u64,
+        status: BuildStatus,
+    ) -> Result<(PutResponse, VersionBuild)> {
+        let key = format!("{}/{}/{}", REGISTER_KEY_PREFIX_VERSION_BUILD, id, version);
+        let now = Utc::now();
+        let state = VersionBuild::new(status, now);
+        let value = serde_json::to_vec(&state)?;
+        let resp = self.put(key, value, None).await?;
+        Ok((resp, state))
+    }
+
+    pub async fn put_version_build_state(
+        &mut self,
+        id: &str,
+        version: u64,
+        status: BuildStatus,
+        lease_id: i64,
+    ) -> Result<(PutResponse, VersionBuild)> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_resp = self.lock(id, lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_put_version_build_state(id, version, status).await;
+        self.unlock(id, key).await?;
+        resp
     }
 }

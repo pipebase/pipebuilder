@@ -1,6 +1,6 @@
 use pipebuilder_common::{
     grpc::build::{builder_server::Builder, BuildRequest, BuildResponse},
-    Register, VersionBuild, VersionBuildStatus,
+    BuildStatus, Register, VersionBuild,
 };
 use tonic::Response;
 
@@ -18,6 +18,6 @@ impl Builder for BuilderService {
     {
         // lock build snapshot with manifest url
         // update latest version, trigger version build
-        Ok(Response::new(BuildResponse { version: 0 }))
+        Ok(Response::new(BuildResponse {}))
     }
 }

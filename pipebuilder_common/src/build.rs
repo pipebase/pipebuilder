@@ -1,8 +1,9 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
-pub enum VersionBuildStatus {
+pub enum BuildStatus {
     // register version build
     Create,
     // pull manifest
@@ -27,7 +28,16 @@ pub enum VersionBuildStatus {
 // Build state per (build_id, version)
 #[derive(Deserialize, Serialize)]
 pub struct VersionBuild {
-    pub status: VersionBuildStatus,
+    // build status
+    pub status: BuildStatus,
+    // timestamp
+    pub timestamp: DateTime<Utc>,
+}
+
+impl VersionBuild {
+    pub fn new(status: BuildStatus, timestamp: DateTime<Utc>) -> Self {
+        VersionBuild { status, timestamp }
+    }
 }
 
 // Latest build state per manifest url
