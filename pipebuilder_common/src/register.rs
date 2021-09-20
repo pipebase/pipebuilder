@@ -1,8 +1,12 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
-use crate::{read_file, NodeState, Result, REGISTER_KEY_PREFIX_BUILDER};
+use crate::{
+    read_file, BuildSnapshot, NodeState, Result, REGISTER_KEY_PREFIX_BUILDER,
+    REGISTER_KEY_PREFIX_MANIFEST_URL,
+};
 use etcd_client::{
     Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, LeaseGrantResponse,
-    PutOptions, PutResponse, TlsOptions, WatchOptions, WatchStream, Watcher,
+    LockOptions, LockResponse, PutOptions, PutResponse, TlsOptions, WatchOptions, WatchStream,
+    Watcher,
 };
 use serde::Deserialize;
 use tracing::info;
@@ -187,5 +191,47 @@ impl Register {
 
     pub async fn watch_builders(&mut self) -> Result<(Watcher, WatchStream)> {
         self.watch_prefix(REGISTER_KEY_PREFIX_BUILDER).await
+    }
+
+    pub async fn lock(&mut self, name: &str, options: Option<LockOptions>) -> Result<LockResponse> {
+        info!("acquire lock, name {} ...", name);
+        let resp = self.client.lock(name, options).await?;
+        Ok(resp)
+    }
+
+    pub async fn unlock(&mut self, name: &str, key: &[u8]) -> Result<()> {
+        self.client.unlock(key).await?;
+        info!("released lock, name {} ...", name);
+        Ok(())
+    }
+
+    async fn do_incr_build_snapshot(&mut self, manifest_url: &str) -> Result<BuildSnapshot> {
+        // get current snapshot and incr version
+        let manifest_key = format!("{}/{}", REGISTER_KEY_PREFIX_MANIFEST_URL, manifest_url);
+        let get_resp = self.get(manifest_key.clone(), None).await?;
+        let new_snapshot = match get_resp.kvs().first() {
+            Some(kv) => {
+                let mut snapshot = serde_json::from_slice::<BuildSnapshot>(kv.value())?;
+                snapshot.latest_version += 1;
+                snapshot
+            }
+            None => BuildSnapshot::new(),
+        };
+        let new_snapshot_bytes = serde_json::to_vec(&new_snapshot)?;
+        self.put(manifest_key, new_snapshot_bytes, None).await?;
+        Ok(new_snapshot)
+    }
+
+    pub async fn incr_build_snapshot(
+        &mut self,
+        manifest_url: &str,
+        lease_id: i64,
+    ) -> Result<BuildSnapshot> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_resp = self.lock(manifest_url, lock_options.into()).await?;
+        let key = lock_resp.key();
+        let result = self.do_incr_build_snapshot(manifest_url).await;
+        self.unlock(manifest_url, key).await?;
+        result
     }
 }

@@ -1,6 +1,7 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub enum VersionBuildStatus {
     // register version build
     Create,
@@ -24,21 +25,30 @@ pub enum VersionBuildStatus {
 }
 
 // Build state per (build_id, version)
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct VersionBuild {
     pub status: VersionBuildStatus,
 }
 
 // Latest build state per manifest url
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct BuildSnapshot {
-    pub id: String,
+    pub id: Uuid,
     pub latest_version: u64,
+}
+
+impl BuildSnapshot {
+    pub fn new() -> Self {
+        BuildSnapshot {
+            id: Uuid::new_v4(),
+            latest_version: 0,
+        }
+    }
 }
 
 // A build task
 pub struct Build {
     pub manifest_url: String,
-    pub id: String,
+    pub id: Uuid,
     pub version: u64,
 }
