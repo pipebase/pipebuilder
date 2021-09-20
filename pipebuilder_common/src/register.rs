@@ -245,10 +245,11 @@ impl Register {
         id: &str,
         version: u64,
         status: BuildStatus,
+        message: Option<String>,
     ) -> Result<(PutResponse, VersionBuild)> {
         let key = format!("{}/{}/{}", REGISTER_KEY_PREFIX_VERSION_BUILD, id, version);
         let now = Utc::now();
-        let state = VersionBuild::new(status, now);
+        let state = VersionBuild::new(status, now, message);
         let value = serde_json::to_vec(&state)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, state))
@@ -256,15 +257,18 @@ impl Register {
 
     pub async fn put_version_build_state(
         &mut self,
+        lease_id: i64,
         id: &str,
         version: u64,
         status: BuildStatus,
-        lease_id: i64,
+        message: Option<String>,
     ) -> Result<(PutResponse, VersionBuild)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
         let lock_resp = self.lock(id, lock_options.into()).await?;
         let key = lock_resp.key();
-        let resp = self.do_put_version_build_state(id, version, status).await;
+        let resp = self
+            .do_put_version_build_state(id, version, status, message)
+            .await;
         self.unlock(id, key).await?;
         resp
     }

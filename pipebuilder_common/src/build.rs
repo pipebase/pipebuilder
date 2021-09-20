@@ -21,6 +21,8 @@ pub enum BuildStatus {
     Store,
     // publish app binary
     Publish,
+    // succeed all steps
+    Done,
     // build failed
     Fail,
 }
@@ -32,11 +34,17 @@ pub struct VersionBuild {
     pub status: BuildStatus,
     // timestamp
     pub timestamp: DateTime<Utc>,
+    // message
+    pub message: Option<String>,
 }
 
 impl VersionBuild {
-    pub fn new(status: BuildStatus, timestamp: DateTime<Utc>) -> Self {
-        VersionBuild { status, timestamp }
+    pub fn new(status: BuildStatus, timestamp: DateTime<Utc>, message: Option<String>) -> Self {
+        VersionBuild {
+            status,
+            timestamp,
+            message,
+        }
     }
 }
 
@@ -61,4 +69,22 @@ pub struct Build {
     pub manifest_url: String,
     pub id: Uuid,
     pub version: u64,
+}
+
+impl Build {
+    pub fn new(manifest_url: String, id: Uuid, version: u64) -> Self {
+        Build {
+            manifest_url,
+            id,
+            version,
+        }
+    }
+
+    pub fn get_string_id(&self) -> String {
+        self.id.to_string()
+    }
+
+    pub fn get_version(&self) -> u64 {
+        self.version
+    }
 }

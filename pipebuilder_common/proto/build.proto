@@ -6,7 +6,10 @@ message BuildRequest {
     string manifest_url = 1; 
 }
 
-message BuildResponse {}
+message BuildResponse {
+    // version: patch number
+    uint64 version = 1;
+}
 
 service Builder {
     rpc Build(BuildRequest) returns (BuildResponse) {}

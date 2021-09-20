@@ -5,7 +5,11 @@ pub struct BuildRequest {
     pub manifest_url: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BuildResponse {}
+pub struct BuildResponse {
+    /// version: patch number
+    #[prost(uint64, tag = "1")]
+    pub version: u64,
+}
 #[doc = r" Generated client implementations."]
 pub mod builder_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
