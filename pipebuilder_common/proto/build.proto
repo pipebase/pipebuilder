@@ -2,8 +2,8 @@ syntax = "proto3";
 package build;
 
 message BuildRequest {
-    // manifest file url
-    string manifest_url = 1; 
+    // manifest id
+    string manifest_id = 1; 
 }
 
 message BuildResponse {

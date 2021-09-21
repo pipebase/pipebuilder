@@ -1,8 +1,8 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BuildRequest {
-    /// manifest file url
+    /// manifest id
     #[prost(string, tag = "1")]
-    pub manifest_url: ::prost::alloc::string::String,
+    pub manifest_id: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BuildResponse {

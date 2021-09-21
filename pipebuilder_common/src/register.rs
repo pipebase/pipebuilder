@@ -1,7 +1,7 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
     read_file, BuildSnapshot, BuildStatus, NodeState, Result, VersionBuild,
-    REGISTER_KEY_PREFIX_BUILDER, REGISTER_KEY_PREFIX_MANIFEST_URL,
+    REGISTER_KEY_PREFIX_BUILDER, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
     REGISTER_KEY_PREFIX_VERSION_BUILD,
 };
 use chrono::Utc;
@@ -209,10 +209,10 @@ impl Register {
 
     async fn do_incr_build_snapshot(
         &mut self,
-        manifest_url: &str,
+        manifest_id: &str,
     ) -> Result<(PutResponse, BuildSnapshot)> {
         // get current snapshot and incr version
-        let key = format!("{}/{}", REGISTER_KEY_PREFIX_MANIFEST_URL, manifest_url);
+        let key = format!("{}/{}", REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, manifest_id);
         let get_resp = self.get(key.clone(), None).await?;
         let new_snapshot = match get_resp.kvs().first() {
             Some(kv) => {
@@ -220,7 +220,7 @@ impl Register {
                 snapshot.latest_version += 1;
                 snapshot
             }
-            None => BuildSnapshot::new(),
+            None => BuildSnapshot::default(),
         };
         let value = serde_json::to_vec(&new_snapshot)?;
         let resp = self.put(key, value, None).await?;
@@ -229,14 +229,14 @@ impl Register {
 
     pub async fn incr_build_snapshot(
         &mut self,
-        manifest_url: &str,
+        manifest_id: &str,
         lease_id: i64,
     ) -> Result<(PutResponse, BuildSnapshot)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_resp = self.lock(manifest_url, lock_options.into()).await?;
+        let lock_resp = self.lock(manifest_id, lock_options.into()).await?;
         let key = lock_resp.key();
-        let resp = self.do_incr_build_snapshot(manifest_url).await;
-        self.unlock(manifest_url, key).await?;
+        let resp = self.do_incr_build_snapshot(manifest_id).await;
+        self.unlock(manifest_id, key).await?;
         resp
     }
 

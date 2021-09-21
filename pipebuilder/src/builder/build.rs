@@ -19,22 +19,21 @@ impl Builder for BuilderService {
     ) -> Result<tonic::Response<pipebuilder_common::grpc::build::BuildResponse>, tonic::Status>
     {
         let request = request.get_ref();
-        let manifest_url = request.manifest_url.as_str();
-        // lock build snapshot with manifest url
+        let manifest_id = request.manifest_id.as_str();
+        // lock build snapshot with manifest id
         // update latest version
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
-        let snapshot = match register.incr_build_snapshot(manifest_url, lease_id).await {
+        let snapshot = match register.incr_build_snapshot(manifest_id, lease_id).await {
             Ok((_, snapshot)) => snapshot,
             Err(err) => {
                 error!("trigger build failed, error: {:#?}", err);
                 return Err(tonic::Status::internal(format!("{:#?}", err)));
             }
         };
-        let id = snapshot.id;
         let version = snapshot.latest_version;
-        let manifest_url = String::from(manifest_url);
-        let build = Build::new(manifest_url, id, version);
+        let manifest_id = String::from(manifest_id);
+        let build = Build::new(manifest_id, version);
         // trigger version build
         // register.put_version_build_state(&id.to_string(), version, BuildStatus::Create, lease_id)
         // response
@@ -65,7 +64,7 @@ async fn do_fail(
     build: Build,
     message: String,
 ) -> pipebuilder_common::Result<()> {
-    let id = build.get_string_id();
+    let id = build.get_id();
     let version = build.get_version();
     register
         .put_version_build_state(lease_id, &id, version, BuildStatus::Fail, message.into())
