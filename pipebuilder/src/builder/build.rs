@@ -43,22 +43,22 @@ impl Builder for BuilderService {
 
 // build state machine
 #[async_recursion]
-async fn do_build(register: Register, lease_id: i64, build: Build, status: BuildStatus) {
+async fn run(register: Register, lease_id: i64, build: Build, status: BuildStatus) {
     match status {
-        BuildStatus::Create => do_build(register, lease_id, build, BuildStatus::Pull).await,
-        BuildStatus::Pull => do_build(register, lease_id, build, BuildStatus::Validate).await,
-        BuildStatus::Validate => do_build(register, lease_id, build, BuildStatus::Initialize).await,
-        BuildStatus::Initialize => do_build(register, lease_id, build, BuildStatus::Generate).await,
-        BuildStatus::Generate => do_build(register, lease_id, build, BuildStatus::Build).await,
-        BuildStatus::Build => do_build(register, lease_id, build, BuildStatus::Store).await,
-        BuildStatus::Store => do_build(register, lease_id, build, BuildStatus::Publish).await,
-        BuildStatus::Publish => do_build(register, lease_id, build, BuildStatus::Done).await,
+        BuildStatus::Create => run(register, lease_id, build, BuildStatus::Pull).await,
+        BuildStatus::Pull => run(register, lease_id, build, BuildStatus::Validate).await,
+        BuildStatus::Validate => run(register, lease_id, build, BuildStatus::Initialize).await,
+        BuildStatus::Initialize => run(register, lease_id, build, BuildStatus::Generate).await,
+        BuildStatus::Generate => run(register, lease_id, build, BuildStatus::Build).await,
+        BuildStatus::Build => run(register, lease_id, build, BuildStatus::Store).await,
+        BuildStatus::Store => run(register, lease_id, build, BuildStatus::Publish).await,
+        BuildStatus::Publish => run(register, lease_id, build, BuildStatus::Done).await,
         BuildStatus::Done => {}
         _ => unreachable!(),
     };
 }
 
-async fn do_fail(
+async fn fail(
     mut register: Register,
     lease_id: i64,
     build: Build,
