@@ -7,7 +7,7 @@ message BuildRequest {
 }
 
 message BuildResponse {
-    // version: patch number
+    // version: build version
     uint64 version = 1;
 }
 

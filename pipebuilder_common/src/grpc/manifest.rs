@@ -1,24 +1,45 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BuildRequest {
-    /// manifest id
+pub struct GetManifestRequest {
+    /// get manifest given manifest id
     #[prost(string, tag = "1")]
-    pub manifest_id: ::prost::alloc::string::String,
+    pub id: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BuildResponse {
-    /// version: build version
+pub struct GetManifestResponse {
+    /// latest manifest version
+    #[prost(uint64, tag = "1")]
+    pub version: u64,
+    /// manifest binaries
+    #[prost(bytes = "vec", tag = "2")]
+    pub manifest: ::prost::alloc::vec::Vec<u8>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PutManifestRequest {
+    /// manifest id
+    #[prost(string, optional, tag = "1")]
+    pub id: ::core::option::Option<::prost::alloc::string::String>,
+    /// manifest name
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    /// manifest binaries
+    #[prost(bytes = "vec", tag = "3")]
+    pub manifest: ::prost::alloc::vec::Vec<u8>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PutManifestResponse {
+    /// latest manifest version
     #[prost(uint64, tag = "1")]
     pub version: u64,
 }
 #[doc = r" Generated client implementations."]
-pub mod builder_client {
+pub mod manifest_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     #[derive(Debug, Clone)]
-    pub struct BuilderClient<T> {
+    pub struct ManifestClient<T> {
         inner: tonic::client::Grpc<T>,
     }
-    impl BuilderClient<tonic::transport::Channel> {
+    impl ManifestClient<tonic::transport::Channel> {
         #[doc = r" Attempt to create a new client by connecting to a given endpoint."]
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
@@ -29,7 +50,7 @@ pub mod builder_client {
             Ok(Self::new(conn))
         }
     }
-    impl<T> BuilderClient<T>
+    impl<T> ManifestClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::ResponseBody: Body + Send + Sync + 'static,
@@ -43,7 +64,7 @@ pub mod builder_client {
         pub fn with_interceptor<F>(
             inner: T,
             interceptor: F,
-        ) -> BuilderClient<InterceptedService<T, F>>
+        ) -> ManifestClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
             T: tonic::codegen::Service<
@@ -55,7 +76,7 @@ pub mod builder_client {
             <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
                 Into<StdError> + Send + Sync,
         {
-            BuilderClient::new(InterceptedService::new(inner, interceptor))
+            ManifestClient::new(InterceptedService::new(inner, interceptor))
         }
         #[doc = r" Compress requests with `gzip`."]
         #[doc = r""]
@@ -70,10 +91,10 @@ pub mod builder_client {
             self.inner = self.inner.accept_gzip();
             self
         }
-        pub async fn build(
+        pub async fn get_manifest(
             &mut self,
-            request: impl tonic::IntoRequest<super::BuildRequest>,
-        ) -> Result<tonic::Response<super::BuildResponse>, tonic::Status> {
+            request: impl tonic::IntoRequest<super::GetManifestRequest>,
+        ) -> Result<tonic::Response<super::GetManifestResponse>, tonic::Status> {
             self.inner.ready().await.map_err(|e| {
                 tonic::Status::new(
                     tonic::Code::Unknown,
@@ -81,31 +102,49 @@ pub mod builder_client {
                 )
             })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/build.Builder/Build");
+            let path = http::uri::PathAndQuery::from_static("/manifest.Manifest/GetManifest");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn put_manifest(
+            &mut self,
+            request: impl tonic::IntoRequest<super::PutManifestRequest>,
+        ) -> Result<tonic::Response<super::PutManifestResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/manifest.Manifest/PutManifest");
             self.inner.unary(request.into_request(), path, codec).await
         }
     }
 }
 #[doc = r" Generated server implementations."]
-pub mod builder_server {
+pub mod manifest_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "Generated trait containing gRPC methods that should be implemented for use with BuilderServer."]
+    #[doc = "Generated trait containing gRPC methods that should be implemented for use with ManifestServer."]
     #[async_trait]
-    pub trait Builder: Send + Sync + 'static {
-        async fn build(
+    pub trait Manifest: Send + Sync + 'static {
+        async fn get_manifest(
             &self,
-            request: tonic::Request<super::BuildRequest>,
-        ) -> Result<tonic::Response<super::BuildResponse>, tonic::Status>;
+            request: tonic::Request<super::GetManifestRequest>,
+        ) -> Result<tonic::Response<super::GetManifestResponse>, tonic::Status>;
+        async fn put_manifest(
+            &self,
+            request: tonic::Request<super::PutManifestRequest>,
+        ) -> Result<tonic::Response<super::PutManifestResponse>, tonic::Status>;
     }
     #[derive(Debug)]
-    pub struct BuilderServer<T: Builder> {
+    pub struct ManifestServer<T: Manifest> {
         inner: _Inner<T>,
         accept_compression_encodings: (),
         send_compression_encodings: (),
     }
     struct _Inner<T>(Arc<T>);
-    impl<T: Builder> BuilderServer<T> {
+    impl<T: Manifest> ManifestServer<T> {
         pub fn new(inner: T) -> Self {
             let inner = Arc::new(inner);
             let inner = _Inner(inner);
@@ -122,9 +161,9 @@ pub mod builder_server {
             InterceptedService::new(Self::new(inner), interceptor)
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for BuilderServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for ManifestServer<T>
     where
-        T: Builder,
+        T: Manifest,
         B: Body + Send + Sync + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
@@ -137,18 +176,18 @@ pub mod builder_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/build.Builder/Build" => {
+                "/manifest.Manifest/GetManifest" => {
                     #[allow(non_camel_case_types)]
-                    struct BuildSvc<T: Builder>(pub Arc<T>);
-                    impl<T: Builder> tonic::server::UnaryService<super::BuildRequest> for BuildSvc<T> {
-                        type Response = super::BuildResponse;
+                    struct GetManifestSvc<T: Manifest>(pub Arc<T>);
+                    impl<T: Manifest> tonic::server::UnaryService<super::GetManifestRequest> for GetManifestSvc<T> {
+                        type Response = super::GetManifestResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::BuildRequest>,
+                            request: tonic::Request<super::GetManifestRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).build(request).await };
+                            let fut = async move { (*inner).get_manifest(request).await };
                             Box::pin(fut)
                         }
                     }
@@ -157,7 +196,38 @@ pub mod builder_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = BuildSvc(inner);
+                        let method = GetManifestSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/manifest.Manifest/PutManifest" => {
+                    #[allow(non_camel_case_types)]
+                    struct PutManifestSvc<T: Manifest>(pub Arc<T>);
+                    impl<T: Manifest> tonic::server::UnaryService<super::PutManifestRequest> for PutManifestSvc<T> {
+                        type Response = super::PutManifestResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::PutManifestRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).put_manifest(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = PutManifestSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
                             accept_compression_encodings,
@@ -179,7 +249,7 @@ pub mod builder_server {
             }
         }
     }
-    impl<T: Builder> Clone for BuilderServer<T> {
+    impl<T: Manifest> Clone for ManifestServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -189,7 +259,7 @@ pub mod builder_server {
             }
         }
     }
-    impl<T: Builder> Clone for _Inner<T> {
+    impl<T: Manifest> Clone for _Inner<T> {
         fn clone(&self) -> Self {
             Self(self.0.clone())
         }
@@ -199,7 +269,7 @@ pub mod builder_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: Builder> tonic::transport::NamedService for BuilderServer<T> {
-        const NAME: &'static str = "build.Builder";
+    impl<T: Manifest> tonic::transport::NamedService for ManifestServer<T> {
+        const NAME: &'static str = "manifest.Manifest";
     }
 }

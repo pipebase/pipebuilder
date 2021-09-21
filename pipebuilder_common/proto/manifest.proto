@@ -1,0 +1,33 @@
+syntax = "proto3";
+package manifest;
+
+message GetManifestRequest {
+    // get manifest given manifest id
+    string id = 1;
+}
+
+message GetManifestResponse {
+    // latest manifest version
+    uint64 version = 1;
+    // manifest binaries
+    bytes manifest = 2;
+}
+
+message PutManifestRequest {
+    // manifest id
+    optional string id = 1;
+    // manifest name
+    string name = 2;
+    // manifest binaries
+    bytes manifest = 3;
+}
+
+message PutManifestResponse {
+    // latest manifest version
+    uint64 version = 1;
+}
+
+service Manifest {
+    rpc GetManifest(GetManifestRequest) returns (GetManifestResponse) {}
+    rpc PutManifest(PutManifestRequest) returns (PutManifestResponse) {}
+}
