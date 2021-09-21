@@ -9,3 +9,4 @@ pub const REGISTER_KEY_PREFIX_BUILDER: &str = "/builder";
 pub const REGISTER_KEY_PREFIX_SCHEDULER: &str = "/scheduler";
 pub const REGISTER_KEY_PREFIX_BUILD_SNAPSHOT: &str = "/build_snapshot";
 pub const REGISTER_KEY_PREFIX_VERSION_BUILD: &str = "/build";
+pub const REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT: &str = "/manifest_snapshot";

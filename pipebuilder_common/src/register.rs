@@ -1,8 +1,8 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
-    read_file, BuildSnapshot, BuildStatus, NodeState, Result, VersionBuild,
+    read_file, BuildSnapshot, BuildStatus, ManifestSnapshot, NodeState, Result, VersionBuild,
     REGISTER_KEY_PREFIX_BUILDER, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
-    REGISTER_KEY_PREFIX_VERSION_BUILD,
+    REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_VERSION_BUILD,
 };
 use chrono::Utc;
 use etcd_client::{
@@ -269,6 +269,42 @@ impl Register {
         let resp = self
             .do_put_version_build_state(id, version, status, message)
             .await;
+        self.unlock(id, key).await?;
+        resp
+    }
+
+    async fn do_incr_manifest_snapshot(
+        &mut self,
+        id: &str,
+        name: &str,
+        url: &str,
+    ) -> Result<(PutResponse, ManifestSnapshot)> {
+        let key = format!("{}/{}", REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, id);
+        let get_resp = self.get(key.clone(), None).await?;
+        let new_snapshot = match get_resp.kvs().first() {
+            Some(kv) => {
+                let mut snapshot = serde_json::from_slice::<ManifestSnapshot>(kv.value())?;
+                snapshot.latest_version += 1;
+                snapshot
+            }
+            None => ManifestSnapshot::new(String::from(name), String::from(url)),
+        };
+        let value = serde_json::to_vec(&new_snapshot)?;
+        let resp = self.put(key, value, None).await?;
+        Ok((resp, new_snapshot))
+    }
+
+    pub async fn incr_manifest_snapshot(
+        &mut self,
+        lease_id: i64,
+        id: &str,
+        name: &str,
+        url: &str,
+    ) -> Result<(PutResponse, ManifestSnapshot)> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_resp = self.lock(id, lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_incr_manifest_snapshot(id, name, url).await;
         self.unlock(id, key).await?;
         resp
     }
