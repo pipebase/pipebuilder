@@ -1,14 +1,30 @@
 use async_recursion::async_recursion;
 use pipebuilder_common::{
     grpc::build::{builder_server::Builder, BuildRequest, BuildResponse},
+    grpc::manifest::manifest_client::ManifestClient,
     Build, BuildStatus, Register, VersionBuild,
 };
-use tonic::Response;
+use tonic::{transport::Channel, Response};
 use tracing::error;
 
 pub struct BuilderService {
     lease_id: i64,
     register: Register,
+    manifest_client: ManifestClient<Channel>,
+}
+
+impl BuilderService {
+    pub fn new(
+        lease_id: i64,
+        register: Register,
+        manifest_client: ManifestClient<Channel>,
+    ) -> Self {
+        BuilderService {
+            lease_id,
+            register,
+            manifest_client,
+        }
+    }
 }
 
 #[tonic::async_trait]
