@@ -11,24 +11,24 @@ pub struct GetManifestResponse {
     pub version: u64,
     /// manifest binaries
     #[prost(bytes = "vec", tag = "2")]
-    pub manifest: ::prost::alloc::vec::Vec<u8>,
+    pub buffer: ::prost::alloc::vec::Vec<u8>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PutManifestRequest {
     /// manifest id
     #[prost(string, optional, tag = "1")]
     pub id: ::core::option::Option<::prost::alloc::string::String>,
-    /// manifest name
-    #[prost(string, tag = "2")]
-    pub name: ::prost::alloc::string::String,
     /// manifest binaries
-    #[prost(bytes = "vec", tag = "3")]
-    pub manifest: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes = "vec", tag = "2")]
+    pub buffer: ::prost::alloc::vec::Vec<u8>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PutManifestResponse {
+    /// manifest id
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
     /// latest manifest version
-    #[prost(uint64, tag = "1")]
+    #[prost(uint64, tag = "2")]
     pub version: u64,
 }
 #[doc = r" Generated client implementations."]

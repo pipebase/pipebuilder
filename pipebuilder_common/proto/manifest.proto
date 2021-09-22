@@ -10,21 +10,21 @@ message GetManifestResponse {
     // latest manifest version
     uint64 version = 1;
     // manifest binaries
-    bytes manifest = 2;
+    bytes buffer = 2;
 }
 
 message PutManifestRequest {
     // manifest id
     optional string id = 1;
-    // manifest name
-    string name = 2;
     // manifest binaries
-    bytes manifest = 3;
+    bytes buffer = 2;
 }
 
 message PutManifestResponse {
+    // manifest id
+    string id = 1;
     // latest manifest version
-    uint64 version = 1;
+    uint64 version = 2;
 }
 
 service Manifest {

@@ -1,8 +1,8 @@
-use crate::Result;
+use crate::{Error, Result};
 use etcd_client::{Event, EventType};
 use serde::de::DeserializeOwned;
-use std::fs::File;
-use std::io::{BufReader, Read};
+use std::fs::{self, File};
+use std::io::{BufReader, BufWriter, Read, Write};
 use tracing::info;
 
 pub fn open_file<P>(path: P) -> Result<File>
@@ -24,6 +24,16 @@ where
     Ok(buffer)
 }
 
+pub fn write_file<P>(path: P, buffer: &[u8]) -> Result<()>
+where
+    P: AsRef<std::path::Path>,
+{
+    let mut wrt = BufWriter::new(fs::File::create(path)?);
+    wrt.write_all(buffer)?;
+    wrt.flush()?;
+    Ok(())
+}
+
 pub fn parse_config<C>(file: File) -> Result<C>
 where
     C: DeserializeOwned,
@@ -43,6 +53,7 @@ pub fn log_event(event: &Event) -> Result<()> {
     Ok(())
 }
 
+// etcd ops
 pub fn deserialize_event<T>(event: &Event) -> Result<Option<(EventType, String, T)>>
 where
     T: DeserializeOwned,
@@ -54,4 +65,21 @@ where
         return Ok(Some((event.event_type(), key.to_owned(), value)));
     }
     Ok(None)
+}
+
+pub fn prefix_id_key(prefix: &str, id: &str) -> String {
+    format!("{}/{}", prefix, id)
+}
+
+pub fn prefix_id_version_key(prefix: &str, id: &str, version: u64) -> String {
+    format!("{}/{}/{}", prefix, id, version)
+}
+
+// tonic status
+pub fn internal_error(error: Error) -> tonic::Status {
+    tonic::Status::internal(format!("{:#?}", error))
+}
+
+pub fn not_found(message: &str) -> tonic::Status {
+    tonic::Status::not_found(message)
 }

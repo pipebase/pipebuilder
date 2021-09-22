@@ -16,6 +16,10 @@ path = "src/builder/app.rs"
 name = "scheduler"
 path = "src/scheduler/app.rs"
 
+[[bin]]
+name = "manifest"
+path = "src/manifest/app.rs"
+
 [dependencies]
 async-recursion = "0.3.2"
 etcd-client = "0.7.2"
@@ -28,6 +32,7 @@ tonic = "0.5"
 tokio = { version = "1.11.0", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1"
 tracing-subscriber = "0.2"
+uuid = { version = "0.8", features = ["v4"] }
 
 [build-dependencies]
 tonic-build = "0.5"
