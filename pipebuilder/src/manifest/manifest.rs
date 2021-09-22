@@ -13,6 +13,16 @@ pub struct ManifestService {
     // TODO: remote repository as backup
 }
 
+impl ManifestService {
+    pub fn new(register: Register, lease_id: i64, repository: String) -> Self {
+        ManifestService {
+            register,
+            lease_id,
+            repository,
+        }
+    }
+}
+
 #[tonic::async_trait]
 impl Manifest for ManifestService {
     async fn get_manifest(
