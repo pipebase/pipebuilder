@@ -23,6 +23,10 @@ pub enum ErrorImpl {
     TonicTransport(#[from] tonic::transport::Error),
     #[error("yaml exception")]
     Yaml(#[from] serde_yaml::Error),
+    #[error("rpc exception")]
+    Rpc(#[from] tonic::Status),
+    #[error("pipegen exception")]
+    Pipegen(#[from] pipegen::error::Error),
 }
 
 impl From<std::io::Error> for Error {
@@ -64,5 +68,17 @@ impl From<net::AddrParseError> for Error {
 impl From<etcd_client::Error> for Error {
     fn from(err: etcd_client::Error) -> Self {
         Error(Box::new(ErrorImpl::Etcd(err)))
+    }
+}
+
+impl From<tonic::Status> for Error {
+    fn from(status: tonic::Status) -> Self {
+        Error(Box::new(ErrorImpl::Rpc(status)))
+    }
+}
+
+impl From<pipegen::error::Error> for Error {
+    fn from(err: pipegen::error::Error) -> Self {
+        Error(Box::new(ErrorImpl::Pipegen(err)))
     }
 }

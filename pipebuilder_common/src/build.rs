@@ -1,12 +1,11 @@
 use chrono::{DateTime, Utc};
+use pipegen::models::App;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 pub enum BuildStatus {
     // register version build
     Create,
-    // pull manifest
-    Pull,
     // validate manifest
     Validate,
     // initialize rust app
@@ -56,14 +55,18 @@ pub struct BuildSnapshot {
 // A build task
 pub struct Build {
     pub manifest_id: String,
-    pub version: u64,
+    pub manifest_version: u64,
+    pub build_version: u64,
+    pub app: App,
 }
 
 impl Build {
-    pub fn new(manifest_id: String, version: u64) -> Self {
+    pub fn new(manifest_id: String, manifest_version: u64, build_version: u64, app: App) -> Self {
         Build {
             manifest_id,
-            version,
+            manifest_version,
+            build_version,
+            app,
         }
     }
 
@@ -71,7 +74,7 @@ impl Build {
         self.manifest_id.to_string()
     }
 
-    pub fn get_version(&self) -> u64 {
-        self.version
+    pub fn get_build_version(&self) -> u64 {
+        self.build_version
     }
 }

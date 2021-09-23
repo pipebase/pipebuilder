@@ -1,3 +1,4 @@
+use crate::grpc::manifest::GetManifestRequest;
 use crate::{Error, Result};
 use etcd_client::{Event, EventType};
 use serde::de::DeserializeOwned;
@@ -75,11 +76,16 @@ pub fn prefix_id_version_key(prefix: &str, id: &str, version: u64) -> String {
     format!("{}/{}/{}", prefix, id, version)
 }
 
-// tonic status
+// rpc status
 pub fn internal_error(error: Error) -> tonic::Status {
     tonic::Status::internal(format!("{:#?}", error))
 }
 
 pub fn not_found(message: &str) -> tonic::Status {
     tonic::Status::not_found(message)
+}
+
+// rpc request
+pub fn build_get_manifest_request(id: String) -> GetManifestRequest {
+    GetManifestRequest { id }
 }

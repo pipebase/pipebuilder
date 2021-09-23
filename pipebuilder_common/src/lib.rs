@@ -16,6 +16,7 @@ pub use config::*;
 pub use constant::*;
 pub use error::*;
 pub use manifest::*;
+pub use pipegen::models::App;
 pub use register::*;
 pub use service::*;
 pub use time::*;
