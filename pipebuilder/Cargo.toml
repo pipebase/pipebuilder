@@ -21,7 +21,6 @@ name = "manifest"
 path = "src/manifest/app.rs"
 
 [dependencies]
-async-recursion = "0.3.2"
 etcd-client = "0.7.2"
 chrono = { version = "0.4" }
 flurry = "0.3.1"

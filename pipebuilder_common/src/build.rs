@@ -1,16 +1,22 @@
+use crate::{build_get_manifest_request, Result};
 use chrono::{DateTime, Utc};
 use pipegen::models::App;
 use serde::{Deserialize, Serialize};
+use tonic::transport::Channel;
+use tracing::info;
+
+use crate::grpc::manifest::manifest_client::ManifestClient;
 
 #[derive(Deserialize, Serialize)]
 pub enum BuildStatus {
-    // register version build
+    // pull manifest
+    Pull,
+    // create build workspace
     Create,
     // validate manifest
     Validate,
-    // initialize rust app
-    // restore from previous build or create a new project
-    Initialize,
+    // restore previous compilation
+    Restore,
     // generate rust code
     Generate,
     // cargo build
@@ -52,21 +58,27 @@ pub struct BuildSnapshot {
     pub latest_version: u64,
 }
 
-// A build task
+// App build
 pub struct Build {
     pub manifest_id: String,
-    pub manifest_version: u64,
+    pub manifest_client: ManifestClient<Channel>,
     pub build_version: u64,
-    pub app: App,
+    pub manifest_version: Option<u64>,
+    pub app: Option<App>,
 }
 
 impl Build {
-    pub fn new(manifest_id: String, manifest_version: u64, build_version: u64, app: App) -> Self {
+    pub fn new(
+        manifest_id: String,
+        manifest_client: ManifestClient<Channel>,
+        build_version: u64,
+    ) -> Self {
         Build {
             manifest_id,
-            manifest_version,
+            manifest_client,
             build_version,
-            app,
+            manifest_version: None,
+            app: None,
         }
     }
 
@@ -76,5 +88,141 @@ impl Build {
 
     pub fn get_build_version(&self) -> u64 {
         self.build_version
+    }
+
+    pub fn get_build_meta(&self) -> (String, Option<u64>, u64) {
+        let manifest_id = self.manifest_id.to_owned();
+        let manifest_version = self.manifest_version.to_owned();
+        let build_version = self.build_version;
+        (manifest_id, manifest_version, build_version)
+    }
+
+    // run current status and return next status
+    pub async fn run(&mut self, status: BuildStatus) -> Result<Option<BuildStatus>> {
+        match status {
+            BuildStatus::Pull => self.pull_manifest().await,
+            BuildStatus::Create => self.create_build(),
+            BuildStatus::Validate => self.validate_manifest(),
+            BuildStatus::Restore => self.restore_compilation().await,
+            BuildStatus::Generate => self.generate_app(),
+            BuildStatus::Build => self.build_app(),
+            BuildStatus::Store => self.store_compilation().await,
+            BuildStatus::Publish => self.publish_app().await,
+            BuildStatus::Done => self.done(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub async fn pull_manifest(&mut self) -> Result<Option<BuildStatus>> {
+        let manifest_id = self.manifest_id.to_owned();
+        let request = build_get_manifest_request(manifest_id);
+        let response = self
+            .manifest_client
+            .get_manifest(request)
+            .await?
+            .into_inner();
+        let version = response.version;
+        let buffer = response.buffer;
+        let app = App::read_from_buffer(buffer.as_slice())?;
+        self.app = Some(app);
+        self.manifest_version = Some(version);
+        Ok(Some(BuildStatus::Create))
+    }
+
+    pub fn create_build(&mut self) -> Result<Option<BuildStatus>> {
+        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        info!(
+            "create build workspace for manifest {}:({}, {})",
+            manifest_id,
+            manifest_version.expect("unknown manifest version"),
+            build_version
+        );
+        // cargo new
+        Ok(Some(BuildStatus::Validate))
+    }
+
+    pub fn validate_manifest(&mut self) -> Result<Option<BuildStatus>> {
+        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        info!(
+            "validate manifest {}:({}, {})",
+            manifest_id,
+            manifest_version.expect("unknown manifest version"),
+            build_version
+        );
+        self.app.as_ref().expect("app not initialized").validate()?;
+        Ok(Some(BuildStatus::Restore))
+    }
+
+    pub async fn restore_compilation(&mut self) -> Result<Option<BuildStatus>> {
+        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        info!(
+            "restore compilation for manifest {}:({}, {})",
+            manifest_id,
+            manifest_version.expect("unknown manifest version"),
+            build_version
+        );
+        // restore previous compilation if any
+        Ok(Some(BuildStatus::Generate))
+    }
+
+    pub fn generate_app(&mut self) -> Result<Option<BuildStatus>> {
+        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        info!(
+            "generate app for {}:({}, {})",
+            manifest_id,
+            manifest_version.expect("unknown manifest version"),
+            build_version
+        );
+        // update dependency Cargo.toml
+        let generated_code = self.app.as_ref().expect("app not initialized").generate();
+        // write to app/src/main.rs
+        Ok(Some(BuildStatus::Build))
+    }
+
+    pub fn build_app(&mut self) -> Result<Option<BuildStatus>> {
+        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        info!(
+            "build app for {}:({}, {})",
+            manifest_id,
+            manifest_version.expect("unknown manifest version"),
+            build_version
+        );
+        // cargo build and stream log to file
+        Ok(Some(BuildStatus::Store))
+    }
+
+    pub async fn store_compilation(&mut self) -> Result<Option<BuildStatus>> {
+        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        info!(
+            "store compilation for {}:({}, {})",
+            manifest_id,
+            manifest_version.expect("unknown manifest version"),
+            build_version
+        );
+        // store target folder
+        Ok(Some(BuildStatus::Publish))
+    }
+
+    pub async fn publish_app(&mut self) -> Result<Option<BuildStatus>> {
+        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        info!(
+            "publish app binaries for {}:({}, {})",
+            manifest_id,
+            manifest_version.expect("unknown manifest version"),
+            build_version
+        );
+        // publish app binaries
+        Ok(Some(BuildStatus::Done))
+    }
+
+    pub fn done(&mut self) -> Result<Option<BuildStatus>> {
+        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        info!(
+            "build succeed for {}:({}, {})",
+            manifest_id,
+            manifest_version.expect("unknown manifest version"),
+            build_version
+        );
+        Ok(None)
     }
 }
