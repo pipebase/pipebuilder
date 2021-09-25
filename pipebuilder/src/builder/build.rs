@@ -12,6 +12,7 @@ pub struct BuilderService {
     manifest_client: ManifestClient<Channel>,
     workspace: String,
     target_directory: String,
+    build_log_directory: String,
 }
 
 impl BuilderService {
@@ -21,6 +22,7 @@ impl BuilderService {
         manifest_client: ManifestClient<Channel>,
         workspace: String,
         target_directory: String,
+        build_log_directory: String,
     ) -> Self {
         BuilderService {
             lease_id,
@@ -28,6 +30,7 @@ impl BuilderService {
             manifest_client,
             workspace,
             target_directory,
+            build_log_directory,
         }
     }
 }
@@ -70,6 +73,7 @@ impl Builder for BuilderService {
             */
         let workspace = self.workspace.to_owned();
         let target_directory = self.target_directory.to_owned();
+        let log_directory = self.build_log_directory.to_owned();
         let target_platform = request.target_platform;
         let build = Build::new(
             manifest_id,
@@ -78,6 +82,7 @@ impl Builder for BuilderService {
             workspace,
             target_directory,
             target_platform,
+            log_directory,
         );
         // trigger build
         // register.put_version_build_state(&id.to_string(), version, BuildStatus::Create, lease_id)

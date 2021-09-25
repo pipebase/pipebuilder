@@ -3,11 +3,15 @@ use crate::{
     grpc::manifest::GetManifestRequest,
 };
 use etcd_client::{Event, EventType};
+use pipegen::models::Dependency;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     ffi::OsString,
     fs::{self, File},
     io::{BufReader, BufWriter, Read, Write},
+    path::Path,
     process::Command,
 };
 use tracing::info;
@@ -46,7 +50,7 @@ pub fn create_directory<P>(path: P) -> Result<()>
 where
     P: AsRef<std::path::Path>,
 {
-    fs::create_dir(path)?;
+    fs::create_dir_all(path)?;
     Ok(())
 }
 
@@ -56,6 +60,31 @@ where
 {
     let config = serde_yaml::from_reader::<std::fs::File, C>(file)?;
     Ok(config)
+}
+
+pub fn app_directory(workspace: &str, manifest_id: &str, build_version: u64) -> String {
+    format!("{}/{}/{}/app", workspace, manifest_id, build_version)
+}
+
+pub fn app_toml_manifest_path(workspace: &str, manifest_id: &str, build_version: u64) -> String {
+    format!(
+        "{}/{}/{}/app/Cargo.toml",
+        workspace, manifest_id, build_version
+    )
+}
+
+pub fn app_main_path(workspace: &str, manifest_id: &str, build_version: u64) -> String {
+    format!(
+        "{}/{}/{}/app/src/main.rs",
+        workspace, manifest_id, build_version
+    )
+}
+
+pub fn app_build_log_path(log_directory: &str, manifest_id: &str, build_version: u64) -> String {
+    format!(
+        "{}/{}/{}/build.log",
+        log_directory, manifest_id, build_version
+    )
 }
 
 // cmd ops
@@ -103,7 +132,12 @@ pub fn cargo_fmt(manifest_path: &str) -> Result<()> {
 }
 
 // target platform: https://doc.rust-lang.org/cargo/commands/cargo-build.html#compilation-options
-pub fn cargo_build(manifest_path: &str, target_platform: &str, target_directory: &str, log_path: &str) -> Result<()> {
+pub fn cargo_build(
+    manifest_path: &str,
+    target_platform: &str,
+    target_directory: &str,
+    log_path: &str,
+) -> Result<()> {
     let mut cmd = Command::new(cargo_binary());
     cmd.arg("build")
         .arg("--manifest-path")
@@ -170,4 +204,94 @@ pub fn not_found(message: &str) -> tonic::Status {
 // rpc request
 pub fn build_get_manifest_request(id: String) -> GetManifestRequest {
     GetManifestRequest { id }
+}
+
+// App cargo.toml
+#[derive(Deserialize, Serialize, Debug)]
+pub struct TomlProject {
+    name: String,
+    version: String,
+    authors: Option<Vec<String>>,
+    edition: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct TomlDependency {
+    version: Option<String>,
+    path: Option<String>,
+    git: Option<String>,
+    branch: Option<String>,
+    tag: Option<String>,
+    features: Option<Vec<String>>,
+    package: Option<String>,
+}
+
+impl From<Dependency> for TomlDependency {
+    fn from(pd: Dependency) -> Self {
+        TomlDependency {
+            version: pd.get_version(),
+            path: pd.get_path(),
+            git: pd.get_git(),
+            branch: pd.get_branch(),
+            tag: pd.get_tag(),
+            features: pd.get_features(),
+            package: pd.get_package(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TomlWorkspace {}
+
+impl TomlWorkspace {
+    pub fn new() -> Self {
+        TomlWorkspace {}
+    }
+}
+
+impl Default for TomlWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct TomlManifest {
+    package: Option<TomlProject>,
+    dependencies: Option<HashMap<String, TomlDependency>>,
+    workspace: Option<TomlWorkspace>,
+}
+
+impl TomlManifest {
+    pub fn init(&mut self) {
+        self.dependencies = Some(HashMap::new());
+        self.workspace = Some(TomlWorkspace::new());
+    }
+
+    pub fn add_dependency(&mut self, name: String, dependency: TomlDependency) {
+        let dependencies = self.dependencies.as_mut().unwrap();
+        dependencies.insert(name, dependency);
+    }
+}
+
+pub fn parse_toml<M, P>(toml_path: P) -> Result<M>
+where
+    M: DeserializeOwned,
+    P: AsRef<Path>,
+{
+    let toml_string = fs::read_to_string(toml_path)?;
+    let toml_manifest = toml::from_str::<M>(toml_string.as_str())?;
+    Ok(toml_manifest)
+}
+
+pub fn write_toml<M, P>(object: &M, path: P) -> Result<()>
+where
+    M: Serialize,
+    P: AsRef<Path>,
+{
+    let toml_string = toml::to_string(object)?;
+    fs::write(path, toml_string)?;
+    Ok(())
 }

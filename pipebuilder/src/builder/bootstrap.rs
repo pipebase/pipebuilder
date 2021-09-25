@@ -11,6 +11,7 @@ fn build_builder_service(
     manifest_client: ManifestClient<Channel>,
     workspace: String,
     target_directory: String,
+    build_log_directory: String,
 ) -> BuilderService {
     BuilderService::new(
         lease_id,
@@ -18,6 +19,7 @@ fn build_builder_service(
         manifest_client,
         workspace,
         target_directory,
+        build_log_directory,
     )
 }
 
@@ -35,12 +37,14 @@ pub async fn bootstrap(
     let manifest_client = build_manifest_client(manifest_endpoint).await?;
     let worksapce = config.workspace;
     let target_directory = config.target_directory;
+    let build_log_directory = config.build_log_directory;
     let builder_svc = build_builder_service(
         lease_id,
         register,
         manifest_client,
         worksapce,
         target_directory,
+        build_log_directory,
     );
     Ok(BuilderServer::new(builder_svc))
 }

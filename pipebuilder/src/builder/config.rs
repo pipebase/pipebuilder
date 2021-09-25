@@ -6,6 +6,7 @@ pub struct BuilderConfig {
     pub manifest_endpoint: String,
     pub workspace: String,
     pub target_directory: String,
+    pub build_log_directory: String,
 }
 
 #[derive(Deserialize)]

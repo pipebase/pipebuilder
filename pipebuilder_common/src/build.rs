@@ -1,4 +1,11 @@
-use crate::{build_get_manifest_request, Result};
+use crate::{
+    errors::Result,
+    utils::{
+        app_build_log_path, app_directory, app_main_path, app_toml_manifest_path,
+        build_get_manifest_request, cargo_build, cargo_fmt, cargo_init, create_directory,
+        parse_toml, write_file, write_toml, TomlManifest,
+    },
+};
 use chrono::{DateTime, Utc};
 use pipegen::models::App;
 use serde::{Deserialize, Serialize};
@@ -68,6 +75,7 @@ pub struct Build {
     pub workspace: String,
     pub target_directory: String,
     pub target_platform: String,
+    pub log_directory: String,
     pub manifest_version: Option<u64>,
     pub app: Option<App>,
 }
@@ -80,6 +88,7 @@ impl Build {
         workspace: String,
         target_directory: String,
         target_platform: String,
+        log_directory: String,
     ) -> Self {
         Build {
             manifest_id,
@@ -88,6 +97,7 @@ impl Build {
             workspace,
             target_directory,
             target_platform,
+            log_directory,
             manifest_version: None,
             app: None,
         }
@@ -160,7 +170,13 @@ impl Build {
             manifest_version.expect("unknown manifest version"),
             build_version
         );
-        // cargo new
+        let workspace = self.workspace.as_str();
+        let manifest_id = self.manifest_id.as_str();
+        let build_version = self.build_version;
+        let app_directory = app_directory(workspace, manifest_id, build_version);
+        // cargo init
+        create_directory(app_directory.as_str())?;
+        cargo_init(app_directory.as_str())?;
         Ok(Some(BuildStatus::Restore))
     }
 
@@ -185,8 +201,24 @@ impl Build {
             build_version
         );
         // update dependency Cargo.toml
+        let workspace = self.workspace.as_str();
+        let manifest_id = self.manifest_id.as_str();
+        let build_version = self.build_version;
+        let toml_path = app_toml_manifest_path(workspace, manifest_id, build_version);
+        let mut toml_manifest: TomlManifest = parse_toml(toml_path.as_str())?;
+        toml_manifest.init();
+        let app = self.app.as_ref().expect("app not initialized");
+        let additionals = app.get_dependencies().clone();
+        for additional in additionals {
+            toml_manifest.add_dependency(additional.get_name(), additional.into());
+        }
+        write_toml(&toml_manifest, toml_path.as_str())?;
+        // generate src/main.rs
         let generated_code = self.app.as_ref().expect("app not initialized").generate();
-        // write to app/src/main.rs
+        let main_path = app_main_path(workspace, manifest_id, build_version);
+        write_file(main_path.as_str(), generated_code.as_bytes())?;
+        // fmt code
+        cargo_fmt(toml_path.as_str())?;
         Ok(Some(BuildStatus::Build))
     }
 
@@ -198,7 +230,21 @@ impl Build {
             manifest_version.expect("unknown manifest version"),
             build_version
         );
+        let workspace = self.workspace.as_str();
+        let manifest_id = self.manifest_id.as_str();
+        let log_directory = self.log_directory.as_str();
+        let build_version = self.build_version;
         // cargo build and stream log to file
+        let target_platform = self.target_platform.as_str();
+        let target_directory = self.target_directory.as_str();
+        let toml_path = app_toml_manifest_path(workspace, manifest_id, build_version);
+        let log_path = app_build_log_path(log_directory, manifest_id, build_version);
+        cargo_build(
+            toml_path.as_str(),
+            target_platform,
+            target_directory,
+            log_path.as_str(),
+        )?;
         Ok(Some(BuildStatus::Store))
     }
 
