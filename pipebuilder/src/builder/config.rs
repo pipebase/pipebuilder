@@ -4,6 +4,8 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 pub struct BuilderConfig {
     pub manifest_endpoint: String,
+    pub workspace: String,
+    pub target_directory: String,
 }
 
 #[derive(Deserialize)]

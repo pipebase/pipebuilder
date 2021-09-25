@@ -11,10 +11,10 @@ use crate::grpc::manifest::manifest_client::ManifestClient;
 pub enum BuildStatus {
     // pull manifest
     Pull,
-    // create build workspace
-    Create,
     // validate manifest
     Validate,
+    // create build workspace
+    Create,
     // restore previous compilation
     Restore,
     // generate rust code
@@ -29,6 +29,8 @@ pub enum BuildStatus {
     Done,
     // build failed
     Fail,
+    // build interrupt due to node maintenance / deployment
+    Interrupt,
 }
 
 // Build state per (build_id, version)
@@ -63,6 +65,9 @@ pub struct Build {
     pub manifest_id: String,
     pub manifest_client: ManifestClient<Channel>,
     pub build_version: u64,
+    pub workspace: String,
+    pub target_directory: String,
+    pub target_platform: String,
     pub manifest_version: Option<u64>,
     pub app: Option<App>,
 }
@@ -72,11 +77,17 @@ impl Build {
         manifest_id: String,
         manifest_client: ManifestClient<Channel>,
         build_version: u64,
+        workspace: String,
+        target_directory: String,
+        target_platform: String,
     ) -> Self {
         Build {
             manifest_id,
             manifest_client,
             build_version,
+            workspace,
+            target_directory,
+            target_platform,
             manifest_version: None,
             app: None,
         }
@@ -126,18 +137,6 @@ impl Build {
         let app = App::read_from_buffer(buffer.as_slice())?;
         self.app = Some(app);
         self.manifest_version = Some(version);
-        Ok(Some(BuildStatus::Create))
-    }
-
-    pub fn create_build(&mut self) -> Result<Option<BuildStatus>> {
-        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
-        info!(
-            "create build workspace for manifest {}:({}, {})",
-            manifest_id,
-            manifest_version.expect("unknown manifest version"),
-            build_version
-        );
-        // cargo new
         Ok(Some(BuildStatus::Validate))
     }
 
@@ -150,6 +149,18 @@ impl Build {
             build_version
         );
         self.app.as_ref().expect("app not initialized").validate()?;
+        Ok(Some(BuildStatus::Create))
+    }
+
+    pub fn create_build(&mut self) -> Result<Option<BuildStatus>> {
+        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        info!(
+            "create build workspace for manifest {}:({}, {})",
+            manifest_id,
+            manifest_version.expect("unknown manifest version"),
+            build_version
+        );
+        // cargo new
         Ok(Some(BuildStatus::Restore))
     }
 

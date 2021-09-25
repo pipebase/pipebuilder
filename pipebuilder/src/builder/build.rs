@@ -10,6 +10,8 @@ pub struct BuilderService {
     lease_id: i64,
     register: Register,
     manifest_client: ManifestClient<Channel>,
+    workspace: String,
+    target_directory: String,
 }
 
 impl BuilderService {
@@ -17,11 +19,15 @@ impl BuilderService {
         lease_id: i64,
         register: Register,
         manifest_client: ManifestClient<Channel>,
+        workspace: String,
+        target_directory: String,
     ) -> Self {
         BuilderService {
             lease_id,
             register,
             manifest_client,
+            workspace,
+            target_directory,
         }
     }
 }
@@ -33,13 +39,16 @@ impl Builder for BuilderService {
         request: tonic::Request<pipebuilder_common::grpc::build::BuildRequest>,
     ) -> Result<tonic::Response<pipebuilder_common::grpc::build::BuildResponse>, tonic::Status>
     {
-        let request = request.get_ref();
-        let manifest_id = request.manifest_id.as_str();
+        let request = request.into_inner();
+        let manifest_id = request.manifest_id;
         // lock build snapshot with manifest id
         // update latest build version
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
-        let snapshot = match register.incr_build_snapshot(manifest_id, lease_id).await {
+        let snapshot = match register
+            .incr_build_snapshot(manifest_id.as_str(), lease_id)
+            .await
+        {
             Ok((_, snapshot)) => snapshot,
             Err(err) => {
                 error!("trigger build failed, error: {:#?}", err);
@@ -59,7 +68,17 @@ impl Builder for BuilderService {
                 }
             };
             */
-        let build = Build::new(String::from(manifest_id), manifest_client, build_version);
+        let workspace = self.workspace.to_owned();
+        let target_directory = self.target_directory.to_owned();
+        let target_platform = request.target_platform;
+        let build = Build::new(
+            manifest_id,
+            manifest_client,
+            build_version,
+            workspace,
+            target_directory,
+            target_platform,
+        );
         // trigger build
         // register.put_version_build_state(&id.to_string(), version, BuildStatus::Create, lease_id)
         // response

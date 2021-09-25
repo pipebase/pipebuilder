@@ -15,6 +15,7 @@ serde_yaml = "0.8"
 thiserror = "1.0.29"
 prost = "0.8"
 pipegen = "0.1.15"
+toml = "0.5.8"
 tonic = "0.5"
 tokio = { version = "1.11.0", features = ["time"] }
 tracing = "0.1"

@@ -3,7 +3,9 @@ package build;
 
 message BuildRequest {
     // manifest id
-    string manifest_id = 1; 
+    string manifest_id = 1;
+    // target platform
+    string target_platform = 2;
 }
 
 message BuildResponse {

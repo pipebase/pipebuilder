@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::{env, io, net, result};
+use std::{env, io, net, result, string::FromUtf8Error};
 use thiserror::Error;
 
 #[derive(Debug)]
@@ -27,6 +27,14 @@ pub enum ErrorImpl {
     Rpc(#[from] tonic::Status),
     #[error("pipegen exception")]
     Pipegen(#[from] pipegen::error::Error),
+    #[error("toml deserialize exception")]
+    TomlDe(#[from] toml::de::Error),
+    #[error("toml Serialize exception")]
+    TomlSer(#[from] toml::ser::Error),
+    #[error("utf8 exception")]
+    Utf8(#[from] FromUtf8Error),
+    #[error("cargo {cmd:?} error")]
+    Cargo { cmd: String, code: i32, msg: String },
 }
 
 impl From<std::io::Error> for Error {
@@ -81,4 +89,30 @@ impl From<pipegen::error::Error> for Error {
     fn from(err: pipegen::error::Error) -> Self {
         Error(Box::new(ErrorImpl::Pipegen(err)))
     }
+}
+
+impl From<toml::de::Error> for Error {
+    fn from(err: toml::de::Error) -> Self {
+        Error(Box::new(ErrorImpl::TomlDe(err)))
+    }
+}
+
+impl From<toml::ser::Error> for Error {
+    fn from(err: toml::ser::Error) -> Self {
+        Error(Box::new(ErrorImpl::TomlSer(err)))
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(err: FromUtf8Error) -> Self {
+        Error(Box::new(ErrorImpl::Utf8(err)))
+    }
+}
+
+pub fn cargo_error(cmd: &str, code: i32, msg: String) -> Error {
+    Error(Box::new(ErrorImpl::Cargo {
+        cmd: String::from(cmd),
+        code,
+        msg,
+    }))
 }
