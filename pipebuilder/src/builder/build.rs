@@ -65,17 +65,17 @@ impl Builder for BuilderService {
             build_context,
             target_platform,
         );
-        // trigger build
+        // start build
         let lease_id = self.lease_id;
         let register = self.register.to_owned();
-        run(lease_id, register, build);
+        start_build(lease_id, register, build);
         Ok(Response::new(BuildResponse {
             version: build_version,
         }))
     }
 }
 
-fn run(lease_id: i64, mut register: Register, mut build: Build) {
+fn start_build(lease_id: i64, mut register: Register, mut build: Build) {
     let _ = tokio::spawn(async move {
         let mut status = BuildStatus::Pull;
         loop {
@@ -83,10 +83,10 @@ fn run(lease_id: i64, mut register: Register, mut build: Build) {
             match update(&mut register, lease_id, &build, status.clone(), None).await {
                 Ok(()) => (),
                 Err(err) => {
+                    let (id, _, build_version) = build.get_build_meta();
                     error!(
-                        "update build status failed for {}, error: {:#?}",
-                        build.get_id(),
-                        err
+                        "update build status failed for {}:{}, error: {:#?}",
+                        id, build_version, err
                     );
                     return;
                 }
@@ -124,9 +124,8 @@ async fn update(
     status: BuildStatus,
     message: Option<String>,
 ) -> pipebuilder_common::Result<()> {
-    let id = build.get_id();
-    let version = build.get_build_version();
-    let (builder_id, builder_address) = build.get_builder_info();
+    let (id, _, build_version) = build.get_build_meta();
+    let (builder_id, builder_address) = build.get_builder_meta();
     let now = Utc::now();
     let state = VersionBuild::new(
         status,
@@ -136,7 +135,7 @@ async fn update(
         message,
     );
     register
-        .put_version_build_state(lease_id, &id, version, state)
+        .put_version_build_state(lease_id, id.as_str(), build_version, state)
         .await?;
     Ok(())
 }

@@ -76,6 +76,7 @@ impl Manifest for ManifestService {
         };
         let repository = self.repository.as_str();
         let buffer = request_ref.buffer.as_slice();
+        // TODO: validate manifest before write
         match write_manifest_into_repo(repository, id.as_str(), version, buffer) {
             Ok(_) => Ok(Response::new(PutManifestResponse { id, version })),
             Err(err) => return Err(internal_error(err)),
@@ -101,6 +102,7 @@ fn write_manifest_into_repo(
 ) -> pipebuilder_common::Result<()> {
     let path = get_manifest_path(repository, id, version);
     write_file(path, buffer)?;
+    // TODO S3 backup
     Ok(())
 }
 

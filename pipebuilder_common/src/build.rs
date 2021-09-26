@@ -140,7 +140,7 @@ impl Build {
     }
 
     // (id, address)
-    pub fn get_builder_info(&self) -> (&String, &String) {
+    pub fn get_builder_meta(&self) -> (&String, &String) {
         (&self.build_context.id, &self.build_context.address)
     }
 
@@ -156,17 +156,9 @@ impl Build {
         &self.build_context.target_directory
     }
 
-    pub fn get_id(&self) -> String {
-        self.manifest_id.to_string()
-    }
-
-    pub fn get_build_version(&self) -> u64 {
-        self.build_version
-    }
-
-    pub fn get_build_meta(&self) -> (String, Option<u64>, u64) {
-        let manifest_id = self.manifest_id.to_owned();
-        let manifest_version = self.manifest_version.to_owned();
+    pub fn get_build_meta(&self) -> (&String, Option<&u64>, u64) {
+        let manifest_id = &self.manifest_id;
+        let manifest_version = self.manifest_version.as_ref();
         let build_version = self.build_version;
         (manifest_id, manifest_version, build_version)
     }
