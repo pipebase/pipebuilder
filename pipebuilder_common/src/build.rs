@@ -14,7 +14,7 @@ use tracing::info;
 
 use crate::grpc::manifest::manifest_client::ManifestClient;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub enum BuildStatus {
     // pull manifest
     Pull,
@@ -33,7 +33,7 @@ pub enum BuildStatus {
     // publish app binary
     Publish,
     // succeed all steps
-    Done,
+    Succeed,
     // build failed
     Fail,
     // build interrupt due to node maintenance / deployment
@@ -79,15 +79,43 @@ pub struct BuildSnapshot {
     pub latest_version: u64,
 }
 
+// build context shared by all local builds
+#[derive(Clone)]
+pub struct LocalBuildContext {
+    // builder id
+    id: String,
+    // builder external_address
+    address: String,
+    workspace: String,
+    target_directory: String,
+    log_directory: String,
+}
+
+impl LocalBuildContext {
+    pub fn new(
+        id: String,
+        address: String,
+        workspace: String,
+        target_directory: String,
+        log_directory: String,
+    ) -> Self {
+        LocalBuildContext {
+            id,
+            address,
+            workspace,
+            target_directory,
+            log_directory,
+        }
+    }
+}
+
 // App build
 pub struct Build {
     pub manifest_id: String,
     pub manifest_client: ManifestClient<Channel>,
     pub build_version: u64,
-    pub workspace: String,
-    pub target_directory: String,
+    pub build_context: LocalBuildContext,
     pub target_platform: String,
-    pub log_directory: String,
     pub manifest_version: Option<u64>,
     pub app: Option<App>,
 }
@@ -97,22 +125,35 @@ impl Build {
         manifest_id: String,
         manifest_client: ManifestClient<Channel>,
         build_version: u64,
-        workspace: String,
-        target_directory: String,
+        build_context: LocalBuildContext,
         target_platform: String,
-        log_directory: String,
     ) -> Self {
         Build {
             manifest_id,
             manifest_client,
             build_version,
-            workspace,
-            target_directory,
+            build_context,
             target_platform,
-            log_directory,
             manifest_version: None,
             app: None,
         }
+    }
+
+    // (id, address)
+    pub fn get_builder_info(&self) -> (&String, &String) {
+        (&self.build_context.id, &self.build_context.address)
+    }
+
+    fn get_workspace(&self) -> &String {
+        &self.build_context.workspace
+    }
+
+    fn get_log_directory(&self) -> &String {
+        &self.build_context.log_directory
+    }
+
+    fn get_target_directory(&self) -> &String {
+        &self.build_context.target_directory
     }
 
     pub fn get_id(&self) -> String {
@@ -141,7 +182,7 @@ impl Build {
             BuildStatus::Build => self.build_app(),
             BuildStatus::Store => self.store_compilation().await,
             BuildStatus::Publish => self.publish_app().await,
-            BuildStatus::Done => self.done(),
+            BuildStatus::Succeed => self.succeed(),
             _ => unreachable!(),
         }
     }
@@ -182,7 +223,7 @@ impl Build {
             manifest_version.expect("unknown manifest version"),
             build_version
         );
-        let workspace = self.workspace.as_str();
+        let workspace = self.get_workspace().as_str();
         let manifest_id = self.manifest_id.as_str();
         let build_version = self.build_version;
         let app_directory = app_directory(workspace, manifest_id, build_version);
@@ -213,7 +254,7 @@ impl Build {
             build_version
         );
         // update dependency Cargo.toml
-        let workspace = self.workspace.as_str();
+        let workspace = self.get_workspace().as_str();
         let manifest_id = self.manifest_id.as_str();
         let build_version = self.build_version;
         let toml_path = app_toml_manifest_path(workspace, manifest_id, build_version);
@@ -242,13 +283,13 @@ impl Build {
             manifest_version.expect("unknown manifest version"),
             build_version
         );
-        let workspace = self.workspace.as_str();
+        let workspace = self.get_workspace().as_str();
         let manifest_id = self.manifest_id.as_str();
-        let log_directory = self.log_directory.as_str();
+        let log_directory = self.get_log_directory().as_str();
         let build_version = self.build_version;
         // cargo build and stream log to file
         let target_platform = self.target_platform.as_str();
-        let target_directory = self.target_directory.as_str();
+        let target_directory = self.get_target_directory().as_str();
         let toml_path = app_toml_manifest_path(workspace, manifest_id, build_version);
         let log_path = app_build_log_path(log_directory, manifest_id, build_version);
         cargo_build(
@@ -281,10 +322,10 @@ impl Build {
             build_version
         );
         // publish app binaries
-        Ok(Some(BuildStatus::Done))
+        Ok(Some(BuildStatus::Succeed))
     }
 
-    pub fn done(&mut self) -> Result<Option<BuildStatus>> {
+    pub fn succeed(&mut self) -> Result<Option<BuildStatus>> {
         let (manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "build succeed for {}:({}, {})",

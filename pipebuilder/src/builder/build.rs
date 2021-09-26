@@ -1,44 +1,31 @@
+use chrono::Utc;
 use pipebuilder_common::{
-    grpc::build::{builder_server::Builder, BuildRequest, BuildResponse},
+    grpc::build::{builder_server::Builder, BuildResponse},
     grpc::manifest::manifest_client::ManifestClient,
-    Build, BuildStatus, Register, VersionBuild,
+    Build, BuildStatus, LocalBuildContext, Register, VersionBuild,
 };
 use tonic::{transport::Channel, Response};
 use tracing::error;
 
 pub struct BuilderService {
-    // builder id
-    id: String,
-    // builder external_address
-    address: String,
     lease_id: i64,
     register: Register,
     manifest_client: ManifestClient<Channel>,
-    workspace: String,
-    target_directory: String,
-    build_log_directory: String,
+    context: LocalBuildContext,
 }
 
 impl BuilderService {
     pub fn new(
-        id: String,
-        address: String,
         lease_id: i64,
         register: Register,
         manifest_client: ManifestClient<Channel>,
-        workspace: String,
-        target_directory: String,
-        build_log_directory: String,
+        context: LocalBuildContext,
     ) -> Self {
         BuilderService {
-            id,
-            address,
             lease_id,
             register,
             manifest_client,
-            workspace,
-            target_directory,
-            build_log_directory,
+            context,
         }
     }
 }
@@ -66,61 +53,90 @@ impl Builder for BuilderService {
                 return Err(tonic::Status::internal(format!("{:#?}", err)));
             }
         };
+        // prepare build contexts
         let build_version = snapshot.latest_version;
-        // fetch latest manifest
         let manifest_client = self.manifest_client.clone();
-        /*
-        let (app, manifest_version) =
-            match read_manifest(manifest_client, String::from(manifest_id)).await {
-                Ok((app, version)) => (app, version),
-                Err(err) => {
-                    error!("read manifest {} failed, error: {:#?}", manifest_id, err);
-                    return Err(tonic::Status::invalid_argument(format!("{:#?}", err)));
-                }
-            };
-            */
-        let workspace = self.workspace.to_owned();
-        let target_directory = self.target_directory.to_owned();
-        let log_directory = self.build_log_directory.to_owned();
+        let build_context = self.context.to_owned();
         let target_platform = request.target_platform;
         let build = Build::new(
             manifest_id,
             manifest_client,
             build_version,
-            workspace,
-            target_directory,
+            build_context,
             target_platform,
-            log_directory,
         );
         // trigger build
-        // register.put_version_build_state(&id.to_string(), version, BuildStatus::Create, lease_id)
-        // response
+        let lease_id = self.lease_id;
+        let register = self.register.to_owned();
+        run(lease_id, register, build);
         Ok(Response::new(BuildResponse {
             version: build_version,
         }))
     }
 }
 
-async fn fail(
-    mut register: Register,
-    builder_id: String,
-    builder_ip: String,
+fn run(lease_id: i64, mut register: Register, mut build: Build) {
+    let _ = tokio::spawn(async move {
+        let mut status = BuildStatus::Pull;
+        loop {
+            // update build status in register
+            match update(&mut register, lease_id, &build, status.clone(), None).await {
+                Ok(()) => (),
+                Err(err) => {
+                    error!(
+                        "update build status failed for {}, error: {:#?}",
+                        build.get_id(),
+                        err
+                    );
+                    return;
+                }
+            };
+            // run current build state
+            let result = build.run(status.clone()).await;
+            let next_status = match result {
+                Ok(next_status) => next_status,
+                Err(err) => {
+                    let _ = update(
+                        &mut register,
+                        lease_id,
+                        &build,
+                        BuildStatus::Fail,
+                        Some(format!("{:#?}", err)),
+                    )
+                    .await;
+                    return;
+                }
+            };
+            // continue next state or exit
+            match next_status {
+                Some(next_status) => status = next_status,
+                None => return,
+            }
+        }
+    });
+}
+
+// update version build status
+async fn update(
+    register: &mut Register,
     lease_id: i64,
-    build: Build,
-    message: String,
+    build: &Build,
+    status: BuildStatus,
+    message: Option<String>,
 ) -> pipebuilder_common::Result<()> {
     let id = build.get_id();
     let version = build.get_build_version();
+    let (builder_id, builder_address) = build.get_builder_info();
+    let now = Utc::now();
+    let state = VersionBuild::new(
+        status,
+        now,
+        builder_id.to_owned(),
+        builder_address.to_owned(),
+        message,
+    );
     register
-        .put_version_build_state(
-            lease_id,
-            &id,
-            version,
-            BuildStatus::Fail,
-            builder_id,
-            builder_ip,
-            message.into(),
-        )
+        .put_version_build_state(lease_id, &id, version, state)
         .await?;
     Ok(())
 }
