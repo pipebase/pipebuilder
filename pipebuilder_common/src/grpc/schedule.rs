@@ -2,10 +2,12 @@
 pub struct ScheduleRequest {}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BuilderInfo {
+    /// builder id
     #[prost(string, tag = "1")]
-    pub builder_id: ::prost::alloc::string::String,
+    pub id: ::prost::alloc::string::String,
+    /// builder address
     #[prost(string, tag = "2")]
-    pub builder_addr: ::prost::alloc::string::String,
+    pub address: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ScheduleResponse {

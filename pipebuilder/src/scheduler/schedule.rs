@@ -1,13 +1,36 @@
 use etcd_client::{EventType, WatchStream};
 use flurry::HashMap;
-use pipebuilder_common::{deserialize_event, log_event, NodeState, Register, Result};
+use pipebuilder_common::{
+    deserialize_event,
+    grpc::schedule::{scheduler_server::Scheduler, BuilderInfo, ScheduleResponse},
+    log_event, NodeState, Register,
+};
 use std::sync::Arc;
+use tonic::Response;
 use tracing::{error, info};
 
 use crate::config::SchedulerConfig;
 
 pub struct SchedulerService {
     builders: Arc<HashMap<String, NodeState>>,
+}
+
+#[tonic::async_trait]
+impl Scheduler for SchedulerService {
+    async fn schedule(
+        &self,
+        _request: tonic::Request<pipebuilder_common::grpc::schedule::ScheduleRequest>,
+    ) -> Result<tonic::Response<pipebuilder_common::grpc::schedule::ScheduleResponse>, tonic::Status>
+    {
+        let builders_ref = self.builders.pin();
+        let builder = builders_ref.values().next();
+        let builder_info = builder.map(|b| {
+            let id = b.id.to_owned();
+            let address = b.external_address.to_owned();
+            BuilderInfo { id, address }
+        });
+        Ok(Response::new(ScheduleResponse { builder_info }))
+    }
 }
 
 impl SchedulerService {
@@ -46,7 +69,7 @@ impl SchedulerService {
     async fn watch(
         mut stream: WatchStream,
         builders: Arc<HashMap<String, NodeState>>,
-    ) -> Result<()> {
+    ) -> pipebuilder_common::Result<()> {
         while let Some(resp) = stream.message().await? {
             for event in resp.events() {
                 log_event(event)?;

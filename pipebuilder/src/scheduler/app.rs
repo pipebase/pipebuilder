@@ -26,9 +26,10 @@ async fn main() -> Result<()> {
         node_id, internal_address
     );
     // bootstrap schedluer services
-    let _ = bootstrap::bootstrap(SchedulerConfig {}, register);
+    let scheduler_svc = bootstrap::bootstrap(SchedulerConfig {}, register);
     Server::builder()
         .add_service(health_svc)
+        .add_service(scheduler_svc)
         .serve(addr)
         .await?;
     info!("scheduler server {:?} exit ...", node_id);

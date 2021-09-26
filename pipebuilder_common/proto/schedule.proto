@@ -4,8 +4,10 @@ package schedule;
 message ScheduleRequest {}
 
 message BuilderInfo {
-    string builder_id = 1;
-    string builder_addr = 2;
+    // builder id
+    string id = 1;
+    // builder address
+    string address = 2;
 }
 
 message ScheduleResponse {
