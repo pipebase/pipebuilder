@@ -6,6 +6,8 @@ use pipebuilder_common::{
 use tonic::transport::Channel;
 
 fn build_builder_service(
+    node_id: String,
+    external_address: String,
     lease_id: i64,
     register: Register,
     manifest_client: ManifestClient<Channel>,
@@ -14,6 +16,8 @@ fn build_builder_service(
     build_log_directory: String,
 ) -> BuilderService {
     BuilderService::new(
+        node_id,
+        external_address,
         lease_id,
         register,
         manifest_client,
@@ -29,6 +33,8 @@ async fn build_manifest_client(endpoint: String) -> Result<ManifestClient<Channe
 }
 
 pub async fn bootstrap(
+    node_id: String,
+    external_address: String,
     config: BuilderConfig,
     lease_id: i64,
     register: Register,
@@ -39,6 +45,8 @@ pub async fn bootstrap(
     let target_directory = config.target_directory;
     let build_log_directory = config.build_log_directory;
     let builder_svc = build_builder_service(
+        node_id,
+        external_address,
         lease_id,
         register,
         manifest_client,

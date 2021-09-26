@@ -109,6 +109,10 @@ impl NodeService {
         &self.internal_address
     }
 
+    pub fn get_external_address(&self) -> &String {
+        &self.external_address
+    }
+
     pub fn run(&self, mut register: Register) {
         let heartbeat_period = self.heartbeat_period.to_owned();
         let mut interval = tokio::time::interval(heartbeat_period);

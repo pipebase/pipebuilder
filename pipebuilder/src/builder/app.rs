@@ -21,10 +21,18 @@ async fn main() -> Result<()> {
         pipebuilder_common::bootstrap(config.base).await?;
     let lease_id = lease_svc.get_lease_id();
     // bootstrap builder service
-    let builder_svc = bootstrap(config.builder, lease_id, register).await?;
+    let node_id = node_svc.get_id();
+    let external_address = node_svc.get_external_address();
+    let builder_svc = bootstrap(
+        node_id.clone(),
+        external_address.clone(),
+        config.builder,
+        lease_id,
+        register,
+    )
+    .await?;
     // bootstrap server
-    let node_id = node_svc.get_id().to_owned();
-    let internal_address = node_svc.get_internal_address().to_owned();
+    let internal_address = node_svc.get_internal_address();
     let addr: SocketAddr = internal_address.parse()?;
     info!(
         "run builder server {:?}, internal address {:?}...",

@@ -47,15 +47,27 @@ pub struct VersionBuild {
     pub status: BuildStatus,
     // timestamp
     pub timestamp: DateTime<Utc>,
+    // builder id
+    pub builder_id: String,
+    // builder external adress
+    pub builder_address: String,
     // message
     pub message: Option<String>,
 }
 
 impl VersionBuild {
-    pub fn new(status: BuildStatus, timestamp: DateTime<Utc>, message: Option<String>) -> Self {
+    pub fn new(
+        status: BuildStatus,
+        timestamp: DateTime<Utc>,
+        builder_id: String,
+        builder_address: String,
+        message: Option<String>,
+    ) -> Self {
         VersionBuild {
             status,
             timestamp,
+            builder_id,
+            builder_address,
             message,
         }
     }

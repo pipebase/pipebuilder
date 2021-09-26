@@ -9,3 +9,6 @@ base:
     endpoints: ["localhost:2379"]
 builder:
   manifest_endpoint: 127.0.0.1:17000
+  workspace: /opt/builder/apps
+  target_directory: /opt/builder/targets
+  build_log_directory: /opt/builder/logs

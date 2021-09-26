@@ -257,11 +257,13 @@ impl Register {
         id: &str,
         version: u64,
         status: BuildStatus,
+        builder_id: String,
+        builder_address: String,
         message: Option<String>,
     ) -> Result<(PutResponse, VersionBuild)> {
         let key = prefix_id_version_key(REGISTER_KEY_PREFIX_VERSION_BUILD, id, version);
         let now = Utc::now();
-        let state = VersionBuild::new(status, now, message);
+        let state = VersionBuild::new(status, now, builder_id, builder_address, message);
         let value = serde_json::to_vec(&state)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, state))
@@ -273,13 +275,15 @@ impl Register {
         id: &str,
         version: u64,
         status: BuildStatus,
+        builder_id: String,
+        builder_address: String,
         message: Option<String>,
     ) -> Result<(PutResponse, VersionBuild)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
         let lock_resp = self.lock(id, lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self
-            .do_put_version_build_state(id, version, status, message)
+            .do_put_version_build_state(id, version, status, builder_id, builder_address, message)
             .await;
         self.unlock(id, key).await?;
         resp

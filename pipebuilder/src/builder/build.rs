@@ -7,6 +7,10 @@ use tonic::{transport::Channel, Response};
 use tracing::error;
 
 pub struct BuilderService {
+    // builder id
+    id: String,
+    // builder external_address
+    address: String,
     lease_id: i64,
     register: Register,
     manifest_client: ManifestClient<Channel>,
@@ -17,6 +21,8 @@ pub struct BuilderService {
 
 impl BuilderService {
     pub fn new(
+        id: String,
+        address: String,
         lease_id: i64,
         register: Register,
         manifest_client: ManifestClient<Channel>,
@@ -25,6 +31,8 @@ impl BuilderService {
         build_log_directory: String,
     ) -> Self {
         BuilderService {
+            id,
+            address,
             lease_id,
             register,
             manifest_client,
@@ -95,6 +103,8 @@ impl Builder for BuilderService {
 
 async fn fail(
     mut register: Register,
+    builder_id: String,
+    builder_ip: String,
     lease_id: i64,
     build: Build,
     message: String,
@@ -102,7 +112,15 @@ async fn fail(
     let id = build.get_id();
     let version = build.get_build_version();
     register
-        .put_version_build_state(lease_id, &id, version, BuildStatus::Fail, message.into())
+        .put_version_build_state(
+            lease_id,
+            &id,
+            version,
+            BuildStatus::Fail,
+            builder_id,
+            builder_ip,
+            message.into(),
+        )
         .await?;
     Ok(())
 }
