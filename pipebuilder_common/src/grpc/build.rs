@@ -1,10 +1,13 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BuildRequest {
-    /// manifest id
+    /// manifest namespace
     #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// manifest id
+    #[prost(string, tag = "2")]
     pub manifest_id: ::prost::alloc::string::String,
     /// target platform
-    #[prost(string, tag = "2")]
+    #[prost(string, tag = "3")]
     pub target_platform: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

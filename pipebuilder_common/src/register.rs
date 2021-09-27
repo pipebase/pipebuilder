@@ -1,8 +1,9 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
-    prefix_id_key, prefix_id_version_key, read_file, BuildSnapshot, ManifestSnapshot, NodeState,
-    Result, VersionBuild, REGISTER_KEY_PREFIX_BUILDER, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
-    REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_VERSION_BUILD,
+    prefix_namespace_id_key, prefix_namespace_id_version_key, read_file, BuildSnapshot,
+    ManifestSnapshot, NodeState, Result, VersionBuild, REGISTER_KEY_PREFIX_BUILDER,
+    REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
+    REGISTER_KEY_PREFIX_VERSION_BUILD,
 };
 use etcd_client::{
     Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, LeaseGrantResponse,
@@ -208,24 +209,31 @@ impl Register {
 
     async fn do_incr_build_snapshot(
         &mut self,
+        namespace: &str,
         manifest_id: &str,
     ) -> Result<(PutResponse, BuildSnapshot)> {
         // get current snapshot and incr version
-        let new_snapshot = match self.do_get_build_snapshot(manifest_id).await? {
+        let new_snapshot = match self.do_get_build_snapshot(namespace, manifest_id).await? {
             Some(mut snapshot) => {
                 snapshot.latest_version += 1;
                 snapshot
             }
             None => BuildSnapshot::default(),
         };
-        let key = prefix_id_key(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, manifest_id);
+        let key =
+            prefix_namespace_id_key(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, manifest_id);
         let value = serde_json::to_vec(&new_snapshot)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, new_snapshot))
     }
 
-    async fn do_get_build_snapshot(&mut self, manifest_id: &str) -> Result<Option<BuildSnapshot>> {
-        let key = prefix_id_key(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, manifest_id);
+    async fn do_get_build_snapshot(
+        &mut self,
+        namespace: &str,
+        manifest_id: &str,
+    ) -> Result<Option<BuildSnapshot>> {
+        let key =
+            prefix_namespace_id_key(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, manifest_id);
         let get_resp = self.get(key.clone(), None).await?;
         let snapshot = match get_resp.kvs().first() {
             Some(kv) => {
@@ -239,24 +247,31 @@ impl Register {
 
     pub async fn incr_build_snapshot(
         &mut self,
+        namespace: &str,
         manifest_id: &str,
         lease_id: i64,
     ) -> Result<(PutResponse, BuildSnapshot)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
         let lock_resp = self.lock(manifest_id, lock_options.into()).await?;
         let key = lock_resp.key();
-        let resp = self.do_incr_build_snapshot(manifest_id).await;
+        let resp = self.do_incr_build_snapshot(namespace, manifest_id).await;
         self.unlock(manifest_id, key).await?;
         resp
     }
 
     pub async fn do_put_version_build_state(
         &mut self,
+        namespace: &str,
         id: &str,
         version: u64,
         state: VersionBuild,
     ) -> Result<(PutResponse, VersionBuild)> {
-        let key = prefix_id_version_key(REGISTER_KEY_PREFIX_VERSION_BUILD, id, version);
+        let key = prefix_namespace_id_version_key(
+            REGISTER_KEY_PREFIX_VERSION_BUILD,
+            namespace,
+            id,
+            version,
+        );
         let value = serde_json::to_vec(&state)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, state))
@@ -265,6 +280,7 @@ impl Register {
     pub async fn put_version_build_state(
         &mut self,
         lease_id: i64,
+        namespace: &str,
         id: &str,
         version: u64,
         state: VersionBuild,
@@ -272,23 +288,26 @@ impl Register {
         let lock_options = LockOptions::new().with_lease(lease_id);
         let lock_resp = self.lock(id, lock_options.into()).await?;
         let key = lock_resp.key();
-        let resp = self.do_put_version_build_state(id, version, state).await;
+        let resp = self
+            .do_put_version_build_state(namespace, id, version, state)
+            .await;
         self.unlock(id, key).await?;
         resp
     }
 
     async fn do_incr_manifest_snapshot(
         &mut self,
+        namespace: &str,
         id: &str,
     ) -> Result<(PutResponse, ManifestSnapshot)> {
-        let new_snapshot = match self.do_get_manifest_snapshot(id).await? {
+        let new_snapshot = match self.do_get_manifest_snapshot(namespace, id).await? {
             Some(mut snapshot) => {
                 snapshot.latest_version += 1;
                 snapshot
             }
             None => ManifestSnapshot::new(),
         };
-        let key = prefix_id_key(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, id);
+        let key = prefix_namespace_id_key(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace, id);
         let value = serde_json::to_vec(&new_snapshot)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, new_snapshot))
@@ -297,18 +316,23 @@ impl Register {
     pub async fn incr_manifest_snapshot(
         &mut self,
         lease_id: i64,
+        namespace: &str,
         id: &str,
     ) -> Result<(PutResponse, ManifestSnapshot)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
         let lock_resp = self.lock(id, lock_options.into()).await?;
         let key = lock_resp.key();
-        let resp = self.do_incr_manifest_snapshot(id).await;
+        let resp = self.do_incr_manifest_snapshot(namespace, id).await;
         self.unlock(id, key).await?;
         resp
     }
 
-    async fn do_get_manifest_snapshot(&mut self, id: &str) -> Result<Option<ManifestSnapshot>> {
-        let key = prefix_id_key(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, id);
+    async fn do_get_manifest_snapshot(
+        &mut self,
+        namespace: &str,
+        id: &str,
+    ) -> Result<Option<ManifestSnapshot>> {
+        let key = prefix_namespace_id_key(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace, id);
         let get_resp = self.get(key.clone(), None).await?;
         let snapshot = match get_resp.kvs().first() {
             Some(kv) => {
@@ -323,12 +347,13 @@ impl Register {
     pub async fn get_manifest_snapshot(
         &mut self,
         lease_id: i64,
+        namespace: &str,
         id: &str,
     ) -> Result<Option<ManifestSnapshot>> {
         let lock_options = LockOptions::new().with_lease(lease_id);
         let lock_resp = self.lock(id, lock_options.into()).await?;
         let key = lock_resp.key();
-        let resp = self.do_get_manifest_snapshot(id).await;
+        let resp = self.do_get_manifest_snapshot(namespace, id).await;
         self.unlock(id, key).await?;
         resp
     }

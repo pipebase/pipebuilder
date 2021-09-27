@@ -188,8 +188,17 @@ pub fn prefix_id_key(prefix: &str, id: &str) -> String {
     format!("{}/{}", prefix, id)
 }
 
-pub fn prefix_id_version_key(prefix: &str, id: &str, version: u64) -> String {
-    format!("{}/{}/{}", prefix, id, version)
+pub fn prefix_namespace_id_key(prefix: &str, namespace: &str, id: &str) -> String {
+    format!("{}/{}/{}", prefix, namespace, id)
+}
+
+pub fn prefix_namespace_id_version_key(
+    prefix: &str,
+    namespace: &str,
+    id: &str,
+    version: u64,
+) -> String {
+    format!("{}/{}/{}/{}", prefix, namespace, id, version)
 }
 
 // rpc status
@@ -202,8 +211,8 @@ pub fn not_found(message: &str) -> tonic::Status {
 }
 
 // rpc request
-pub fn build_get_manifest_request(id: String) -> GetManifestRequest {
-    GetManifestRequest { id }
+pub fn build_get_manifest_request(namespace: String, id: String) -> GetManifestRequest {
+    GetManifestRequest { namespace, id }
 }
 
 // App cargo.toml

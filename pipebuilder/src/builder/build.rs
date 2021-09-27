@@ -38,13 +38,14 @@ impl Builder for BuilderService {
     ) -> Result<tonic::Response<pipebuilder_common::grpc::build::BuildResponse>, tonic::Status>
     {
         let request = request.into_inner();
+        let namespace = request.namespace;
         let manifest_id = request.manifest_id;
         // lock build snapshot with manifest id
         // update latest build version
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         let snapshot = match register
-            .incr_build_snapshot(manifest_id.as_str(), lease_id)
+            .incr_build_snapshot(namespace.as_str(), manifest_id.as_str(), lease_id)
             .await
         {
             Ok((_, snapshot)) => snapshot,
@@ -59,6 +60,7 @@ impl Builder for BuilderService {
         let build_context = self.context.to_owned();
         let target_platform = request.target_platform;
         let build = Build::new(
+            namespace,
             manifest_id,
             manifest_client,
             build_version,
@@ -83,10 +85,10 @@ fn start_build(lease_id: i64, mut register: Register, mut build: Build) {
             match update(&mut register, lease_id, &build, status.clone(), None).await {
                 Ok(()) => (),
                 Err(err) => {
-                    let (id, _, build_version) = build.get_build_meta();
+                    let (namespace, id, _, build_version) = build.get_build_meta();
                     error!(
-                        "update build status failed for {}:{}, error: {:#?}",
-                        id, build_version, err
+                        "update build status failed for {}/{}:{}, error: {:#?}",
+                        namespace, id, build_version, err
                     );
                     return;
                 }
@@ -124,7 +126,7 @@ async fn update(
     status: BuildStatus,
     message: Option<String>,
 ) -> pipebuilder_common::Result<()> {
-    let (id, _, build_version) = build.get_build_meta();
+    let (namespace, id, _, build_version) = build.get_build_meta();
     let (builder_id, builder_address) = build.get_builder_meta();
     let now = Utc::now();
     let state = VersionBuild::new(
@@ -135,7 +137,13 @@ async fn update(
         message,
     );
     register
-        .put_version_build_state(lease_id, id.as_str(), build_version, state)
+        .put_version_build_state(
+            lease_id,
+            namespace.as_str(),
+            id.as_str(),
+            build_version,
+            state,
+        )
         .await?;
     Ok(())
 }

@@ -1,7 +1,9 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetManifestRequest {
-    /// get manifest given manifest id
+    /// get manifest given manifest (namespace, id)
     #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -15,11 +17,14 @@ pub struct GetManifestResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PutManifestRequest {
+    /// manifest namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
     /// manifest id
-    #[prost(string, optional, tag = "1")]
+    #[prost(string, optional, tag = "2")]
     pub id: ::core::option::Option<::prost::alloc::string::String>,
     /// manifest binaries
-    #[prost(bytes = "vec", tag = "2")]
+    #[prost(bytes = "vec", tag = "3")]
     pub buffer: ::prost::alloc::vec::Vec<u8>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

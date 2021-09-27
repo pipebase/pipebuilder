@@ -33,18 +33,26 @@ impl Manifest for ManifestService {
         tonic::Status,
     > {
         let request_ref = request.get_ref();
+        let namespace = request_ref.namespace.as_str();
         let id = request_ref.id.as_str();
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
-        let snapshot = match register.get_manifest_snapshot(lease_id, id).await {
+        let snapshot = match register
+            .get_manifest_snapshot(lease_id, namespace, id)
+            .await
+        {
             Ok(snapshot) => snapshot,
             Err(err) => return Err(internal_error(err)),
         };
         let snapshot = match snapshot {
             Some(snapshot) => snapshot,
-            None => return Err(not_found(&format!("manifest {} not found in register", id))),
+            None => {
+                return Err(not_found(&format!(
+                    "manifest {}/{} not found in register",
+                    namespace, id
+                )))
+            }
         };
-        // TODO: read manifest binaries from repository
         let repository = self.repository.as_str();
         let version = snapshot.latest_version;
         match read_manifest_from_repo(repository, id, version) {
@@ -61,6 +69,7 @@ impl Manifest for ManifestService {
         tonic::Status,
     > {
         let request_ref = request.get_ref();
+        let namespace = request_ref.namespace.as_str();
         let id = match request_ref.id {
             Some(ref id) => id.to_owned(),
             None => {
@@ -70,7 +79,10 @@ impl Manifest for ManifestService {
         };
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
-        let version = match register.incr_manifest_snapshot(lease_id, id.as_str()).await {
+        let version = match register
+            .incr_manifest_snapshot(lease_id, namespace, id.as_str())
+            .await
+        {
             Ok((_, snapshot)) => snapshot.latest_version,
             Err(err) => return Err(internal_error(err)),
         };

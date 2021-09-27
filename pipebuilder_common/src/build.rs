@@ -111,6 +111,7 @@ impl LocalBuildContext {
 
 // App build
 pub struct Build {
+    pub namespace: String,
     pub manifest_id: String,
     pub manifest_client: ManifestClient<Channel>,
     pub build_version: u64,
@@ -122,6 +123,7 @@ pub struct Build {
 
 impl Build {
     pub fn new(
+        namespace: String,
         manifest_id: String,
         manifest_client: ManifestClient<Channel>,
         build_version: u64,
@@ -129,6 +131,7 @@ impl Build {
         target_platform: String,
     ) -> Self {
         Build {
+            namespace,
             manifest_id,
             manifest_client,
             build_version,
@@ -156,11 +159,12 @@ impl Build {
         &self.build_context.target_directory
     }
 
-    pub fn get_build_meta(&self) -> (&String, Option<&u64>, u64) {
+    pub fn get_build_meta(&self) -> (&String, &String, Option<&u64>, u64) {
+        let namespace = &self.namespace;
         let manifest_id = &self.manifest_id;
         let manifest_version = self.manifest_version.as_ref();
         let build_version = self.build_version;
-        (manifest_id, manifest_version, build_version)
+        (namespace, manifest_id, manifest_version, build_version)
     }
 
     // run current status and return next status
@@ -180,8 +184,9 @@ impl Build {
     }
 
     pub async fn pull_manifest(&mut self) -> Result<Option<BuildStatus>> {
+        let namespace = self.namespace.to_owned();
         let manifest_id = self.manifest_id.to_owned();
-        let request = build_get_manifest_request(manifest_id);
+        let request = build_get_manifest_request(namespace, manifest_id);
         let response = self
             .manifest_client
             .get_manifest(request)
@@ -196,9 +201,10 @@ impl Build {
     }
 
     pub fn validate_manifest(&mut self) -> Result<Option<BuildStatus>> {
-        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
-            "validate manifest {}:({}, {})",
+            "validate manifest {}/{}:({}, {})",
+            namespace,
             manifest_id,
             manifest_version.expect("unknown manifest version"),
             build_version
@@ -208,9 +214,10 @@ impl Build {
     }
 
     pub fn create_build(&mut self) -> Result<Option<BuildStatus>> {
-        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
-            "create build workspace for manifest {}:({}, {})",
+            "create build workspace for manifest {}/{}:({}, {})",
+            namespace,
             manifest_id,
             manifest_version.expect("unknown manifest version"),
             build_version
@@ -226,9 +233,10 @@ impl Build {
     }
 
     pub async fn restore_compilation(&mut self) -> Result<Option<BuildStatus>> {
-        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
-            "restore compilation for manifest {}:({}, {})",
+            "restore compilation for manifest {}/{}:({}, {})",
+            namespace,
             manifest_id,
             manifest_version.expect("unknown manifest version"),
             build_version
@@ -238,9 +246,10 @@ impl Build {
     }
 
     pub fn generate_app(&mut self) -> Result<Option<BuildStatus>> {
-        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
-            "generate app for {}:({}, {})",
+            "generate app for {}/{}:({}, {})",
+            namespace,
             manifest_id,
             manifest_version.expect("unknown manifest version"),
             build_version
@@ -268,9 +277,10 @@ impl Build {
     }
 
     pub fn build_app(&mut self) -> Result<Option<BuildStatus>> {
-        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
-            "build app for {}:({}, {})",
+            "build app for {}/{}:({}, {})",
+            namespace,
             manifest_id,
             manifest_version.expect("unknown manifest version"),
             build_version
@@ -294,9 +304,10 @@ impl Build {
     }
 
     pub async fn store_compilation(&mut self) -> Result<Option<BuildStatus>> {
-        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
-            "store compilation for {}:({}, {})",
+            "store compilation for {}/{}:({}, {})",
+            namespace,
             manifest_id,
             manifest_version.expect("unknown manifest version"),
             build_version
@@ -306,9 +317,10 @@ impl Build {
     }
 
     pub async fn publish_app(&mut self) -> Result<Option<BuildStatus>> {
-        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
-            "publish app binaries for {}:({}, {})",
+            "publish app binaries for {}/{}:({}, {})",
+            namespace,
             manifest_id,
             manifest_version.expect("unknown manifest version"),
             build_version
@@ -318,9 +330,10 @@ impl Build {
     }
 
     pub fn succeed(&mut self) -> Result<Option<BuildStatus>> {
-        let (manifest_id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
-            "build succeed for {}:({}, {})",
+            "build succeed for {}/{}:({}, {})",
+            namespace,
             manifest_id,
             manifest_version.expect("unknown manifest version"),
             build_version

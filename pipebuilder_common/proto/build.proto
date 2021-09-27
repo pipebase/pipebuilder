@@ -2,10 +2,12 @@ syntax = "proto3";
 package build;
 
 message BuildRequest {
+    // manifest namespace
+    string namespace = 1;
     // manifest id
-    string manifest_id = 1;
+    string manifest_id = 2;
     // target platform
-    string target_platform = 2;
+    string target_platform = 3;
 }
 
 message BuildResponse {
