@@ -204,10 +204,7 @@ impl Build {
         let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "validate manifest {}/{}:({}, {})",
-            namespace,
-            manifest_id,
-            manifest_version,
-            build_version
+            namespace, manifest_id, manifest_version, build_version
         );
         self.app.as_ref().expect("app not initialized").validate()?;
         Ok(Some(BuildStatus::Create))
@@ -217,10 +214,7 @@ impl Build {
         let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "create build workspace for manifest {}/{}:({}, {})",
-            namespace,
-            manifest_id,
-            manifest_version,
-            build_version
+            namespace, manifest_id, manifest_version, build_version
         );
         let workspace = self.get_workspace().as_str();
         let manifest_id = self.manifest_id.as_str();
@@ -236,10 +230,7 @@ impl Build {
         let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "restore compilation for manifest {}/{}:({}, {})",
-            namespace,
-            manifest_id,
-            manifest_version,
-            build_version
+            namespace, manifest_id, manifest_version, build_version
         );
         // restore previous compilation if any
         Ok(Some(BuildStatus::Generate))
@@ -249,10 +240,7 @@ impl Build {
         let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "generate app for {}/{}:({}, {})",
-            namespace,
-            manifest_id,
-            manifest_version,
-            build_version
+            namespace, manifest_id, manifest_version, build_version
         );
         // update dependency Cargo.toml
         let workspace = self.get_workspace().as_str();
@@ -280,10 +268,7 @@ impl Build {
         let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "build app for {}/{}:({}, {})",
-            namespace,
-            manifest_id,
-            manifest_version,
-            build_version
+            namespace, manifest_id, manifest_version, build_version
         );
         let workspace = self.get_workspace().as_str();
         let manifest_id = self.manifest_id.as_str();
@@ -307,10 +292,7 @@ impl Build {
         let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "store compilation for {}/{}:({}, {})",
-            namespace,
-            manifest_id,
-            manifest_version,
-            build_version
+            namespace, manifest_id, manifest_version, build_version
         );
         // store target folder
         Ok(Some(BuildStatus::Publish))
@@ -320,10 +302,7 @@ impl Build {
         let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "publish app binaries for {}/{}:({}, {})",
-            namespace,
-            manifest_id,
-            manifest_version,
-            build_version
+            namespace, manifest_id, manifest_version, build_version
         );
         // publish app binaries
         Ok(Some(BuildStatus::Succeed))
@@ -333,10 +312,7 @@ impl Build {
         let (namespace, manifest_id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "build succeed for {}/{}:({}, {})",
-            namespace,
-            manifest_id,
-            manifest_version,
-            build_version
+            namespace, manifest_id, manifest_version, build_version
         );
         Ok(None)
     }
