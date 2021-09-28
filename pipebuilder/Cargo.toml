@@ -24,9 +24,11 @@ path = "src/manifest/app.rs"
 etcd-client = "0.7.2"
 chrono = { version = "0.4" }
 flurry = "0.3.1"
+http = "0.2.5"
 pipebuilder_common = { version = "0.1.0", path = "../pipebuilder_common" }
 prost = "0.8"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.64"
 tonic = "0.5"
 tokio = { version = "1.11.0", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1"
