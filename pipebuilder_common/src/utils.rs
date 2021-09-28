@@ -211,8 +211,8 @@ pub fn not_found(message: &str) -> tonic::Status {
 }
 
 // rpc request
-pub fn build_get_manifest_request(namespace: String, id: String) -> GetManifestRequest {
-    GetManifestRequest { namespace, id }
+pub fn build_get_manifest_request(namespace: String, id: String, version: u64) -> GetManifestRequest {
+    GetManifestRequest { namespace, id, version }
 }
 
 // App cargo.toml

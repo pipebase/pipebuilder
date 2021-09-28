@@ -113,11 +113,11 @@ impl LocalBuildContext {
 pub struct Build {
     pub namespace: String,
     pub manifest_id: String,
+    pub manifest_version: u64,
     pub manifest_client: ManifestClient<Channel>,
     pub build_version: u64,
     pub build_context: LocalBuildContext,
     pub target_platform: String,
-    pub manifest_version: Option<u64>,
     pub app: Option<App>,
 }
 
@@ -125,6 +125,7 @@ impl Build {
     pub fn new(
         namespace: String,
         manifest_id: String,
+        manifest_version: u64,
         manifest_client: ManifestClient<Channel>,
         build_version: u64,
         build_context: LocalBuildContext,
@@ -133,11 +134,11 @@ impl Build {
         Build {
             namespace,
             manifest_id,
+            manifest_version,
             manifest_client,
             build_version,
             build_context,
             target_platform,
-            manifest_version: None,
             app: None,
         }
     }
@@ -159,10 +160,10 @@ impl Build {
         &self.build_context.target_directory
     }
 
-    pub fn get_build_meta(&self) -> (&String, &String, Option<&u64>, u64) {
+    pub fn get_build_meta(&self) -> (&String, &String, u64, u64) {
         let namespace = &self.namespace;
         let manifest_id = &self.manifest_id;
-        let manifest_version = self.manifest_version.as_ref();
+        let manifest_version = self.manifest_version;
         let build_version = self.build_version;
         (namespace, manifest_id, manifest_version, build_version)
     }
@@ -186,17 +187,16 @@ impl Build {
     pub async fn pull_manifest(&mut self) -> Result<Option<BuildStatus>> {
         let namespace = self.namespace.to_owned();
         let manifest_id = self.manifest_id.to_owned();
-        let request = build_get_manifest_request(namespace, manifest_id);
+        let manifest_version = self.manifest_version;
+        let request = build_get_manifest_request(namespace, manifest_id, manifest_version);
         let response = self
             .manifest_client
             .get_manifest(request)
             .await?
             .into_inner();
-        let version = response.version;
         let buffer = response.buffer;
         let app = App::read_from_buffer(buffer.as_slice())?;
         self.app = Some(app);
-        self.manifest_version = Some(version);
         Ok(Some(BuildStatus::Validate))
     }
 
@@ -206,7 +206,7 @@ impl Build {
             "validate manifest {}/{}:({}, {})",
             namespace,
             manifest_id,
-            manifest_version.expect("unknown manifest version"),
+            manifest_version,
             build_version
         );
         self.app.as_ref().expect("app not initialized").validate()?;
@@ -219,7 +219,7 @@ impl Build {
             "create build workspace for manifest {}/{}:({}, {})",
             namespace,
             manifest_id,
-            manifest_version.expect("unknown manifest version"),
+            manifest_version,
             build_version
         );
         let workspace = self.get_workspace().as_str();
@@ -238,7 +238,7 @@ impl Build {
             "restore compilation for manifest {}/{}:({}, {})",
             namespace,
             manifest_id,
-            manifest_version.expect("unknown manifest version"),
+            manifest_version,
             build_version
         );
         // restore previous compilation if any
@@ -251,7 +251,7 @@ impl Build {
             "generate app for {}/{}:({}, {})",
             namespace,
             manifest_id,
-            manifest_version.expect("unknown manifest version"),
+            manifest_version,
             build_version
         );
         // update dependency Cargo.toml
@@ -282,7 +282,7 @@ impl Build {
             "build app for {}/{}:({}, {})",
             namespace,
             manifest_id,
-            manifest_version.expect("unknown manifest version"),
+            manifest_version,
             build_version
         );
         let workspace = self.get_workspace().as_str();
@@ -309,7 +309,7 @@ impl Build {
             "store compilation for {}/{}:({}, {})",
             namespace,
             manifest_id,
-            manifest_version.expect("unknown manifest version"),
+            manifest_version,
             build_version
         );
         // store target folder
@@ -322,7 +322,7 @@ impl Build {
             "publish app binaries for {}/{}:({}, {})",
             namespace,
             manifest_id,
-            manifest_version.expect("unknown manifest version"),
+            manifest_version,
             build_version
         );
         // publish app binaries
@@ -335,7 +335,7 @@ impl Build {
             "build succeed for {}/{}:({}, {})",
             namespace,
             manifest_id,
-            manifest_version.expect("unknown manifest version"),
+            manifest_version,
             build_version
         );
         Ok(None)

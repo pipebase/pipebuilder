@@ -40,6 +40,7 @@ impl Builder for BuilderService {
         let request = request.into_inner();
         let namespace = request.namespace;
         let manifest_id = request.manifest_id;
+        let manifest_version = request.manifest_version;
         // lock build snapshot with manifest id
         // update latest build version
         let mut register = self.register.clone();
@@ -62,6 +63,7 @@ impl Builder for BuilderService {
         let build = Build::new(
             namespace,
             manifest_id,
+            manifest_version,
             manifest_client,
             build_version,
             build_context,

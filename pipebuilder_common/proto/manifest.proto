@@ -5,13 +5,13 @@ message GetManifestRequest {
     // get manifest given manifest (namespace, id)
     string namespace = 1;
     string id = 2;
+    // latest manifest version
+    uint64 version = 3;
 }
 
 message GetManifestResponse {
-    // latest manifest version
-    uint64 version = 1;
     // manifest binaries
-    bytes buffer = 2;
+    bytes buffer = 1;
 }
 
 message PutManifestRequest {

@@ -6,8 +6,10 @@ message BuildRequest {
     string namespace = 1;
     // manifest id
     string manifest_id = 2;
+    // manifest version
+    uint64 manifest_version = 3;
     // target platform
-    string target_platform = 3;
+    string target_platform = 4;
 }
 
 message BuildResponse {

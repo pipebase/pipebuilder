@@ -6,8 +6,11 @@ pub struct BuildRequest {
     /// manifest id
     #[prost(string, tag = "2")]
     pub manifest_id: ::prost::alloc::string::String,
+    /// manifest version
+    #[prost(uint64, tag = "3")]
+    pub manifest_version: u64,
     /// target platform
-    #[prost(string, tag = "3")]
+    #[prost(string, tag = "4")]
     pub target_platform: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

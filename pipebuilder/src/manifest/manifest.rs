@@ -1,6 +1,6 @@
 use pipebuilder_common::{
     grpc::manifest::{manifest_server::Manifest, GetManifestResponse, PutManifestResponse},
-    internal_error, not_found, read_file, write_file, Register,
+    internal_error, read_file, write_file, Register,
 };
 use tonic::Response;
 use uuid::Uuid;
@@ -33,30 +33,12 @@ impl Manifest for ManifestService {
         tonic::Status,
     > {
         let request_ref = request.get_ref();
+        let repository = self.repository.as_str();
         let namespace = request_ref.namespace.as_str();
         let id = request_ref.id.as_str();
-        let mut register = self.register.clone();
-        let lease_id = self.lease_id;
-        let snapshot = match register
-            .get_manifest_snapshot(lease_id, namespace, id)
-            .await
-        {
-            Ok(snapshot) => snapshot,
-            Err(err) => return Err(internal_error(err)),
-        };
-        let snapshot = match snapshot {
-            Some(snapshot) => snapshot,
-            None => {
-                return Err(not_found(&format!(
-                    "manifest {}/{} not found in register",
-                    namespace, id
-                )))
-            }
-        };
-        let repository = self.repository.as_str();
-        let version = snapshot.latest_version;
-        match read_manifest_from_repo(repository, id, version) {
-            Ok(buffer) => Ok(Response::new(GetManifestResponse { version, buffer })),
+        let version = request_ref.version;
+        match read_manifest_from_repo(repository, namespace, id, version) {
+            Ok(buffer) => Ok(Response::new(GetManifestResponse { buffer })),
             Err(err) => Err(internal_error(err)),
         }
     }
@@ -89,7 +71,7 @@ impl Manifest for ManifestService {
         let repository = self.repository.as_str();
         let buffer = request_ref.buffer.as_slice();
         // TODO: validate manifest before write
-        match write_manifest_into_repo(repository, id.as_str(), version, buffer) {
+        match write_manifest_into_repo(repository, namespace, id.as_str(), version, buffer) {
             Ok(_) => Ok(Response::new(PutManifestResponse { id, version })),
             Err(err) => return Err(internal_error(err)),
         }
@@ -98,26 +80,28 @@ impl Manifest for ManifestService {
 
 fn read_manifest_from_repo(
     repository: &str,
+    namespace: &str,
     id: &str,
     version: u64,
 ) -> pipebuilder_common::Result<Vec<u8>> {
-    let path = get_manifest_path(repository, id, version);
+    let path = get_manifest_path(repository, namespace, id, version);
     let buffer = read_file(path)?;
     Ok(buffer)
 }
 
 fn write_manifest_into_repo(
     repository: &str,
+    namespace: &str,
     id: &str,
     version: u64,
     buffer: &[u8],
 ) -> pipebuilder_common::Result<()> {
-    let path = get_manifest_path(repository, id, version);
+    let path = get_manifest_path(repository, namespace, id, version);
     write_file(path, buffer)?;
     // TODO S3 backup
     Ok(())
 }
 
-fn get_manifest_path(repository: &str, id: &str, version: u64) -> String {
-    format!("{}/{}/{}", repository, id, version)
+fn get_manifest_path(repository: &str, namespace: &str, id: &str, version: u64) -> String {
+    format!("{}/{}/{}/{}", repository, namespace, id, version)
 }

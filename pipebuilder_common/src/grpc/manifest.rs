@@ -5,14 +5,14 @@ pub struct GetManifestRequest {
     pub namespace: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
+    /// latest manifest version
+    #[prost(uint64, tag = "3")]
+    pub version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetManifestResponse {
-    /// latest manifest version
-    #[prost(uint64, tag = "1")]
-    pub version: u64,
     /// manifest binaries
-    #[prost(bytes = "vec", tag = "2")]
+    #[prost(bytes = "vec", tag = "1")]
     pub buffer: ::prost::alloc::vec::Vec<u8>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
