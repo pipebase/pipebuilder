@@ -1,14 +1,13 @@
-mod filters {
-    use warp::Filter;
+pub mod filters {
+    use super::{handlers, models};
     use pipebuilder_common::{
         grpc::{
-            manifest::manifest_client::ManifestClient,
-            schedule::scheduler_client::SchedulerClient,
+            manifest::manifest_client::ManifestClient, schedule::scheduler_client::SchedulerClient,
         },
         Register,
     };
-    use super::{handlers, models};
     use tonic::transport::Channel;
+    use warp::Filter;
 
     pub fn api(
         _manifest_client: ManifestClient<Channel>,
@@ -19,7 +18,9 @@ mod filters {
         v1_build(scheduler_client)
     }
 
-    pub fn v1_build(scheduler_client: SchedulerClient<Channel>) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    pub fn v1_build(
+        scheduler_client: SchedulerClient<Channel>,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "build")
             .and(warp::post())
             .and(json_build_request())
@@ -27,19 +28,28 @@ mod filters {
             .and_then(handlers::build)
     }
 
-    fn with_scheduler_client(client: SchedulerClient<Channel>) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone {
+    fn with_scheduler_client(
+        client: SchedulerClient<Channel>,
+    ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
+    {
         warp::any().map(move || client.clone())
     }
 
-    fn with_manifest_client(client: ManifestClient<Channel>) -> impl Filter<Extract = (ManifestClient<Channel>,), Error = std::convert::Infallible> + Clone {
+    fn with_manifest_client(
+        client: ManifestClient<Channel>,
+    ) -> impl Filter<Extract = (ManifestClient<Channel>,), Error = std::convert::Infallible> + Clone
+    {
         warp::any().map(move || client.clone())
     }
 
-    fn with_register(register: Register) -> impl Filter<Extract = (Register,), Error = std::convert::Infallible> + Clone {
+    fn with_register(
+        register: Register,
+    ) -> impl Filter<Extract = (Register,), Error = std::convert::Infallible> + Clone {
         warp::any().map(move || register.clone())
     }
 
-    fn json_build_request() -> impl Filter<Extract = (models::BuildRequest,), Error = warp::Rejection> + Clone {
+    fn json_build_request(
+    ) -> impl Filter<Extract = (models::BuildRequest,), Error = warp::Rejection> + Clone {
         // When accepting a body, we want a JSON body and reject huge payloads
         warp::body::content_length_limit(1024 * 16).and(warp::body::json())
     }
