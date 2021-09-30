@@ -1,7 +1,7 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
-    prefix_namespace_id_key, prefix_namespace_id_version_key, read_file, BuildSnapshot,
-    ManifestSnapshot, NodeState, Result, VersionBuild, REGISTER_KEY_PREFIX_BUILDER,
+    prefix_namespace, prefix_namespace_id_key, prefix_namespace_id_version_key, read_file,
+    BuildSnapshot, ManifestSnapshot, NodeState, Result, VersionBuild, REGISTER_KEY_PREFIX_BUILDER,
     REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
     REGISTER_KEY_PREFIX_VERSION_BUILD,
 };
@@ -356,5 +356,23 @@ impl Register {
         let resp = self.do_get_manifest_snapshot(namespace, id).await;
         self.unlock(id, key).await?;
         resp
+    }
+
+    // list manifest snapshot in namespace
+    pub async fn list_manifest_snapshot(
+        &mut self,
+        namespace: &str,
+    ) -> Result<Vec<(String, ManifestSnapshot)>> {
+        let key_prefix = prefix_namespace(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace);
+        let resp = self
+            .get(key_prefix, Some(GetOptions::new().with_prefix()))
+            .await?;
+        let mut manifest_snapshots: Vec<(String, ManifestSnapshot)> = vec![];
+        for kv in resp.kvs() {
+            let key = kv.key_str()?;
+            let manifest_snapshot = serde_json::from_slice::<ManifestSnapshot>(kv.value())?;
+            manifest_snapshots.push((key.to_owned(), manifest_snapshot))
+        }
+        Ok(manifest_snapshots)
     }
 }

@@ -201,6 +201,19 @@ pub fn prefix_namespace_id_version_key(
     format!("{}/{}/{}/{}", prefix, namespace, id, version)
 }
 
+pub fn prefix_namespace(prefix: &str, namespace: &str) -> String {
+    format!("{}/{}", prefix, namespace)
+}
+
+// remove /prefix/namespace and return id/<suffix> given a key
+pub fn remove_prefix_namespace<'a>(key: &'a str, prefix: &str, namespace: &str) -> &'a str {
+    let pattern = format!("{}/{}", prefix, namespace);
+    key.strip_prefix(pattern.as_str()).expect(&format!(
+        "key '{}' not start with '/{}/{}'",
+        key, prefix, namespace
+    ))
+}
+
 // rpc status
 pub fn internal_error(error: Error) -> tonic::Status {
     tonic::Status::internal(format!("{:#?}", error))

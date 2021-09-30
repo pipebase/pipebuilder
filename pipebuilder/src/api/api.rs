@@ -6,16 +6,20 @@ pub mod filters {
         },
         Register,
     };
+    use serde::de::DeserializeOwned;
     use tonic::transport::Channel;
     use warp::Filter;
 
     pub fn api(
-        _manifest_client: ManifestClient<Channel>,
+        manifest_client: ManifestClient<Channel>,
         scheduler_client: SchedulerClient<Channel>,
-        _register: Register,
+        register: Register,
         _lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_build(scheduler_client)
+            .or(v1_manifest_put(manifest_client.to_owned()))
+            .or(v1_manifest_get(manifest_client.to_owned()))
+            .or(v1_manifest_list(register.to_owned()))
     }
 
     pub fn v1_build(
@@ -23,9 +27,39 @@ pub mod filters {
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "build")
             .and(warp::post())
-            .and(json_build_request())
             .and(with_scheduler_client(scheduler_client))
+            .and(json_request::<models::BuildRequest>())
             .and_then(handlers::build)
+    }
+
+    pub fn v1_manifest_put(
+        manifest_client: ManifestClient<Channel>,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "manifest")
+            .and(warp::put())
+            .and(with_manifest_client(manifest_client))
+            .and(json_request::<models::PutManifestRequest>())
+            .and_then(handlers::put_manifest)
+    }
+
+    pub fn v1_manifest_get(
+        manifest_client: ManifestClient<Channel>,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "manifest")
+            .and(warp::get())
+            .and(with_manifest_client(manifest_client))
+            .and(warp::query::<models::GetManifestRequest>())
+            .and_then(handlers::get_manifest)
+    }
+
+    pub fn v1_manifest_list(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "manifest")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(warp::query::<models::ListManifestSnapshotRequest>())
+            .and_then(handlers::list_manifest_snapshot)
     }
 
     fn with_scheduler_client(
@@ -48,8 +82,10 @@ pub mod filters {
         warp::any().map(move || register.clone())
     }
 
-    fn json_build_request(
-    ) -> impl Filter<Extract = (models::BuildRequest,), Error = warp::Rejection> + Clone {
+    fn json_request<T>() -> impl Filter<Extract = (T,), Error = warp::Rejection> + Clone
+    where
+        T: Send + DeserializeOwned,
+    {
         // When accepting a body, we want a JSON body and reject huge payloads
         warp::body::content_length_limit(1024 * 16).and(warp::body::json())
     }
@@ -57,35 +93,34 @@ pub mod filters {
 
 mod handlers {
     use super::models::{self, Failure};
-    use pipebuilder_common::grpc::{
-        build::{builder_client::BuilderClient, BuildRequest},
-        schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
+    use pipebuilder_common::{
+        grpc::{
+            build::{builder_client::BuilderClient, BuildRequest},
+            manifest::{manifest_client::ManifestClient, GetManifestRequest, PutManifestRequest},
+            schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
+        },
+        remove_prefix_namespace, Register, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
     };
+    use serde::Serialize;
     use std::convert::Infallible;
     use tonic::transport::Channel;
     use tracing::info;
     use warp::http::{Response, StatusCode};
 
     pub async fn build(
-        request: models::BuildRequest,
         client: SchedulerClient<Channel>,
+        request: models::BuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         let response = match schedule(client).await {
             Ok(response) => response,
-            Err(err) => {
-                return Ok(failure(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Failure::new(format!("{:#?}", err)),
-                ))
-            }
+            Err(err) => return Ok(http_internal_error(err.into())),
         };
         let builder_info = match response.builder_info {
             Some(builder_info) => builder_info,
             None => {
-                return Ok(failure(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    Failure::new(String::from("builder unavailable")),
-                ))
+                return Ok(http_service_unavailable(Failure::new(String::from(
+                    "builder unavailable",
+                ))))
             }
         };
         let builder_id = builder_info.id;
@@ -93,25 +128,42 @@ mod handlers {
         info!("scheduled builder ({}, {})", builder_id, builder_address);
         let builder_client = match builder_client(builder_address).await {
             Ok(builder_client) => builder_client,
-            Err(err) => {
-                return Ok(failure(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Failure::new(format!("{:#?}", err)),
-                ))
-            }
+            Err(err) => return Ok(http_internal_error(err.into())),
         };
-        let response = match do_build(builder_client, request).await {
-            Ok(response) => response,
-            Err(err) => {
-                return Ok(failure(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Failure::new(format!("{:#?}", err)),
-                ))
-            }
-        };
-        Ok(Response::builder()
-            .status(StatusCode::OK)
-            .body(serde_json::to_string(&response).unwrap()))
+        match do_build(builder_client, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    pub async fn put_manifest(
+        client: ManifestClient<Channel>,
+        request: models::PutManifestRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_put_manifest(client, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    pub async fn get_manifest(
+        client: ManifestClient<Channel>,
+        request: models::GetManifestRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_get_manifest(client, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    pub async fn list_manifest_snapshot(
+        register: Register,
+        request: models::ListManifestSnapshotRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_list_manifest_snapshot(register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
     }
 
     async fn builder_client(address: String) -> pipebuilder_common::Result<BuilderClient<Channel>> {
@@ -128,6 +180,45 @@ mod handlers {
         Ok(response.into_inner().into())
     }
 
+    async fn do_put_manifest(
+        mut client: ManifestClient<Channel>,
+        request: models::PutManifestRequest,
+    ) -> pipebuilder_common::Result<models::PutManifestResponse> {
+        let request: PutManifestRequest = request.into();
+        let response = client.put_manifest(request).await?;
+        Ok(response.into_inner().into())
+    }
+
+    async fn do_get_manifest(
+        mut client: ManifestClient<Channel>,
+        request: models::GetManifestRequest,
+    ) -> pipebuilder_common::Result<models::GetManifestResponse> {
+        let request: GetManifestRequest = request.into();
+        let response = client.get_manifest(request).await?;
+        Ok(response.into_inner().into())
+    }
+
+    async fn do_list_manifest_snapshot(
+        mut register: Register,
+        request: models::ListManifestSnapshotRequest,
+    ) -> pipebuilder_common::Result<models::ListManifestSnapshotResponse> {
+        let namespace = request.namespace;
+        let manifest_snapshots = register.list_manifest_snapshot(namespace.as_str()).await?;
+        let snapshots: Vec<models::ManifestSnapshot> = manifest_snapshots
+            .into_iter()
+            .map(|(key, manifest_snapshot)| models::ManifestSnapshot {
+                id: remove_prefix_namespace(
+                    key.as_str(),
+                    REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
+                    namespace.as_str(),
+                )
+                .to_owned(),
+                latest_version: manifest_snapshot.latest_version,
+            })
+            .collect();
+        Ok(models::ListManifestSnapshotResponse { snapshots })
+    }
+
     async fn schedule(
         mut client: SchedulerClient<Channel>,
     ) -> pipebuilder_common::Result<ScheduleResponse> {
@@ -140,11 +231,37 @@ mod handlers {
             .status(status_code)
             .body(serde_json::to_string(&failure).unwrap())
     }
+
+    fn http_internal_error(f: Failure) -> http::Result<Response<String>> {
+        failure(StatusCode::INTERNAL_SERVER_ERROR, f)
+    }
+
+    fn http_service_unavailable(f: Failure) -> http::Result<Response<String>> {
+        failure(StatusCode::SERVICE_UNAVAILABLE, f)
+    }
+
+    fn ok<T>(t: &T) -> http::Result<Response<String>>
+    where
+        T: ?Sized + Serialize,
+    {
+        Response::builder()
+            .status(StatusCode::OK)
+            .body(serde_json::to_string::<T>(t).unwrap())
+    }
+
+    impl From<pipebuilder_common::Error> for Failure {
+        fn from(error: pipebuilder_common::Error) -> Self {
+            Failure::new(format!("{:#?}", error))
+        }
+    }
 }
 
 mod models {
 
-    use pipebuilder_common::{grpc::build, BuildStatus};
+    use pipebuilder_common::{
+        grpc::{build, manifest},
+        BuildStatus,
+    };
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
@@ -186,6 +303,34 @@ mod models {
     }
 
     #[derive(Serialize, Deserialize)]
+    pub struct GetManifestRequest {
+        pub namespace: String,
+        pub id: String,
+        pub version: u64,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct GetManifestResponse {
+        pub buffer: Vec<u8>,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct ListManifestSnapshotRequest {
+        pub namespace: String,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct ManifestSnapshot {
+        pub id: String,
+        pub latest_version: u64,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct ListManifestSnapshotResponse {
+        pub snapshots: Vec<ManifestSnapshot>,
+    }
+
+    #[derive(Serialize, Deserialize)]
     pub struct Failure {
         pub error: String,
     }
@@ -215,6 +360,47 @@ mod models {
         fn from(origin: build::BuildResponse) -> Self {
             let build_version = origin.version;
             BuildResponse { build_version }
+        }
+    }
+
+    impl From<PutManifestRequest> for manifest::PutManifestRequest {
+        fn from(origin: PutManifestRequest) -> Self {
+            let namespace = origin.namespace;
+            let id = origin.id;
+            let buffer = origin.buffer;
+            manifest::PutManifestRequest {
+                namespace,
+                id,
+                buffer,
+            }
+        }
+    }
+
+    impl From<manifest::PutManifestResponse> for PutManifestResponse {
+        fn from(origin: manifest::PutManifestResponse) -> Self {
+            let id = origin.id;
+            let version = origin.version;
+            PutManifestResponse { id, version }
+        }
+    }
+
+    impl From<GetManifestRequest> for manifest::GetManifestRequest {
+        fn from(origin: GetManifestRequest) -> Self {
+            let namespace = origin.namespace;
+            let id = origin.id;
+            let version = origin.version;
+            manifest::GetManifestRequest {
+                namespace,
+                id,
+                version,
+            }
+        }
+    }
+
+    impl From<manifest::GetManifestResponse> for GetManifestResponse {
+        fn from(origin: manifest::GetManifestResponse) -> Self {
+            let buffer = origin.buffer;
+            GetManifestResponse { buffer }
         }
     }
 }
