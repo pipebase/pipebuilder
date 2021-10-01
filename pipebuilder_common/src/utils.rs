@@ -204,10 +204,8 @@ pub fn resource_namespace(prefix: &str, namespace: &str) -> String {
 // remove /resource/namespace and return id/<suffix> given a key
 pub fn remove_resource_namespace<'a>(key: &'a str, prefix: &str, namespace: &str) -> &'a str {
     let pattern = format!("{}/{}", prefix, namespace);
-    key.strip_prefix(pattern.as_str()).expect(&format!(
-        "key '{}' not start with '/{}/{}'",
-        key, prefix, namespace
-    ))
+    key.strip_prefix(pattern.as_str())
+        .unwrap_or_else(|| panic!("key '{}' not start with '/{}/{}'", key, prefix, namespace))
 }
 
 // rpc status

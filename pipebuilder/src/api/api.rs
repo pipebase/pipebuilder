@@ -18,9 +18,9 @@ pub mod filters {
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_build(scheduler_client)
             .or(v1_manifest_put(manifest_client.to_owned()))
-            .or(v1_manifest_get(manifest_client.to_owned()))
+            .or(v1_manifest_get(manifest_client))
             .or(v1_manifest_snapshot_list(register.to_owned()))
-            .or(v1_build_snapshot_list(register.to_owned()))
+            .or(v1_build_snapshot_list(register))
     }
 
     pub fn v1_build(
@@ -249,14 +249,14 @@ mod handlers {
         let build_snapshots = register.list_build_snapshot(namespace.as_str()).await?;
         let snapshots: Vec<models::BuildSnapshot> = build_snapshots
             .into_iter()
-            .map(|(key, BUILD_snapshot)| models::BuildSnapshot {
+            .map(|(key, build_snapshot)| models::BuildSnapshot {
                 id: remove_resource_namespace(
                     key.as_str(),
                     REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
                     namespace.as_str(),
                 )
                 .to_owned(),
-                latest_version: BUILD_snapshot.latest_version,
+                latest_version: build_snapshot.latest_version,
             })
             .collect();
         Ok(snapshots)
