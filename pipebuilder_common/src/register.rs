@@ -1,16 +1,16 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
-    prefix_namespace, prefix_namespace_id_key, prefix_namespace_id_version_key, read_file,
+    prefix_namespace_id_key, prefix_namespace_id_version_key, read_file, resource_namespace,
     BuildSnapshot, ManifestSnapshot, NodeState, Result, VersionBuild, REGISTER_KEY_PREFIX_BUILDER,
     REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
     REGISTER_KEY_PREFIX_VERSION_BUILD,
 };
 use etcd_client::{
-    Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, LeaseGrantResponse,
-    LockOptions, LockResponse, PutOptions, PutResponse, TlsOptions, WatchOptions, WatchStream,
-    Watcher,
+    Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, KeyValue,
+    LeaseGrantResponse, LockOptions, LockResponse, PutOptions, PutResponse, TlsOptions,
+    WatchOptions, WatchStream, Watcher,
 };
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 use tracing::info;
 
 use crate::Period;
@@ -363,16 +363,37 @@ impl Register {
         &mut self,
         namespace: &str,
     ) -> Result<Vec<(String, ManifestSnapshot)>> {
-        let key_prefix = prefix_namespace(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace);
+        let key_prefix = resource_namespace(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace);
         let resp = self
             .get(key_prefix, Some(GetOptions::new().with_prefix()))
             .await?;
-        let mut manifest_snapshots: Vec<(String, ManifestSnapshot)> = vec![];
-        for kv in resp.kvs() {
-            let key = kv.key_str()?;
-            let manifest_snapshot = serde_json::from_slice::<ManifestSnapshot>(kv.value())?;
-            manifest_snapshots.push((key.to_owned(), manifest_snapshot))
-        }
+        let manifest_snapshots = Self::deserialize_kvs::<ManifestSnapshot>(resp.kvs())?;
         Ok(manifest_snapshots)
+    }
+
+    // list build snapshot in namespace
+    pub async fn list_build_snapshot(
+        &mut self,
+        namespace: &str,
+    ) -> Result<Vec<(String, BuildSnapshot)>> {
+        let key_prefix = resource_namespace(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace);
+        let resp = self
+            .get(key_prefix, Some(GetOptions::new().with_prefix()))
+            .await?;
+        let build_snapshots = Self::deserialize_kvs::<BuildSnapshot>(resp.kvs())?;
+        Ok(build_snapshots)
+    }
+
+    fn deserialize_kvs<T>(kvs: &[KeyValue]) -> Result<Vec<(String, T)>>
+    where
+        T: DeserializeOwned,
+    {
+        let mut deserialize_kvs: Vec<(String, T)> = vec![];
+        for kv in kvs {
+            let key = kv.key_str()?;
+            let value = serde_json::from_slice::<T>(kv.value())?;
+            deserialize_kvs.push((key.to_owned(), value))
+        }
+        Ok(deserialize_kvs)
     }
 }

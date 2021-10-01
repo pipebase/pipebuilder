@@ -19,7 +19,8 @@ pub mod filters {
         v1_build(scheduler_client)
             .or(v1_manifest_put(manifest_client.to_owned()))
             .or(v1_manifest_get(manifest_client.to_owned()))
-            .or(v1_manifest_list(register.to_owned()))
+            .or(v1_manifest_snapshot_list(register.to_owned()))
+            .or(v1_build_snapshot_list(register.to_owned()))
     }
 
     pub fn v1_build(
@@ -52,14 +53,24 @@ pub mod filters {
             .and_then(handlers::get_manifest)
     }
 
-    pub fn v1_manifest_list(
+    pub fn v1_manifest_snapshot_list(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "manifest")
+        warp::path!("api" / "v1" / "manifest-snapshot")
             .and(warp::get())
             .and(with_register(register))
             .and(warp::query::<models::ListManifestSnapshotRequest>())
             .and_then(handlers::list_manifest_snapshot)
+    }
+
+    pub fn v1_build_snapshot_list(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "build-snapshot")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(warp::query::<models::ListBuildSnapshotRequest>())
+            .and_then(handlers::list_build_snapshot)
     }
 
     fn with_scheduler_client(
@@ -99,7 +110,8 @@ mod handlers {
             manifest::{manifest_client::ManifestClient, GetManifestRequest, PutManifestRequest},
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
-        remove_prefix_namespace, Register, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
+        remove_resource_namespace, Register, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
+        REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
     };
     use serde::Serialize;
     use std::convert::Infallible;
@@ -166,6 +178,16 @@ mod handlers {
         }
     }
 
+    pub async fn list_build_snapshot(
+        register: Register,
+        request: models::ListBuildSnapshotRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_list_build_snapshot(register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
     async fn builder_client(address: String) -> pipebuilder_common::Result<BuilderClient<Channel>> {
         let client = BuilderClient::connect(address).await?;
         Ok(client)
@@ -201,13 +223,13 @@ mod handlers {
     async fn do_list_manifest_snapshot(
         mut register: Register,
         request: models::ListManifestSnapshotRequest,
-    ) -> pipebuilder_common::Result<models::ListManifestSnapshotResponse> {
+    ) -> pipebuilder_common::Result<Vec<models::ManifestSnapshot>> {
         let namespace = request.namespace;
         let manifest_snapshots = register.list_manifest_snapshot(namespace.as_str()).await?;
         let snapshots: Vec<models::ManifestSnapshot> = manifest_snapshots
             .into_iter()
             .map(|(key, manifest_snapshot)| models::ManifestSnapshot {
-                id: remove_prefix_namespace(
+                id: remove_resource_namespace(
                     key.as_str(),
                     REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
                     namespace.as_str(),
@@ -216,7 +238,28 @@ mod handlers {
                 latest_version: manifest_snapshot.latest_version,
             })
             .collect();
-        Ok(models::ListManifestSnapshotResponse { snapshots })
+        Ok(snapshots)
+    }
+
+    async fn do_list_build_snapshot(
+        mut register: Register,
+        request: models::ListBuildSnapshotRequest,
+    ) -> pipebuilder_common::Result<Vec<models::BuildSnapshot>> {
+        let namespace = request.namespace;
+        let build_snapshots = register.list_build_snapshot(namespace.as_str()).await?;
+        let snapshots: Vec<models::BuildSnapshot> = build_snapshots
+            .into_iter()
+            .map(|(key, BUILD_snapshot)| models::BuildSnapshot {
+                id: remove_resource_namespace(
+                    key.as_str(),
+                    REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
+                    namespace.as_str(),
+                )
+                .to_owned(),
+                latest_version: BUILD_snapshot.latest_version,
+            })
+            .collect();
+        Ok(snapshots)
     }
 
     async fn schedule(
@@ -326,8 +369,14 @@ mod models {
     }
 
     #[derive(Serialize, Deserialize)]
-    pub struct ListManifestSnapshotResponse {
-        pub snapshots: Vec<ManifestSnapshot>,
+    pub struct ListBuildSnapshotRequest {
+        pub namespace: String,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct BuildSnapshot {
+        pub id: String,
+        pub latest_version: u64,
     }
 
     #[derive(Serialize, Deserialize)]
