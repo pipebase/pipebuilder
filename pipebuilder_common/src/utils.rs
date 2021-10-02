@@ -197,15 +197,15 @@ pub fn resource_namespace_id_version(
     format!("{}/{}/{}/{}", resource, namespace, id, version)
 }
 
-pub fn resource_namespace(prefix: &str, namespace: &str) -> String {
-    format!("{}/{}", prefix, namespace)
+pub fn resource_namespace(resource: &str, namespace: &str) -> String {
+    format!("{}/{}", resource, namespace)
 }
 
 // remove /resource/namespace and return id/<suffix> given a key
-pub fn remove_resource_namespace<'a>(key: &'a str, prefix: &str, namespace: &str) -> &'a str {
-    let pattern = format!("{}/{}", prefix, namespace);
+pub fn remove_resource_namespace<'a>(key: &'a str, resource: &str, namespace: &str) -> &'a str {
+    let pattern = format!("{}/{}", resource, namespace);
     key.strip_prefix(pattern.as_str())
-        .unwrap_or_else(|| panic!("key '{}' not start with '/{}/{}'", key, prefix, namespace))
+        .unwrap_or_else(|| panic!("key '{}' not start with '/{}/{}'", key, resource, namespace))
 }
 
 // rpc status

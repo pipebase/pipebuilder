@@ -14,13 +14,15 @@ pub mod filters {
         manifest_client: ManifestClient<Channel>,
         scheduler_client: SchedulerClient<Channel>,
         register: Register,
-        _lease_id: i64,
+        lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_build(scheduler_client)
             .or(v1_manifest_put(manifest_client.to_owned()))
             .or(v1_manifest_get(manifest_client))
             .or(v1_manifest_snapshot_list(register.to_owned()))
-            .or(v1_build_snapshot_list(register))
+            .or(v1_build_snapshot_list(register.to_owned()))
+            .or(v1_version_build_get(register.to_owned(), lease_id))
+            .or(v1_version_build_list(register))
     }
 
     pub fn v1_build(
@@ -73,6 +75,28 @@ pub mod filters {
             .and_then(handlers::list_build_snapshot)
     }
 
+    pub fn v1_version_build_get(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "version-build")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(warp::query::<models::GetVersionBuildRequest>())
+            .and_then(handlers::get_version_build)
+    }
+
+    pub fn v1_version_build_list(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "version-build")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(warp::query::<models::ListVersionBuildRequest>())
+            .and_then(handlers::list_version_build)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -93,6 +117,12 @@ pub mod filters {
         warp::any().map(move || register.clone())
     }
 
+    fn with_lease_id(
+        lease_id: i64,
+    ) -> impl Filter<Extract = (i64,), Error = std::convert::Infallible> + Clone {
+        warp::any().map(move || lease_id)
+    }
+
     fn json_request<T>() -> impl Filter<Extract = (T,), Error = warp::Rejection> + Clone
     where
         T: Send + DeserializeOwned,
@@ -111,7 +141,7 @@ mod handlers {
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
         remove_resource_namespace, Register, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
-        REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
+        REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_VERSION_BUILD,
     };
     use serde::Serialize;
     use std::convert::Infallible;
@@ -183,6 +213,33 @@ mod handlers {
         request: models::ListBuildSnapshotRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         match do_list_build_snapshot(register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    pub async fn get_version_build(
+        register: Register,
+        lease_id: i64,
+        request: models::GetVersionBuildRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        let response = match do_get_version_build(register, lease_id, request).await {
+            Ok(response) => response,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match response {
+            Some(response) => Ok(ok(&response)),
+            None => Ok(http_not_found(Failure::new(String::from(
+                "version build not found",
+            )))),
+        }
+    }
+
+    pub async fn list_version_build(
+        register: Register,
+        request: models::ListVersionBuildRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_list_version_build(register, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
@@ -262,6 +319,62 @@ mod handlers {
         Ok(snapshots)
     }
 
+    async fn do_get_version_build(
+        mut register: Register,
+        lease_id: i64,
+        request: models::GetVersionBuildRequest,
+    ) -> pipebuilder_common::Result<Option<models::VersionBuild>> {
+        let namespace = request.namespace;
+        let id = request.id;
+        let version = request.version;
+        let version_build = register
+            .get_version_build(lease_id, namespace.as_str(), id.as_str(), version)
+            .await?;
+        Ok(version_build.map(|b| models::VersionBuild {
+            id,
+            version,
+            status: b.status,
+            timestamp: b.timestamp,
+            message: b.message,
+        }))
+    }
+
+    async fn do_list_version_build(
+        mut register: Register,
+        request: models::ListVersionBuildRequest,
+    ) -> pipebuilder_common::Result<Vec<models::VersionBuild>> {
+        let namespace = request.namespace;
+        let id = request.id;
+        let version_builds = register
+            .list_version_build(namespace.as_str(), id.as_str())
+            .await?;
+        let version_builds = version_builds
+            .into_iter()
+            .map(|(key, version_build)| {
+                let id_version = remove_resource_namespace(
+                    key.as_str(),
+                    REGISTER_KEY_PREFIX_VERSION_BUILD,
+                    namespace.as_str(),
+                );
+                let id_version = id_version.split('/').collect::<Vec<&str>>();
+                let id = id_version.get(0).expect("id not found in key").to_string();
+                let version: u64 = id_version
+                    .get(1)
+                    .expect("version not found in key")
+                    .parse()
+                    .expect("cannot parse version as u64");
+                models::VersionBuild {
+                    id,
+                    version,
+                    status: version_build.status,
+                    timestamp: version_build.timestamp,
+                    message: version_build.message,
+                }
+            })
+            .collect::<Vec<models::VersionBuild>>();
+        Ok(version_builds)
+    }
+
     async fn schedule(
         mut client: SchedulerClient<Channel>,
     ) -> pipebuilder_common::Result<ScheduleResponse> {
@@ -283,6 +396,10 @@ mod handlers {
         failure(StatusCode::SERVICE_UNAVAILABLE, f)
     }
 
+    fn http_not_found(f: Failure) -> http::Result<Response<String>> {
+        failure(StatusCode::NOT_FOUND, f)
+    }
+
     fn ok<T>(t: &T) -> http::Result<Response<String>>
     where
         T: ?Sized + Serialize,
@@ -301,6 +418,7 @@ mod handlers {
 
 mod models {
 
+    use chrono::{DateTime, Utc};
     use pipebuilder_common::{
         grpc::{build, manifest},
         BuildStatus,
@@ -377,6 +495,33 @@ mod models {
     pub struct BuildSnapshot {
         pub id: String,
         pub latest_version: u64,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct GetVersionBuildRequest {
+        pub namespace: String,
+        pub id: String,
+        pub version: u64,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct VersionBuild {
+        // id
+        pub id: String,
+        // version
+        pub version: u64,
+        // build status
+        pub status: BuildStatus,
+        // timestamp
+        pub timestamp: DateTime<Utc>,
+        // message
+        pub message: Option<String>,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct ListVersionBuildRequest {
+        pub namespace: String,
+        pub id: String,
     }
 
     #[derive(Serialize, Deserialize)]
