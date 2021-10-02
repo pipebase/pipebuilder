@@ -184,17 +184,17 @@ where
     Ok(None)
 }
 
-pub fn prefix_namespace_id_key(prefix: &str, namespace: &str, id: &str) -> String {
-    format!("{}/{}/{}", prefix, namespace, id)
+pub fn resource_namespace_id(resource: &str, namespace: &str, id: &str) -> String {
+    format!("{}/{}/{}", resource, namespace, id)
 }
 
-pub fn prefix_namespace_id_version_key(
-    prefix: &str,
+pub fn resource_namespace_id_version(
+    resource: &str,
     namespace: &str,
     id: &str,
     version: u64,
 ) -> String {
-    format!("{}/{}/{}/{}", prefix, namespace, id, version)
+    format!("{}/{}/{}/{}", resource, namespace, id, version)
 }
 
 pub fn resource_namespace(prefix: &str, namespace: &str) -> String {
