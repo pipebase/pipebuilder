@@ -80,11 +80,65 @@ pub fn app_main_path(workspace: &str, manifest_id: &str, build_version: u64) -> 
     )
 }
 
+pub fn app_build_target_path(workspace: &str, manifest_id: &str, build_version: u64) -> String {
+    format!("{}/{}/{}/app/target", workspace, manifest_id, build_version)
+}
+
+pub fn app_build_release_path(workspace: &str, manifest_id: &str, build_version: u64) -> String {
+    format!(
+        "{}/{}/{}/app/target/release/app",
+        workspace, manifest_id, build_version
+    )
+}
+
 pub fn app_build_log_path(log_directory: &str, manifest_id: &str, build_version: u64) -> String {
     format!(
         "{}/{}/{}/build.log",
         log_directory, manifest_id, build_version
     )
+}
+
+pub fn app_restore_path(restore_directory: &str, manifest_id: &str, build_version: u64) -> String {
+    format!(
+        "{}/{}/{}/app",
+        restore_directory, manifest_id, build_version
+    )
+}
+
+pub fn app_publish_path(publish_directory: &str, manifest_id: &str, build_version: u64) -> String {
+    format!(
+        "{}/{}/{}/app",
+        publish_directory, manifest_id, build_version
+    )
+}
+
+// remove directory and return success flag
+pub fn remove_directory(path: &str) -> Result<bool> {
+    let mut cmd = Command::new("rm");
+    cmd.arg("-r").arg(path);
+    let (code, _) = run_cmd(cmd)?;
+    Ok(code == 0)
+}
+
+// copy directory and return success flag
+pub fn copy_directory(src: &str, dst: &str) -> Result<bool> {
+    let mut cmd = Command::new("cp");
+    cmd.arg("-r").arg(src).arg(dst);
+    let (code, _) = run_cmd(cmd)?;
+    Ok(code == 0)
+}
+
+// move directory and return success flag
+pub fn move_directory(src: &str, dst: &str) -> Result<bool> {
+    let mut cmd = Command::new("mv");
+    cmd.arg(src).arg(dst);
+    let (code, _) = run_cmd(cmd)?;
+    Ok(code == 0)
+}
+
+pub fn copy_file(from: &str, to: &str) -> Result<u64> {
+    let size = std::fs::copy(from, to)?;
+    Ok(size)
 }
 
 // cmd ops

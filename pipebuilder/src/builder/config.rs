@@ -5,8 +5,9 @@ use serde::Deserialize;
 pub struct BuilderConfig {
     pub manifest_endpoint: String,
     pub workspace: String,
-    pub target_directory: String,
-    pub build_log_directory: String,
+    pub restore_directory: String,
+    pub log_directory: String,
+    pub publish_directory: String,
 }
 
 #[derive(Deserialize)]
