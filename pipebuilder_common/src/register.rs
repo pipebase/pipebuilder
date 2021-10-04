@@ -318,7 +318,7 @@ impl Register {
         Ok(version_builds)
     }
 
-    pub async fn do_put_version_build_state(
+    pub async fn do_put_version_build(
         &mut self,
         namespace: &str,
         id: &str,
@@ -336,7 +336,7 @@ impl Register {
         Ok((resp, state))
     }
 
-    pub async fn put_version_build_state(
+    pub async fn put_version_build(
         &mut self,
         lease_id: i64,
         namespace: &str,
@@ -348,7 +348,7 @@ impl Register {
         let lock_resp = self.lock(id, lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self
-            .do_put_version_build_state(namespace, id, version, state)
+            .do_put_version_build(namespace, id, version, state)
             .await;
         self.unlock(id, key).await?;
         resp

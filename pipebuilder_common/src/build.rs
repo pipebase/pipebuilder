@@ -36,8 +36,8 @@ pub enum BuildStatus {
     Succeed,
     // build failed
     Fail,
-    // build interrupt due to node maintenance / deployment
-    Interrupt,
+    // build cancelled due to node maintenance / deployment or cli
+    Cancel,
 }
 
 // Build state per (build_id, version)
@@ -83,13 +83,13 @@ pub struct BuildSnapshot {
 #[derive(Clone)]
 pub struct LocalBuildContext {
     // builder id
-    id: String,
+    pub id: String,
     // builder external_address
-    address: String,
-    workspace: String,
-    restore_directory: String,
-    log_directory: String,
-    publish_directory: String,
+    pub address: String,
+    pub workspace: String,
+    pub restore_directory: String,
+    pub log_directory: String,
+    pub publish_directory: String,
 }
 
 impl LocalBuildContext {
@@ -173,6 +173,14 @@ impl Build {
         let manifest_version = self.manifest_version;
         let build_version = self.build_version;
         (namespace, manifest_id, manifest_version, build_version)
+    }
+
+    pub fn get_build_key_tuple(&self) -> (String, String, u64) {
+        (
+            self.namespace.to_owned(),
+            self.manifest_id.to_owned(),
+            self.build_version,
+        )
     }
 
     // run current status and return next status

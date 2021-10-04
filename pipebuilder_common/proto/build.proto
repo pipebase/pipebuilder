@@ -17,6 +17,18 @@ message BuildResponse {
     uint64 version = 1;
 }
 
+message CancelRequest {
+    // manifest namespace
+    string namespace = 1;
+    // manifest id
+    string manifest_id = 2;
+    // version: build version
+    uint64 build_version = 3;
+}
+
+message CancelResponse {}
+
 service Builder {
     rpc Build(BuildRequest) returns (BuildResponse) {}
+    rpc Cancel(CancelRequest) returns (CancelResponse) {}
 }
