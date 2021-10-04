@@ -227,7 +227,7 @@ fn cancel_local_build(
         }
     };
     // cleanup local build workspace
-    let path = app_directory(workspace, id, version);
+    let path = app_directory(workspace, namespace, id, version);
     let succeed = remove_directory(path.as_str())?;
     Ok(succeed)
 }
