@@ -2,8 +2,8 @@ use chrono::Utc;
 use flurry::HashMap;
 use pipebuilder_common::{
     app_directory,
-    grpc::build::{builder_server::Builder, BuildResponse, CancelResponse},
-    grpc::manifest::manifest_client::ManifestClient,
+    grpc::build::{builder_server::Builder, BuildResponse, CancelResponse, VersionBuildKey},
+    grpc::{build::ListResponse, manifest::manifest_client::ManifestClient},
     remove_directory, Build, BuildStatus, LocalBuildContext, Register, VersionBuild,
 };
 use std::sync::Arc;
@@ -92,7 +92,7 @@ impl Builder for BuilderService {
     {
         let request = request.into_inner();
         let namespace = request.namespace;
-        let id = request.manifest_id;
+        let id = request.id;
         let version = request.build_version;
         let builds = self.builds.clone();
         let workspace = self.context.workspace.as_str();
@@ -124,6 +124,23 @@ impl Builder for BuilderService {
                 )))
             }
         }
+    }
+
+    async fn list(
+        &self,
+        _request: tonic::Request<pipebuilder_common::grpc::build::ListRequest>,
+    ) -> Result<tonic::Response<pipebuilder_common::grpc::build::ListResponse>, tonic::Status> {
+        let builds_ref = self.builds.pin();
+        let keys = builds_ref
+            .keys()
+            .into_iter()
+            .map(|(namespace, id, version)| VersionBuildKey {
+                namespace: namespace.to_owned(),
+                id: id.to_owned(),
+                version: version.to_owned(),
+            })
+            .collect::<Vec<VersionBuildKey>>();
+        Ok(Response::new(ListResponse { keys }))
     }
 }
 
