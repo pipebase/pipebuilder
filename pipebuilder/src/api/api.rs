@@ -150,10 +150,10 @@ mod handlers {
     use warp::http::{Response, StatusCode};
 
     pub async fn build(
-        client: SchedulerClient<Channel>,
+        mut client: SchedulerClient<Channel>,
         request: models::BuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        let response = match schedule(client).await {
+        let response = match schedule(&mut client).await {
             Ok(response) => response,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
@@ -168,62 +168,62 @@ mod handlers {
         let builder_id = builder_info.id;
         let builder_address = builder_info.address;
         info!("scheduled builder ({}, {})", builder_id, builder_address);
-        let builder_client = match builder_client(builder_address).await {
+        let mut builder_client = match builder_client(builder_address).await {
             Ok(builder_client) => builder_client,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
-        match do_build(builder_client, request).await {
+        match do_build(&mut builder_client, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
     }
 
     pub async fn put_manifest(
-        client: ManifestClient<Channel>,
+        mut client: ManifestClient<Channel>,
         request: models::PutManifestRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match do_put_manifest(client, request).await {
+        match do_put_manifest(&mut client, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
     }
 
     pub async fn get_manifest(
-        client: ManifestClient<Channel>,
+        mut client: ManifestClient<Channel>,
         request: models::GetManifestRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match do_get_manifest(client, request).await {
+        match do_get_manifest(&mut client, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
     }
 
     pub async fn list_manifest_snapshot(
-        register: Register,
+        mut register: Register,
         request: models::ListManifestSnapshotRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match do_list_manifest_snapshot(register, request).await {
+        match do_list_manifest_snapshot(&mut register, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
     }
 
     pub async fn list_build_snapshot(
-        register: Register,
+        mut register: Register,
         request: models::ListBuildSnapshotRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match do_list_build_snapshot(register, request).await {
+        match do_list_build_snapshot(&mut register, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
     }
 
     pub async fn get_version_build(
-        register: Register,
+        mut register: Register,
         lease_id: i64,
         request: models::GetVersionBuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        let response = match do_get_version_build(register, lease_id, request).await {
+        let response = match do_get_version_build(&mut register, lease_id, request).await {
             Ok(response) => response,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
@@ -236,10 +236,10 @@ mod handlers {
     }
 
     pub async fn list_version_build(
-        register: Register,
+        mut register: Register,
         request: models::ListVersionBuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match do_list_version_build(register, request).await {
+        match do_list_version_build(&mut register, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
@@ -251,7 +251,7 @@ mod handlers {
     }
 
     async fn do_build(
-        mut client: BuilderClient<Channel>,
+        client: &mut BuilderClient<Channel>,
         request: models::BuildRequest,
     ) -> pipebuilder_common::Result<models::BuildResponse> {
         let request: BuildRequest = request.into();
@@ -260,7 +260,7 @@ mod handlers {
     }
 
     async fn do_put_manifest(
-        mut client: ManifestClient<Channel>,
+        client: &mut ManifestClient<Channel>,
         request: models::PutManifestRequest,
     ) -> pipebuilder_common::Result<models::PutManifestResponse> {
         let request: PutManifestRequest = request.into();
@@ -269,7 +269,7 @@ mod handlers {
     }
 
     async fn do_get_manifest(
-        mut client: ManifestClient<Channel>,
+        client: &mut ManifestClient<Channel>,
         request: models::GetManifestRequest,
     ) -> pipebuilder_common::Result<models::GetManifestResponse> {
         let request: GetManifestRequest = request.into();
@@ -278,7 +278,7 @@ mod handlers {
     }
 
     async fn do_list_manifest_snapshot(
-        mut register: Register,
+        register: &mut Register,
         request: models::ListManifestSnapshotRequest,
     ) -> pipebuilder_common::Result<Vec<models::ManifestSnapshot>> {
         let namespace = request.namespace;
@@ -299,7 +299,7 @@ mod handlers {
     }
 
     async fn do_list_build_snapshot(
-        mut register: Register,
+        register: &mut Register,
         request: models::ListBuildSnapshotRequest,
     ) -> pipebuilder_common::Result<Vec<models::BuildSnapshot>> {
         let namespace = request.namespace;
@@ -320,7 +320,7 @@ mod handlers {
     }
 
     async fn do_get_version_build(
-        mut register: Register,
+        register: &mut Register,
         lease_id: i64,
         request: models::GetVersionBuildRequest,
     ) -> pipebuilder_common::Result<Option<models::VersionBuild>> {
@@ -340,7 +340,7 @@ mod handlers {
     }
 
     async fn do_list_version_build(
-        mut register: Register,
+        register: &mut Register,
         request: models::ListVersionBuildRequest,
     ) -> pipebuilder_common::Result<Vec<models::VersionBuild>> {
         let namespace = request.namespace;
@@ -375,8 +375,16 @@ mod handlers {
         Ok(version_builds)
     }
 
+    async fn do_cancel_build(
+        register: &mut Register,
+        lease_id: i64,
+        request: models::CancelBuildRequest,
+    ) -> pipebuilder_common::Result<models::CancelBuildResponse> {
+        Ok(models::CancelBuildResponse {})
+    }
+
     async fn schedule(
-        mut client: SchedulerClient<Channel>,
+        client: &mut SchedulerClient<Channel>,
     ) -> pipebuilder_common::Result<ScheduleResponse> {
         let response = client.schedule(ScheduleRequest {}).await?;
         Ok(response.into_inner())
@@ -525,11 +533,14 @@ mod models {
     }
 
     #[derive(Serialize, Deserialize)]
-    pub struct CancelVersionBuildRequest {
+    pub struct CancelBuildRequest {
         pub namespace: String,
         pub id: String,
         pub version: u64,
     }
+
+    #[derive(Serialize, Deserialize)]
+    pub struct CancelBuildResponse {}
 
     #[derive(Serialize, Deserialize)]
     pub struct Failure {
