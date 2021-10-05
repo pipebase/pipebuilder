@@ -22,7 +22,8 @@ pub mod filters {
             .or(v1_manifest_snapshot_list(register.to_owned()))
             .or(v1_build_snapshot_list(register.to_owned()))
             .or(v1_version_build_get(register.to_owned(), lease_id))
-            .or(v1_version_build_list(register))
+            .or(v1_version_build_list(register.to_owned()))
+            .or(v1_version_build_cancel(register, lease_id))
     }
 
     pub fn v1_build(
@@ -97,6 +98,18 @@ pub mod filters {
             .and_then(handlers::list_version_build)
     }
 
+    pub fn v1_version_build_cancel(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "version-build" / "cancel")
+            .and(warp::post())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(json_request::<models::CancelBuildRequest>())
+            .and_then(handlers::cancel_build)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -136,7 +149,7 @@ mod handlers {
     use super::models::{self, Failure};
     use pipebuilder_common::{
         grpc::{
-            build::{builder_client::BuilderClient, BuildRequest},
+            build::{builder_client::BuilderClient, BuildRequest, CancelRequest},
             manifest::{manifest_client::ManifestClient, GetManifestRequest, PutManifestRequest},
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
@@ -178,6 +191,15 @@ mod handlers {
         }
     }
 
+    async fn do_build(
+        client: &mut BuilderClient<Channel>,
+        request: models::BuildRequest,
+    ) -> pipebuilder_common::Result<models::BuildResponse> {
+        let request: BuildRequest = request.into();
+        let response = client.build(request).await?;
+        Ok(response.into_inner().into())
+    }
+
     pub async fn put_manifest(
         mut client: ManifestClient<Channel>,
         request: models::PutManifestRequest,
@@ -186,6 +208,15 @@ mod handlers {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
+    }
+
+    async fn do_put_manifest(
+        client: &mut ManifestClient<Channel>,
+        request: models::PutManifestRequest,
+    ) -> pipebuilder_common::Result<models::PutManifestResponse> {
+        let request: PutManifestRequest = request.into();
+        let response = client.put_manifest(request).await?;
+        Ok(response.into_inner().into())
     }
 
     pub async fn get_manifest(
@@ -198,6 +229,15 @@ mod handlers {
         }
     }
 
+    async fn do_get_manifest(
+        client: &mut ManifestClient<Channel>,
+        request: models::GetManifestRequest,
+    ) -> pipebuilder_common::Result<models::GetManifestResponse> {
+        let request: GetManifestRequest = request.into();
+        let response = client.get_manifest(request).await?;
+        Ok(response.into_inner().into())
+    }
+
     pub async fn list_manifest_snapshot(
         mut register: Register,
         request: models::ListManifestSnapshotRequest,
@@ -206,75 +246,6 @@ mod handlers {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
-    }
-
-    pub async fn list_build_snapshot(
-        mut register: Register,
-        request: models::ListBuildSnapshotRequest,
-    ) -> Result<impl warp::Reply, Infallible> {
-        match do_list_build_snapshot(&mut register, request).await {
-            Ok(response) => Ok(ok(&response)),
-            Err(err) => Ok(http_internal_error(err.into())),
-        }
-    }
-
-    pub async fn get_version_build(
-        mut register: Register,
-        lease_id: i64,
-        request: models::GetVersionBuildRequest,
-    ) -> Result<impl warp::Reply, Infallible> {
-        let response = match do_get_version_build(&mut register, lease_id, request).await {
-            Ok(response) => response,
-            Err(err) => return Ok(http_internal_error(err.into())),
-        };
-        match response {
-            Some(response) => Ok(ok(&response)),
-            None => Ok(http_not_found(Failure::new(String::from(
-                "version build not found",
-            )))),
-        }
-    }
-
-    pub async fn list_version_build(
-        mut register: Register,
-        request: models::ListVersionBuildRequest,
-    ) -> Result<impl warp::Reply, Infallible> {
-        match do_list_version_build(&mut register, request).await {
-            Ok(response) => Ok(ok(&response)),
-            Err(err) => Ok(http_internal_error(err.into())),
-        }
-    }
-
-    async fn builder_client(address: String) -> pipebuilder_common::Result<BuilderClient<Channel>> {
-        let client = BuilderClient::connect(address).await?;
-        Ok(client)
-    }
-
-    async fn do_build(
-        client: &mut BuilderClient<Channel>,
-        request: models::BuildRequest,
-    ) -> pipebuilder_common::Result<models::BuildResponse> {
-        let request: BuildRequest = request.into();
-        let response = client.build(request).await?;
-        Ok(response.into_inner().into())
-    }
-
-    async fn do_put_manifest(
-        client: &mut ManifestClient<Channel>,
-        request: models::PutManifestRequest,
-    ) -> pipebuilder_common::Result<models::PutManifestResponse> {
-        let request: PutManifestRequest = request.into();
-        let response = client.put_manifest(request).await?;
-        Ok(response.into_inner().into())
-    }
-
-    async fn do_get_manifest(
-        client: &mut ManifestClient<Channel>,
-        request: models::GetManifestRequest,
-    ) -> pipebuilder_common::Result<models::GetManifestResponse> {
-        let request: GetManifestRequest = request.into();
-        let response = client.get_manifest(request).await?;
-        Ok(response.into_inner().into())
     }
 
     async fn do_list_manifest_snapshot(
@@ -298,6 +269,16 @@ mod handlers {
         Ok(snapshots)
     }
 
+    pub async fn list_build_snapshot(
+        mut register: Register,
+        request: models::ListBuildSnapshotRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_list_build_snapshot(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
     async fn do_list_build_snapshot(
         register: &mut Register,
         request: models::ListBuildSnapshotRequest,
@@ -319,6 +300,23 @@ mod handlers {
         Ok(snapshots)
     }
 
+    pub async fn get_version_build(
+        mut register: Register,
+        lease_id: i64,
+        request: models::GetVersionBuildRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        let response = match do_get_version_build(&mut register, lease_id, request).await {
+            Ok(response) => response,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match response {
+            Some(response) => Ok(ok(&response)),
+            None => Ok(http_not_found(Failure::new(String::from(
+                "version build not found",
+            )))),
+        }
+    }
+
     async fn do_get_version_build(
         register: &mut Register,
         lease_id: i64,
@@ -335,8 +333,20 @@ mod handlers {
             version,
             status: b.status,
             timestamp: b.timestamp,
+            builder_id: b.builder_id,
+            builder_address: b.builder_address,
             message: b.message,
         }))
+    }
+
+    pub async fn list_version_build(
+        mut register: Register,
+        request: models::ListVersionBuildRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_list_version_build(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
     }
 
     async fn do_list_version_build(
@@ -368,6 +378,8 @@ mod handlers {
                     version,
                     status: version_build.status,
                     timestamp: version_build.timestamp,
+                    builder_id: version_build.builder_id,
+                    builder_address: version_build.builder_address,
                     message: version_build.message,
                 }
             })
@@ -375,12 +387,73 @@ mod handlers {
         Ok(version_builds)
     }
 
-    async fn do_cancel_build(
-        register: &mut Register,
+    pub async fn cancel_build(
+        mut register: Register,
         lease_id: i64,
         request: models::CancelBuildRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        // query version build for builder address
+        let namespace = request.namespace;
+        let id = request.id;
+        let version = request.version;
+        let version_build = match do_get_version_build(
+            &mut register,
+            lease_id,
+            models::GetVersionBuildRequest {
+                namespace: namespace.clone(),
+                id: id.clone(),
+                version,
+            },
+        )
+        .await
+        {
+            Ok(version_build) => version_build,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        let version_build = match version_build {
+            Some(version_build) => version_build,
+            None => {
+                return Ok(http_not_found(Failure::new(format!(
+                    "version build {}/{}/{} not found",
+                    namespace, id, version
+                ))))
+            }
+        };
+        // cancel local build at builder
+        let builder_id = version_build.builder_id;
+        let builder_address = version_build.builder_address;
+        info!("scheduled builder ({}, {})", builder_id, builder_address);
+        let mut builder_client = match builder_client(builder_address).await {
+            Ok(builder_client) => builder_client,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match do_cancel_build(
+            &mut builder_client,
+            namespace.as_str(),
+            id.as_str(),
+            version,
+        )
+        .await
+        {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_cancel_build(
+        client: &mut BuilderClient<Channel>,
+        namespace: &str,
+        id: &str,
+        version: u64,
     ) -> pipebuilder_common::Result<models::CancelBuildResponse> {
-        Ok(models::CancelBuildResponse {})
+        let resp = client
+            .cancel(CancelRequest {
+                namespace: namespace.to_owned(),
+                id: id.to_owned(),
+                build_version: version,
+            })
+            .await?;
+        Ok(resp.into_inner().into())
     }
 
     async fn schedule(
@@ -388,6 +461,11 @@ mod handlers {
     ) -> pipebuilder_common::Result<ScheduleResponse> {
         let response = client.schedule(ScheduleRequest {}).await?;
         Ok(response.into_inner())
+    }
+
+    async fn builder_client(address: String) -> pipebuilder_common::Result<BuilderClient<Channel>> {
+        let client = BuilderClient::connect(address).await?;
+        Ok(client)
     }
 
     fn failure(status_code: StatusCode, failure: Failure) -> http::Result<Response<String>> {
@@ -522,6 +600,10 @@ mod models {
         pub status: BuildStatus,
         // timestamp
         pub timestamp: DateTime<Utc>,
+        // builder id
+        pub builder_id: String,
+        // builder address
+        pub builder_address: String,
         // message
         pub message: Option<String>,
     }
@@ -572,6 +654,12 @@ mod models {
         fn from(origin: build::BuildResponse) -> Self {
             let build_version = origin.version;
             BuildResponse { build_version }
+        }
+    }
+
+    impl From<build::CancelResponse> for CancelBuildResponse {
+        fn from(_origin: build::CancelResponse) -> Self {
+            CancelBuildResponse {}
         }
     }
 

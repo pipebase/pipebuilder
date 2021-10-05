@@ -64,7 +64,8 @@ impl Manifest for ManifestService {
         let repository = self.repository.as_str();
         let buffer = request.buffer.as_slice();
         // TODO: validate manifest before write
-        match write_manifest_into_repo(repository, namespace.as_str(), id.as_str(), version, buffer) {
+        match write_manifest_into_repo(repository, namespace.as_str(), id.as_str(), version, buffer)
+        {
             Ok(_) => Ok(Response::new(PutManifestResponse { id, version })),
             Err(err) => return Err(internal_error(err)),
         }

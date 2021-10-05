@@ -62,16 +62,8 @@ where
     Ok(config)
 }
 
-pub fn app_directory(
-    workspace: &str,
-    namespace: &str,
-    id: &str,
-    build_version: u64,
-) -> String {
-    format!(
-        "{}/{}/{}/{}/app",
-        workspace, namespace, id, build_version
-    )
+pub fn app_directory(workspace: &str, namespace: &str, id: &str, build_version: u64) -> String {
+    format!("{}/{}/{}/{}/app", workspace, namespace, id, build_version)
 }
 
 pub fn app_toml_manifest_path(
@@ -86,12 +78,7 @@ pub fn app_toml_manifest_path(
     )
 }
 
-pub fn app_main_path(
-    workspace: &str,
-    namespace: &str,
-    id: &str,
-    build_version: u64,
-) -> String {
+pub fn app_main_path(workspace: &str, namespace: &str, id: &str, build_version: u64) -> String {
     format!(
         "{}/{}/{}/{}/app/src/main.rs",
         workspace, namespace, id, build_version

@@ -204,11 +204,8 @@ impl Build {
             "pull manifest '{}/{}:({}, {})'",
             namespace, id, manifest_version, build_version
         );
-        let request = build_get_manifest_request(
-            namespace.to_owned(),
-            id.to_owned(),
-            manifest_version,
-        );
+        let request =
+            build_get_manifest_request(namespace.to_owned(), id.to_owned(), manifest_version);
         let response = self
             .manifest_client
             .get_manifest(request)
@@ -311,14 +308,9 @@ impl Build {
         let workspace = self.get_workspace().as_str();
         let publish_directory = self.get_publish_directory().as_str();
         let namespace = self.namespace.as_str();
-        let release_path =
-            app_build_release_path(workspace, namespace, id.as_str(), build_version);
-        let publish_path = app_publish_path(
-            publish_directory,
-            namespace,
-            id.as_str(),
-            build_version,
-        );
+        let release_path = app_build_release_path(workspace, namespace, id.as_str(), build_version);
+        let publish_path =
+            app_publish_path(publish_directory, namespace, id.as_str(), build_version);
         let size = copy_file(release_path.as_str(), publish_path.as_str())?;
         info!("published app binariy size: {} Mb", size / 1024 / 1024);
         Ok(Some(BuildStatus::Store))
