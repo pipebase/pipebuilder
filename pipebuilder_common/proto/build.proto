@@ -2,10 +2,10 @@ syntax = "proto3";
 package build;
 
 message BuildRequest {
-    // manifest namespace
+    // app namespace
     string namespace = 1;
-    // manifest id
-    string manifest_id = 2;
+    // app id
+    string id = 2;
     // manifest version
     uint64 manifest_version = 3;
     // target platform
@@ -18,9 +18,9 @@ message BuildResponse {
 }
 
 message CancelRequest {
-    // manifest namespace
+    // app namespace
     string namespace = 1;
-    // manifest id
+    // app id
     string id = 2;
     // version: build version
     uint64 build_version = 3;
@@ -31,12 +31,12 @@ message CancelResponse {}
 message ListRequest {}
 
 message VersionBuildKey {
-    // manifest namespace
+    // app namespace
     string namespace = 1;
-    // manifest id
+    // app id
     string id = 2;
-    // version: build version
-    uint64 version = 3;
+    // app build version
+    uint64 build_version = 3;
 }
 
 message ListResponse {

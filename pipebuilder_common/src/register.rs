@@ -230,17 +230,17 @@ impl Register {
     async fn do_incr_build_snapshot(
         &mut self,
         namespace: &str,
-        manifest_id: &str,
+        id: &str,
     ) -> Result<(PutResponse, BuildSnapshot)> {
         // get current snapshot and incr version
-        let new_snapshot = match self.do_get_build_snapshot(namespace, manifest_id).await? {
+        let new_snapshot = match self.do_get_build_snapshot(namespace, id).await? {
             Some(mut snapshot) => {
                 snapshot.latest_version += 1;
                 snapshot
             }
             None => BuildSnapshot::default(),
         };
-        let key = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, manifest_id);
+        let key = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, id);
         let value = serde_json::to_vec(&new_snapshot)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, new_snapshot))
@@ -249,9 +249,9 @@ impl Register {
     async fn do_get_build_snapshot(
         &mut self,
         namespace: &str,
-        manifest_id: &str,
+        id: &str,
     ) -> Result<Option<BuildSnapshot>> {
-        let key = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, manifest_id);
+        let key = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, id);
         let snapshot = self
             .get_json_object::<String, BuildSnapshot>(key, None)
             .await?;
@@ -265,7 +265,7 @@ impl Register {
         lease_id: i64,
     ) -> Result<(PutResponse, BuildSnapshot)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, id); 
+        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, id);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_incr_build_snapshot(namespace, id).await;

@@ -1,11 +1,12 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetManifestRequest {
-    /// get manifest given manifest (namespace, id)
+    /// app namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
+    /// app id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
-    /// latest manifest version
+    /// app manifest version
     #[prost(uint64, tag = "3")]
     pub version: u64,
 }
@@ -17,12 +18,12 @@ pub struct GetManifestResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PutManifestRequest {
-    /// manifest namespace
+    /// app namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
-    /// manifest id
-    #[prost(string, optional, tag = "2")]
-    pub id: ::core::option::Option<::prost::alloc::string::String>,
+    /// app id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
     /// manifest binaries
     #[prost(bytes = "vec", tag = "3")]
     pub buffer: ::prost::alloc::vec::Vec<u8>,
@@ -32,7 +33,7 @@ pub struct PutManifestResponse {
     /// manifest id
     #[prost(string, tag = "1")]
     pub id: ::prost::alloc::string::String,
-    /// latest manifest version
+    /// app manifest version
     #[prost(uint64, tag = "2")]
     pub version: u64,
 }

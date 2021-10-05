@@ -3,7 +3,6 @@ use pipebuilder_common::{
     internal_error, read_file, write_file, Register,
 };
 use tonic::Response;
-use uuid::Uuid;
 
 pub struct ManifestService {
     register: Register,
@@ -32,12 +31,12 @@ impl Manifest for ManifestService {
         tonic::Response<pipebuilder_common::grpc::manifest::GetManifestResponse>,
         tonic::Status,
     > {
-        let request_ref = request.get_ref();
+        let request = request.into_inner();
+        let namespace = request.namespace;
+        let id = request.id;
+        let version = request.version;
         let repository = self.repository.as_str();
-        let namespace = request_ref.namespace.as_str();
-        let id = request_ref.id.as_str();
-        let version = request_ref.version;
-        match read_manifest_from_repo(repository, namespace, id, version) {
+        match read_manifest_from_repo(repository, namespace.as_str(), id.as_str(), version) {
             Ok(buffer) => Ok(Response::new(GetManifestResponse { buffer })),
             Err(err) => Err(internal_error(err)),
         }
@@ -50,28 +49,22 @@ impl Manifest for ManifestService {
         tonic::Response<pipebuilder_common::grpc::manifest::PutManifestResponse>,
         tonic::Status,
     > {
-        let request_ref = request.get_ref();
-        let namespace = request_ref.namespace.as_str();
-        let id = match request_ref.id {
-            Some(ref id) => id.to_owned(),
-            None => {
-                let uuid = Uuid::new_v4();
-                uuid.to_string()
-            }
-        };
+        let request = request.into_inner();
+        let namespace = request.namespace;
+        let id = request.id;
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         let version = match register
-            .incr_manifest_snapshot(lease_id, namespace, id.as_str())
+            .incr_manifest_snapshot(lease_id, namespace.as_str(), id.as_str())
             .await
         {
             Ok((_, snapshot)) => snapshot.latest_version,
             Err(err) => return Err(internal_error(err)),
         };
         let repository = self.repository.as_str();
-        let buffer = request_ref.buffer.as_slice();
+        let buffer = request.buffer.as_slice();
         // TODO: validate manifest before write
-        match write_manifest_into_repo(repository, namespace, id.as_str(), version, buffer) {
+        match write_manifest_into_repo(repository, namespace.as_str(), id.as_str(), version, buffer) {
             Ok(_) => Ok(Response::new(PutManifestResponse { id, version })),
             Err(err) => return Err(internal_error(err)),
         }

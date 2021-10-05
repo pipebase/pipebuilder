@@ -2,10 +2,11 @@ syntax = "proto3";
 package manifest;
 
 message GetManifestRequest {
-    // get manifest given manifest (namespace, id)
+    // app namespace
     string namespace = 1;
+    // app id
     string id = 2;
-    // latest manifest version
+    // app manifest version
     uint64 version = 3;
 }
 
@@ -15,10 +16,10 @@ message GetManifestResponse {
 }
 
 message PutManifestRequest {
-    // manifest namespace
+    // app namespace
     string namespace = 1;
-    // manifest id
-    optional string id = 2;
+    // app id
+    string id = 2;
     // manifest binaries
     bytes buffer = 3;
 }
@@ -26,7 +27,7 @@ message PutManifestRequest {
 message PutManifestResponse {
     // manifest id
     string id = 1;
-    // latest manifest version
+    // app manifest version
     uint64 version = 2;
 }
 

@@ -65,96 +65,96 @@ where
 pub fn app_directory(
     workspace: &str,
     namespace: &str,
-    manifest_id: &str,
+    id: &str,
     build_version: u64,
 ) -> String {
     format!(
         "{}/{}/{}/{}/app",
-        workspace, namespace, manifest_id, build_version
+        workspace, namespace, id, build_version
     )
 }
 
 pub fn app_toml_manifest_path(
     workspace: &str,
     namespace: &str,
-    manifest_id: &str,
+    id: &str,
     build_version: u64,
 ) -> String {
     format!(
         "{}/{}/{}/{}/app/Cargo.toml",
-        workspace, namespace, manifest_id, build_version
+        workspace, namespace, id, build_version
     )
 }
 
 pub fn app_main_path(
     workspace: &str,
     namespace: &str,
-    manifest_id: &str,
+    id: &str,
     build_version: u64,
 ) -> String {
     format!(
         "{}/{}/{}/{}/app/src/main.rs",
-        workspace, namespace, manifest_id, build_version
+        workspace, namespace, id, build_version
     )
 }
 
 pub fn app_build_target_path(
     workspace: &str,
     namespace: &str,
-    manifest_id: &str,
+    id: &str,
     build_version: u64,
 ) -> String {
     format!(
         "{}/{}/{}/{}/app/target",
-        workspace, namespace, manifest_id, build_version
+        workspace, namespace, id, build_version
     )
 }
 
 pub fn app_build_release_path(
     workspace: &str,
     namespace: &str,
-    manifest_id: &str,
+    id: &str,
     build_version: u64,
 ) -> String {
     format!(
         "{}/{}/{}/{}/app/target/release/app",
-        workspace, namespace, manifest_id, build_version
+        workspace, namespace, id, build_version
     )
 }
 
 pub fn app_build_log_path(
     log_directory: &str,
     namespace: &str,
-    manifest_id: &str,
+    id: &str,
     build_version: u64,
 ) -> String {
     format!(
         "{}/{}/{}/{}/build.log",
-        log_directory, namespace, manifest_id, build_version
+        log_directory, namespace, id, build_version
     )
 }
 
 pub fn app_restore_path(
     restore_directory: &str,
     namespace: &str,
-    manifest_id: &str,
+    id: &str,
     build_version: u64,
 ) -> String {
     format!(
         "{}/{}/{}/{}/app",
-        restore_directory, namespace, manifest_id, build_version
+        restore_directory, namespace, id, build_version
     )
 }
 
 pub fn app_publish_path(
     publish_directory: &str,
     namespace: &str,
-    manifest_id: &str,
+    id: &str,
     build_version: u64,
 ) -> String {
     format!(
         "{}/{}/{}/{}/app",
-        publish_directory, namespace, manifest_id, build_version
+        publish_directory, namespace, id, build_version
     )
 }
 

@@ -45,14 +45,14 @@ impl Builder for BuilderService {
     {
         let request = request.into_inner();
         let namespace = request.namespace;
-        let manifest_id = request.manifest_id;
+        let id = request.id;
         let manifest_version = request.manifest_version;
         // lock build snapshot with manifest id
         // update latest build version
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         let snapshot = match register
-            .incr_build_snapshot(namespace.as_str(), manifest_id.as_str(), lease_id)
+            .incr_build_snapshot(namespace.as_str(), id.as_str(), lease_id)
             .await
         {
             Ok((_, snapshot)) => snapshot,
@@ -68,7 +68,7 @@ impl Builder for BuilderService {
         let target_platform = request.target_platform;
         let build = Build::new(
             namespace,
-            manifest_id,
+            id,
             manifest_version,
             manifest_client,
             build_version,
@@ -134,10 +134,10 @@ impl Builder for BuilderService {
         let keys = builds_ref
             .keys()
             .into_iter()
-            .map(|(namespace, id, version)| VersionBuildKey {
+            .map(|(namespace, id, build_version)| VersionBuildKey {
                 namespace: namespace.to_owned(),
                 id: id.to_owned(),
-                version: version.to_owned(),
+                build_version: build_version.to_owned(),
             })
             .collect::<Vec<VersionBuildKey>>();
         Ok(Response::new(ListResponse { keys }))

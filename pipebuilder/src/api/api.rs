@@ -428,7 +428,7 @@ mod models {
     #[derive(Serialize, Deserialize)]
     pub struct BuildRequest {
         pub namespace: String,
-        pub manifest_id: String,
+        pub id: String,
         pub manifest_version: u64,
         pub target_platform: String,
     }
@@ -441,7 +441,7 @@ mod models {
     #[derive(Serialize, Deserialize)]
     pub struct GetBuildRequest {
         pub namespace: String,
-        pub manifest_id: String,
+        pub id: String,
         pub build_version: u64,
     }
 
@@ -453,7 +453,7 @@ mod models {
     #[derive(Serialize, Deserialize)]
     pub struct PutManifestRequest {
         pub namespace: String,
-        pub id: Option<String>,
+        pub id: String,
         pub buffer: Vec<u8>,
     }
 
@@ -525,6 +525,13 @@ mod models {
     }
 
     #[derive(Serialize, Deserialize)]
+    pub struct CancelVersionBuildRequest {
+        pub namespace: String,
+        pub id: String,
+        pub version: u64,
+    }
+
+    #[derive(Serialize, Deserialize)]
     pub struct Failure {
         pub error: String,
     }
@@ -538,12 +545,12 @@ mod models {
     impl From<BuildRequest> for build::BuildRequest {
         fn from(origin: BuildRequest) -> Self {
             let namespace = origin.namespace;
-            let manifest_id = origin.manifest_id;
+            let id = origin.id;
             let manifest_version = origin.manifest_version;
             let target_platform = origin.target_platform;
             build::BuildRequest {
                 namespace,
-                manifest_id,
+                id,
                 manifest_version,
                 target_platform,
             }
