@@ -40,7 +40,7 @@ message VersionBuildKey {
 }
 
 message ListResponse {
-    repeated VersionBuildKey keys = 1;
+    repeated VersionBuildKey builds = 1;
 }
 
 service Builder {

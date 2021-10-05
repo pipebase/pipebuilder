@@ -50,7 +50,7 @@ pub struct VersionBuildKey {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ListResponse {
     #[prost(message, repeated, tag = "1")]
-    pub keys: ::prost::alloc::vec::Vec<VersionBuildKey>,
+    pub builds: ::prost::alloc::vec::Vec<VersionBuildKey>,
 }
 #[doc = r" Generated client implementations."]
 pub mod builder_client {

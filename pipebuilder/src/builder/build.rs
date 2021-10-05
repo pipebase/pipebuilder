@@ -131,7 +131,7 @@ impl Builder for BuilderService {
         _request: tonic::Request<pipebuilder_common::grpc::build::ListRequest>,
     ) -> Result<tonic::Response<pipebuilder_common::grpc::build::ListResponse>, tonic::Status> {
         let builds_ref = self.builds.pin();
-        let keys = builds_ref
+        let builds = builds_ref
             .keys()
             .into_iter()
             .map(|(namespace, id, build_version)| VersionBuildKey {
@@ -140,7 +140,7 @@ impl Builder for BuilderService {
                 build_version: build_version.to_owned(),
             })
             .collect::<Vec<VersionBuildKey>>();
-        Ok(Response::new(ListResponse { keys }))
+        Ok(Response::new(ListResponse { builds }))
     }
 }
 
