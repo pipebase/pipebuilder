@@ -261,14 +261,15 @@ impl Register {
     pub async fn incr_build_snapshot(
         &mut self,
         namespace: &str,
-        manifest_id: &str,
+        id: &str,
         lease_id: i64,
     ) -> Result<(PutResponse, BuildSnapshot)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_resp = self.lock(manifest_id, lock_options.into()).await?;
+        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, id); 
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
-        let resp = self.do_incr_build_snapshot(namespace, manifest_id).await;
-        self.unlock(manifest_id, key).await?;
+        let resp = self.do_incr_build_snapshot(namespace, id).await;
+        self.unlock(lock_name.as_str(), key).await?;
         resp
     }
 
@@ -298,10 +299,16 @@ impl Register {
         version: u64,
     ) -> Result<Option<VersionBuild>> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_resp = self.lock(id, lock_options.into()).await?;
+        let lock_name = resource_namespace_id_version(
+            REGISTER_KEY_PREFIX_VERSION_BUILD,
+            namespace,
+            id,
+            version,
+        );
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_get_version_build(namespace, id, version).await?;
-        self.unlock(id, key).await?;
+        self.unlock(lock_name.as_str(), key).await?;
         Ok(resp)
     }
 
@@ -345,12 +352,18 @@ impl Register {
         state: VersionBuild,
     ) -> Result<(PutResponse, VersionBuild)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_resp = self.lock(id, lock_options.into()).await?;
+        let lock_name = resource_namespace_id_version(
+            REGISTER_KEY_PREFIX_VERSION_BUILD,
+            namespace,
+            id,
+            version,
+        );
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self
             .do_put_version_build(namespace, id, version, state)
             .await;
-        self.unlock(id, key).await?;
+        self.unlock(lock_name.as_str(), key).await?;
         resp
     }
 
@@ -379,10 +392,11 @@ impl Register {
         id: &str,
     ) -> Result<(PutResponse, ManifestSnapshot)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_resp = self.lock(id, lock_options.into()).await?;
+        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace, id);
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_incr_manifest_snapshot(namespace, id).await;
-        self.unlock(id, key).await?;
+        self.unlock(lock_name.as_str(), key).await?;
         resp
     }
 
@@ -405,10 +419,11 @@ impl Register {
         id: &str,
     ) -> Result<Option<ManifestSnapshot>> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_resp = self.lock(id, lock_options.into()).await?;
+        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace, id);
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_get_manifest_snapshot(namespace, id).await;
-        self.unlock(id, key).await?;
+        self.unlock(lock_name.as_str(), key).await?;
         resp
     }
 
