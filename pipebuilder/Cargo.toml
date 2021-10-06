@@ -13,6 +13,10 @@ name = "builder"
 path = "src/builder/app.rs"
 
 [[bin]]
+name = "pbctl"
+path = "src/cli/app.rs"
+
+[[bin]]
 name = "scheduler"
 path = "src/scheduler/app.rs"
 
@@ -21,19 +25,20 @@ name = "manifest"
 path = "src/manifest/app.rs"
 
 [dependencies]
-etcd-client = "0.7.2"
 chrono = { version = "0.4" }
+clap = "3.0.0-beta.2"
+etcd-client = "0.7.2"
 flurry = "0.3.1"
 http = "0.2.5"
 pipebuilder_common = { version = "0.1.0", path = "../pipebuilder_common" }
 prost = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.64"
+termcolor = "1.1"
 tonic = "0.5"
 tokio = { version = "1.11.0", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1"
 tracing-subscriber = "0.2"
-uuid = { version = "0.8", features = ["v4"] }
 warp = "0.3.1"
 
 [build-dependencies]
