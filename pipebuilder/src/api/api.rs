@@ -1,6 +1,7 @@
 pub mod filters {
-    use super::{handlers, models};
+    use super::handlers;
     use pipebuilder_common::{
+        api::models,
         grpc::{
             manifest::manifest_client::ManifestClient, schedule::scheduler_client::SchedulerClient,
         },
@@ -146,8 +147,8 @@ pub mod filters {
 }
 
 mod handlers {
-    use super::models::{self, Failure};
     use pipebuilder_common::{
+        api::models::{self, Failure},
         grpc::{
             build::{builder_client::BuilderClient, BuildRequest, CancelRequest},
             manifest::{manifest_client::ManifestClient, GetManifestRequest, PutManifestRequest},
@@ -493,12 +494,6 @@ mod handlers {
         Response::builder()
             .status(StatusCode::OK)
             .body(serde_json::to_string::<T>(t).unwrap())
-    }
-
-    impl From<pipebuilder_common::Error> for Failure {
-        fn from(error: pipebuilder_common::Error) -> Self {
-            Failure::new(format!("{:#?}", error))
-        }
     }
 }
 
