@@ -35,6 +35,12 @@ pub enum ErrorImpl {
     Utf8(#[from] FromUtf8Error),
     #[error("cargo {cmd:?} error")]
     Cargo { cmd: String, code: i32, msg: String },
+    #[error("reqwest exception")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("http header name exception")]
+    HttpHeaderName(#[from] http::header::InvalidHeaderName),
+    #[error("http header value exception")]
+    HttpHeaderValue(#[from] http::header::InvalidHeaderValue),
 }
 
 impl From<std::io::Error> for Error {
@@ -106,6 +112,24 @@ impl From<toml::ser::Error> for Error {
 impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
         Error(Box::new(ErrorImpl::Utf8(err)))
+    }
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(err: reqwest::Error) -> Self {
+        Error(Box::new(ErrorImpl::Reqwest(err)))
+    }
+}
+
+impl From<http::header::InvalidHeaderName> for Error {
+    fn from(err: http::header::InvalidHeaderName) -> Self {
+        Error(Box::new(ErrorImpl::HttpHeaderName(err)))
+    }
+}
+
+impl From<http::header::InvalidHeaderValue> for Error {
+    fn from(err: http::header::InvalidHeaderValue) -> Self {
+        Error(Box::new(ErrorImpl::HttpHeaderValue(err)))
     }
 }
 

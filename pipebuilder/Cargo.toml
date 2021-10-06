@@ -32,6 +32,7 @@ flurry = "0.3.1"
 http = "0.2.5"
 pipebuilder_common = { version = "0.1.0", path = "../pipebuilder_common" }
 prost = "0.8"
+reqwest = "0.11.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.64"
 termcolor = "1.1"

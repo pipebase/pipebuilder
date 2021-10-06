@@ -5,37 +5,33 @@ use pipebuilder_common::Result;
 use clap::Arg;
 
 pub fn cmd() -> Cmd {
-    Cmd::new("create")
-        .about("Create resource")
-        .subcommands(vec![manifest(), build()])
+    Cmd::new("list")
+        .about("List resources")
+        .subcommands(vec![snapshot(), build()])
 }
 
-pub fn manifest() -> Cmd {
-    Cmd::new("manifest")
-        .about("Create manifest given namespace, app id and manifest file")
+pub fn snapshot() -> Cmd {
+    Cmd::new("snapshot")
+        .about("List build or manifest snapshot given namespace")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
                 .about("Specify namespace")
                 .takes_value(true),
-            Arg::new("id")
-                .short('i')
-                .about("Specify app id")
-                .takes_value(true),
-            Arg::new("file")
-                .short('f')
-                .about("Specify app manifest file path")
-                .takes_value(true),
+            Arg::new("build").short('b').about("List build snapshot"),
+            Arg::new("manifest")
+                .short('m')
+                .about("List manifest snapshot"),
         ])
 }
 
-pub async fn exec_manifest(config: &Config, args: &clap::ArgMatches) -> Result<()> {
+pub async fn exec_snapshot(config: &Config, args: &clap::ArgMatches) -> Result<()> {
     Ok(())
 }
 
 pub fn build() -> Cmd {
     Cmd::new("build")
-        .about("Create build given namespace and app id")
+        .about("List build history given namespace and app id")
         .args(vec![
             Arg::new("namespace")
                 .short('n')

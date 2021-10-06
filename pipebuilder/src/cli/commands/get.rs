@@ -11,20 +11,22 @@ pub fn cmd() -> Cmd {
 }
 
 pub fn manifest() -> Cmd {
-    Cmd::new("manifest").about("Get manifest").args(vec![
-        Arg::new("namespace")
-            .short('n')
-            .about("Specify namespace")
-            .takes_value(true),
-        Arg::new("id")
-            .short('i')
-            .about("Specify app id")
-            .takes_value(true),
-        Arg::new("version")
-            .short('v')
-            .about("Specify app manifest version")
-            .takes_value(true),
-    ])
+    Cmd::new("manifest")
+        .about("Get manifest given namespace, app id and manifest version")
+        .args(vec![
+            Arg::new("namespace")
+                .short('n')
+                .about("Specify namespace")
+                .takes_value(true),
+            Arg::new("id")
+                .short('i')
+                .about("Specify app id")
+                .takes_value(true),
+            Arg::new("version")
+                .short('v')
+                .about("Specify app manifest version")
+                .takes_value(true),
+        ])
 }
 
 pub async fn exec_manifest(config: &Config, args: &clap::ArgMatches) -> Result<()> {
@@ -32,20 +34,22 @@ pub async fn exec_manifest(config: &Config, args: &clap::ArgMatches) -> Result<(
 }
 
 pub fn build() -> Cmd {
-    Cmd::new("build").about("Get build").args(vec![
-        Arg::new("namespace")
-            .short('n')
-            .about("Specify namespace")
-            .takes_value(true),
-        Arg::new("id")
-            .short('i')
-            .about("Specify app id")
-            .takes_value(true),
-        Arg::new("version")
-            .short('v')
-            .about("Specify app build version")
-            .takes_value(true),
-    ])
+    Cmd::new("build")
+        .about("Get build given namespace, app id and build version")
+        .args(vec![
+            Arg::new("namespace")
+                .short('n')
+                .about("Specify namespace")
+                .takes_value(true),
+            Arg::new("id")
+                .short('i')
+                .about("Specify app id")
+                .takes_value(true),
+            Arg::new("version")
+                .short('v')
+                .about("Specify app build version")
+                .takes_value(true),
+        ])
 }
 
 pub async fn exec_build(config: &Config, args: &clap::ArgMatches) -> Result<()> {
