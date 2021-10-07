@@ -1,6 +1,5 @@
 use super::Cmd;
-use crate::config::Config;
-use pipebuilder_common::Result;
+use pipebuilder_common::{api::client::ApiClient, Result};
 
 use clap::Arg;
 
@@ -25,7 +24,7 @@ pub fn snapshot() -> Cmd {
         ])
 }
 
-pub async fn exec_snapshot(config: &Config, args: &clap::ArgMatches) -> Result<()> {
+pub async fn exec_snapshot(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     Ok(())
 }
 
@@ -44,6 +43,6 @@ pub fn build() -> Cmd {
         ])
 }
 
-pub async fn exec_build(config: &Config, args: &clap::ArgMatches) -> Result<()> {
+pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     Ok(())
 }

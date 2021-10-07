@@ -33,8 +33,10 @@ async fn run() -> Result<()> {
         .get_matches();
     // TODO: parse config file
     let config = Config::default();
+    let api_config = config.api;
+    let api_client = api_config.into();
     // parse (action, resource) cmds
     let (action, matches) = matches.subcommand().unwrap();
     let (resource, matches) = matches.subcommand().unwrap();
-    commands::exec(action, resource, &config, &matches).await
+    commands::exec(action, resource, api_client, &matches).await
 }

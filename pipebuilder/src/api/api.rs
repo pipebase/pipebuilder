@@ -624,12 +624,6 @@ mod models {
         pub error: String,
     }
 
-    impl Failure {
-        pub fn new(error: String) -> Self {
-            Failure { error }
-        }
-    }
-
     impl From<BuildRequest> for build::BuildRequest {
         fn from(origin: BuildRequest) -> Self {
             let namespace = origin.namespace;

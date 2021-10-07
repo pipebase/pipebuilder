@@ -26,11 +26,6 @@ pub struct GetBuildRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct GetBuildResponse {
-    pub status: BuildStatus,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct PutManifestRequest {
     pub namespace: String,
     pub id: String,
