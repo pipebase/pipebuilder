@@ -1,9 +1,13 @@
-use crate::Result;
+use super::{
+    constants::BUILD,
+    models::{BuildRequest, BuildResponse},
+};
+use crate::{api_client_error, api_server_error, Result};
 use reqwest::{
     header::{HeaderMap, HeaderName},
     Body, Client, Response,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Clone, Deserialize)]
@@ -117,5 +121,42 @@ impl ApiClient {
         };
         let resp = req.send().await?;
         Ok(resp)
+    }
+
+    pub async fn build(&self, request: &BuildRequest) -> Result<BuildResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(BUILD, request).await?;
+        let response = Self::get_response_body::<BuildResponse>(response).await?;
+        Ok(response)
+    }
+
+    fn serialize_request<T>(request: &T) -> Result<Vec<u8>>
+    where
+        T: Serialize,
+    {
+        let buffer = serde_json::to_vec(request)?;
+        Ok(buffer)
+    }
+
+    async fn get_response_body<T>(response: Response) -> Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        let status = response.status();
+        if status.is_success() {
+            let buffer = response.bytes().await?;
+            let buffer = buffer.to_vec();
+            let t = serde_json::from_slice::<T>(&buffer)?;
+            return Ok(t);
+        }
+        let status_code = status.as_u16();
+        let reason = status.canonical_reason().map(|r| String::from(r));
+        if status.is_client_error() {
+            return Err(api_client_error(status_code, reason));
+        }
+        if status.is_server_error() {
+            return Err(api_server_error(status_code, reason));
+        }
+        unreachable!()
     }
 }

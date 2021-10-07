@@ -41,6 +41,16 @@ pub enum ErrorImpl {
     HttpHeaderName(#[from] http::header::InvalidHeaderName),
     #[error("http header value exception")]
     HttpHeaderValue(#[from] http::header::InvalidHeaderValue),
+    #[error("api client exception")]
+    ApiClient {
+        status_code: u16,
+        reason: Option<String>,
+    },
+    #[error("api server exception")]
+    ApiServer {
+        status_code: u16,
+        reason: Option<String>,
+    },
 }
 
 impl From<std::io::Error> for Error {
@@ -138,5 +148,19 @@ pub fn cargo_error(cmd: &str, code: i32, msg: String) -> Error {
         cmd: String::from(cmd),
         code,
         msg,
+    }))
+}
+
+pub fn api_client_error(status_code: u16, reason: Option<String>) -> Error {
+    Error(Box::new(ErrorImpl::ApiClient {
+        status_code,
+        reason,
+    }))
+}
+
+pub fn api_server_error(status_code: u16, reason: Option<String>) -> Error {
+    Error(Box::new(ErrorImpl::ApiServer {
+        status_code,
+        reason,
     }))
 }
