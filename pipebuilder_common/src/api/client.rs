@@ -1,6 +1,10 @@
 use super::{
-    constants::BUILD,
-    models::{BuildRequest, BuildResponse},
+    constants::{BUILD, BUILD_SNAPSHOT, CANCEL_BUILD, MANIFEST, MANIFEST_SNAPSHOT},
+    models::{
+        BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
+        GetBuildRequest, GetManifestRequest, GetManifestResponse, ListBuildRequest,
+        ListBuildSnapshotRequest, ListManifestSnapshotRequest, ManifestSnapshot, VersionBuild,
+    },
 };
 use crate::{api_client_error, api_server_error, Result};
 use reqwest::{
@@ -97,18 +101,15 @@ impl ApiClient {
         Ok(resp)
     }
 
-    pub async fn query<Q>(&self, path: &str, query: Option<Q>) -> Result<Response>
+    pub async fn query<Q>(&self, path: &str, query: &Q) -> Result<Response>
     where
         Q: Serialize,
     {
         let req = self
             .client
             .get(self.get_url(path))
-            .headers(self.headers.to_owned());
-        let req = match query {
-            Some(ref query) => req.query(query),
-            None => req,
-        };
+            .headers(self.headers.to_owned())
+            .query(query);
         let req = match self.basic_auth {
             Some(ref basic_auth) => {
                 req.basic_auth(&basic_auth.username, basic_auth.password.as_ref())
@@ -127,6 +128,49 @@ impl ApiClient {
         let request = Self::serialize_request(request)?;
         let response = self.post(BUILD, request).await?;
         let response = Self::get_response_body::<BuildResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn get_build(&self, request: &GetBuildRequest) -> Result<VersionBuild> {
+        let response = self.query(BUILD, request).await?;
+        let response = Self::get_response_body::<VersionBuild>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_build(&self, request: &ListBuildRequest) -> Result<Vec<VersionBuild>> {
+        let response = self.query(BUILD, request).await?;
+        let response = Self::get_response_body::<Vec<VersionBuild>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn cancel_build(&self, request: &CancelBuildRequest) -> Result<CancelBuildResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(CANCEL_BUILD, request).await?;
+        let response = Self::get_response_body::<CancelBuildResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_build_snapshot(
+        &self,
+        request: &ListBuildSnapshotRequest,
+    ) -> Result<Vec<BuildSnapshot>> {
+        let response = self.query(BUILD_SNAPSHOT, request).await?;
+        let response = Self::get_response_body::<Vec<BuildSnapshot>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn get_manifest(&self, request: &GetManifestRequest) -> Result<GetManifestResponse> {
+        let response = self.query(MANIFEST, request).await?;
+        let response = Self::get_response_body::<GetManifestResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_manifest_snapshot(
+        &self,
+        request: &ListManifestSnapshotRequest,
+    ) -> Result<Vec<ManifestSnapshot>> {
+        let response = self.query(MANIFEST_SNAPSHOT, request).await?;
+        let response = Self::get_response_body::<Vec<ManifestSnapshot>>(response).await?;
         Ok(response)
     }
 
@@ -150,7 +194,7 @@ impl ApiClient {
             return Ok(t);
         }
         let status_code = status.as_u16();
-        let reason = status.canonical_reason().map(|r| String::from(r));
+        let reason = status.canonical_reason().map(String::from);
         if status.is_client_error() {
             return Err(api_client_error(status_code, reason));
         }

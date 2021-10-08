@@ -22,7 +22,8 @@ pub struct BuildResponse {
 pub struct GetBuildRequest {
     pub namespace: String,
     pub id: String,
-    pub build_version: u64,
+    // build version
+    pub version: u64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -72,13 +73,7 @@ pub struct BuildSnapshot {
     pub latest_version: u64,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct GetVersionBuildRequest {
-    pub namespace: String,
-    pub id: String,
-    pub version: u64,
-}
-
+// version build model for rest api
 #[derive(Serialize, Deserialize)]
 pub struct VersionBuild {
     // id
@@ -98,7 +93,7 @@ pub struct VersionBuild {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ListVersionBuildRequest {
+pub struct ListBuildRequest {
     pub namespace: String,
     pub id: String,
 }

@@ -22,9 +22,9 @@ pub mod filters {
             .or(v1_manifest_get(manifest_client))
             .or(v1_manifest_snapshot_list(register.to_owned()))
             .or(v1_build_snapshot_list(register.to_owned()))
-            .or(v1_version_build_get(register.to_owned(), lease_id))
-            .or(v1_version_build_list(register.to_owned()))
-            .or(v1_version_build_cancel(register, lease_id))
+            .or(v1_build_get(register.to_owned(), lease_id))
+            .or(v1_build_list(register.to_owned()))
+            .or(v1_build_cancel(register, lease_id))
     }
 
     pub fn v1_build(
@@ -60,7 +60,7 @@ pub mod filters {
     pub fn v1_manifest_snapshot_list(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "manifest-snapshot")
+        warp::path!("api" / "v1" / "manifest" / "snapshot")
             .and(warp::get())
             .and(with_register(register))
             .and(warp::query::<models::ListManifestSnapshotRequest>())
@@ -70,40 +70,40 @@ pub mod filters {
     pub fn v1_build_snapshot_list(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "build-snapshot")
+        warp::path!("api" / "v1" / "build" / "snapshot")
             .and(warp::get())
             .and(with_register(register))
             .and(warp::query::<models::ListBuildSnapshotRequest>())
             .and_then(handlers::list_build_snapshot)
     }
 
-    pub fn v1_version_build_get(
+    pub fn v1_build_get(
         register: Register,
         lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "version-build")
+        warp::path!("api" / "v1" / "build")
             .and(warp::get())
             .and(with_register(register))
             .and(with_lease_id(lease_id))
-            .and(warp::query::<models::GetVersionBuildRequest>())
-            .and_then(handlers::get_version_build)
+            .and(warp::query::<models::GetBuildRequest>())
+            .and_then(handlers::get_build)
     }
 
-    pub fn v1_version_build_list(
+    pub fn v1_build_list(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "version-build")
+        warp::path!("api" / "v1" / "build")
             .and(warp::get())
             .and(with_register(register))
-            .and(warp::query::<models::ListVersionBuildRequest>())
-            .and_then(handlers::list_version_build)
+            .and(warp::query::<models::ListBuildRequest>())
+            .and_then(handlers::list_build)
     }
 
-    pub fn v1_version_build_cancel(
+    pub fn v1_build_cancel(
         register: Register,
         lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "version-build" / "cancel")
+        warp::path!("api" / "v1" / "build" / "cancel")
             .and(warp::post())
             .and(with_register(register))
             .and(with_lease_id(lease_id))
@@ -301,12 +301,12 @@ mod handlers {
         Ok(snapshots)
     }
 
-    pub async fn get_version_build(
+    pub async fn get_build(
         mut register: Register,
         lease_id: i64,
-        request: models::GetVersionBuildRequest,
+        request: models::GetBuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        let response = match do_get_version_build(&mut register, lease_id, request).await {
+        let response = match do_get_build(&mut register, lease_id, request).await {
             Ok(response) => response,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
@@ -318,10 +318,10 @@ mod handlers {
         }
     }
 
-    async fn do_get_version_build(
+    async fn do_get_build(
         register: &mut Register,
         lease_id: i64,
-        request: models::GetVersionBuildRequest,
+        request: models::GetBuildRequest,
     ) -> pipebuilder_common::Result<Option<models::VersionBuild>> {
         let namespace = request.namespace;
         let id = request.id;
@@ -340,19 +340,19 @@ mod handlers {
         }))
     }
 
-    pub async fn list_version_build(
+    pub async fn list_build(
         mut register: Register,
-        request: models::ListVersionBuildRequest,
+        request: models::ListBuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match do_list_version_build(&mut register, request).await {
+        match do_list_build(&mut register, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
     }
 
-    async fn do_list_version_build(
+    async fn do_list_build(
         register: &mut Register,
-        request: models::ListVersionBuildRequest,
+        request: models::ListBuildRequest,
     ) -> pipebuilder_common::Result<Vec<models::VersionBuild>> {
         let namespace = request.namespace;
         let id = request.id;
@@ -397,10 +397,10 @@ mod handlers {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        let version_build = match do_get_version_build(
+        let version_build = match do_get_build(
             &mut register,
             lease_id,
-            models::GetVersionBuildRequest {
+            models::GetBuildRequest {
                 namespace: namespace.clone(),
                 id: id.clone(),
                 version,
@@ -604,7 +604,7 @@ mod models {
     }
 
     #[derive(Serialize, Deserialize)]
-    pub struct ListVersionBuildRequest {
+    pub struct ListBuildRequest {
         pub namespace: String,
         pub id: String,
     }

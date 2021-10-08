@@ -40,7 +40,7 @@ pub enum BuildStatus {
     Cancel,
 }
 
-// Build state per (build_id, version)
+// Build state per (build_id, version), persist in registry
 #[derive(Deserialize, Serialize)]
 pub struct VersionBuild {
     // build status

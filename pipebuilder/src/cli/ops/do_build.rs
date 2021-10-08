@@ -1,7 +1,5 @@
 use pipebuilder_common::{
-    api::models::{
-        BuildRequest, BuildResponse, GetBuildRequest, ListVersionBuildRequest, VersionBuild,
-    },
+    api::models::{BuildRequest, BuildResponse, GetBuildRequest, ListBuildRequest, VersionBuild},
     Result,
 };
 
