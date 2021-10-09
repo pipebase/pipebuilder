@@ -3,7 +3,8 @@ use super::{
     models::{
         BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
         GetBuildRequest, GetManifestRequest, GetManifestResponse, ListBuildRequest,
-        ListBuildSnapshotRequest, ListManifestSnapshotRequest, ManifestSnapshot, VersionBuild,
+        ListBuildSnapshotRequest, ListManifestSnapshotRequest, ManifestSnapshot,
+        PutManifestRequest, PutManifestResponse, VersionBuild,
     },
 };
 use crate::{api_client_error, api_server_error, Result};
@@ -162,6 +163,13 @@ impl ApiClient {
     pub async fn get_manifest(&self, request: &GetManifestRequest) -> Result<GetManifestResponse> {
         let response = self.query(MANIFEST, request).await?;
         let response = Self::get_response_body::<GetManifestResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn put_manifest(&self, request: &PutManifestRequest) -> Result<PutManifestResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(MANIFEST, request).await?;
+        let response = Self::get_response_body::<PutManifestResponse>(response).await?;
         Ok(response)
     }
 

@@ -14,6 +14,7 @@ use std::fmt::Display;
 #[derive(Serialize, Deserialize)]
 pub struct BuildRequest {
     pub namespace: String,
+    // app id
     pub id: String,
     pub manifest_version: u64,
     pub target_platform: String,
@@ -26,7 +27,9 @@ pub struct BuildResponse {
 
 #[derive(Serialize, Deserialize)]
 pub struct GetBuildRequest {
+    // namespace
     pub namespace: String,
+    // app id
     pub id: String,
     // build version
     pub version: u64,
@@ -152,6 +155,7 @@ impl Display for VersionBuild {
 #[derive(Serialize, Deserialize)]
 pub struct ListBuildRequest {
     pub namespace: String,
+    // app id
     pub id: String,
 }
 
