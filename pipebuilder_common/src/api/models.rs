@@ -1,9 +1,15 @@
+use super::constants::{
+    DISPLAY_BUILD_STATUS_WIDTH, DISPLAY_ID_WIDTH, DISPLAY_MESSAGE_WIDTH, DISPLAY_TIMESTAMP_WIDTH,
+    DISPLAY_VERSION_WIDTH,
+};
 use crate::{
+    api::constants::DISPLAY_ADDRESS_WIDTH,
     grpc::{build, manifest},
     BuildStatus, Error,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
 #[derive(Serialize, Deserialize)]
 pub struct BuildRequest {
@@ -62,6 +68,19 @@ pub struct ManifestSnapshot {
     pub latest_version: u64,
 }
 
+impl Display for ManifestSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:>id_width$}{latest_version:>version_width$}",
+            id = self.id,
+            latest_version = self.latest_version,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ListBuildSnapshotRequest {
     pub namespace: String,
@@ -71,6 +90,19 @@ pub struct ListBuildSnapshotRequest {
 pub struct BuildSnapshot {
     pub id: String,
     pub latest_version: u64,
+}
+
+impl Display for BuildSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:>id_width$}{latest_version:>version_width$}",
+            id = self.id,
+            latest_version = self.latest_version,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
 }
 
 // version build model for rest api
@@ -90,6 +122,31 @@ pub struct VersionBuild {
     pub builder_address: String,
     // message
     pub message: Option<String>,
+}
+
+impl Display for VersionBuild {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self.message.as_ref() {
+            Some(message) => message.as_str(),
+            None => "",
+        };
+        writeln!(f,
+                "{id:>id_width$}{version:>version_width$}{status:>status_width$}{timestamp:>timestamp_width$}{builder_id:>id_width$}{builder_address:>address_width$}{message:>message_width$}",
+                id = self.id,
+                version = self.version,
+                status = self.status,
+                timestamp = self.timestamp,
+                builder_id = self.builder_id,
+                builder_address = self.builder_address,
+                message = message,
+                id_width = DISPLAY_ID_WIDTH,
+                version_width = DISPLAY_VERSION_WIDTH,
+                status_width = DISPLAY_BUILD_STATUS_WIDTH,
+                timestamp_width = DISPLAY_TIMESTAMP_WIDTH,
+                address_width = DISPLAY_ADDRESS_WIDTH,
+                message_width = DISPLAY_MESSAGE_WIDTH,
+                )
+    }
 }
 
 #[derive(Serialize, Deserialize)]

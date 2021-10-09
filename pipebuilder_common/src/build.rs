@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     errors::Result,
     utils::{
@@ -38,6 +40,24 @@ pub enum BuildStatus {
     Fail,
     // build cancelled due to node maintenance / deployment or cli
     Cancel,
+}
+
+impl Display for BuildStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let status_text = match self {
+            Self::Pull => "Pull",
+            Self::Validate => "Validate",
+            Self::Create => "Create",
+            Self::Generate => "Generate",
+            Self::Build => "Build",
+            Self::Publish => "Publish",
+            Self::Store => "Store",
+            Self::Succeed => "Succeed",
+            Self::Fail => "Fail",
+            Self::Cancel => "Cancel",
+        };
+        write!(f, "{}", status_text)
+    }
 }
 
 // Build state per (build_id, version), persist in registry
