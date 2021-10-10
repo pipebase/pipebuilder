@@ -465,7 +465,8 @@ mod handlers {
     }
 
     async fn builder_client(address: String) -> pipebuilder_common::Result<BuilderClient<Channel>> {
-        let client = BuilderClient::connect(address).await?;
+        // TODO (Li Yu): configurable protocol
+        let client = BuilderClient::connect(format!("http://{}", address)).await?;
         Ok(client)
     }
 

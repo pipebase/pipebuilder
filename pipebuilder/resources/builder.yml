@@ -8,8 +8,8 @@ base:
   register:
     endpoints: ["localhost:2379"]
 builder:
-  manifest_endpoint: 127.0.0.1:17000
-  workspace: /opt/build/apps
-  restore_directory: /opt/build/restore
-  log_directory: /opt/build/logs
-  publish_directory: /opt/build/publish
+  manifest_endpoint: http://127.0.0.1:17000
+  workspace: data/build/apps
+  restore_directory: data/build/restore
+  log_directory: data/build/logs
+  publish_directory: data/build/publish

@@ -33,7 +33,7 @@ pub struct ApiClientConfig {
 impl Default for ApiClientConfig {
     fn default() -> Self {
         ApiClientConfig {
-            endpoint: String::from("127.0.0.1:16000"),
+            endpoint: String::from("http://127.0.0.1:16000"),
             basic_auth: None,
             bearer_auth_token: None,
             headers: HashMap::new(),

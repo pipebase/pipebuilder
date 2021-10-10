@@ -1,20 +1,20 @@
 pipebuilder apps
 ### Run Apps
-api
+manifest
 ```sh
-RUST_LOG=info PIPEBUILDER_CONFIG_FILE=resources/api.yml cargo run --bin api
+RUST_LOG=info PIPEBUILDER_CONFIG_FILE=resources/manifest.yml cargo run --bin manifest
 ```
 builder
 ```sh
 RUST_LOG=info PIPEBUILDER_CONFIG_FILE=resources/builder.yml cargo run --bin builder
 ```
-manifest
-```sh
-RUST_LOG=info PIPEBUILDER_CONFIG_FILE=resources/manifest.yml cargo run --bin manifest
-```
 scheduler
 ```sh
 RUST_LOG=info PIPEBUILDER_CONFIG_FILE=resources/scheduler.yml cargo run --bin scheduler
+```
+api
+```sh
+RUST_LOG=info PIPEBUILDER_CONFIG_FILE=resources/api.yml cargo run --bin api
 ```
 ### Endpoints
 health

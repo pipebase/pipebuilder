@@ -10,6 +10,6 @@ base:
 api:
   clients:
     manifest:
-      endpoint: 127.0.0.1:17000
+      endpoint: http://127.0.0.1:17000
     scheduler:
-      endpoint: 127.0.0.1:18000
+      endpoint: http://127.0.0.1:18000
