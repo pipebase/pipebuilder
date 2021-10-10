@@ -1,8 +1,9 @@
 use pipebuilder_common::{
     grpc::manifest::{manifest_server::Manifest, GetManifestResponse, PutManifestResponse},
-    internal_error, read_file, write_file, Register,
+    read_file, rpc_internal_error, rpc_not_found, write_file, Register,
 };
 use tonic::Response;
+use tracing::error;
 
 pub struct ManifestService {
     register: Register,
@@ -38,7 +39,13 @@ impl Manifest for ManifestService {
         let repository = self.repository.as_str();
         match read_manifest_from_repo(repository, namespace.as_str(), id.as_str(), version) {
             Ok(buffer) => Ok(Response::new(GetManifestResponse { buffer })),
-            Err(err) => Err(internal_error(err)),
+            Err(err) => {
+                error!(
+                    "read manifest {}/{}/{} fail, error '{}'",
+                    namespace, id, version, err
+                );
+                Err(rpc_not_found("manifest not found"))
+            }
         }
     }
 
@@ -59,15 +66,20 @@ impl Manifest for ManifestService {
             .await
         {
             Ok((_, snapshot)) => snapshot.latest_version,
-            Err(err) => return Err(internal_error(err)),
+            Err(err) => {
+                error!("increase manifest snapshot version fail, error '{}'", err);
+                return Err(rpc_internal_error(err));
+            }
         };
         let repository = self.repository.as_str();
         let buffer = request.buffer.as_slice();
-        // TODO: validate manifest before write
         match write_manifest_into_repo(repository, namespace.as_str(), id.as_str(), version, buffer)
         {
             Ok(_) => Ok(Response::new(PutManifestResponse { id, version })),
-            Err(err) => return Err(internal_error(err)),
+            Err(err) => {
+                error!("write manifest fail, error '{}'", err);
+                return Err(rpc_internal_error(err));
+            }
         }
     }
 }

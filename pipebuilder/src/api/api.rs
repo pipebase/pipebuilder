@@ -226,7 +226,7 @@ mod handlers {
     ) -> Result<impl warp::Reply, Infallible> {
         match do_get_manifest(&mut client, request).await {
             Ok(response) => Ok(ok(&response)),
-            Err(err) => Ok(http_internal_error(err.into())),
+            Err(err) => Ok(http_not_found(err.into())),
         }
     }
 

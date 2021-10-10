@@ -1,55 +1,67 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::{env, io, net, result, string::FromUtf8Error};
 use thiserror::Error;
 
 #[derive(Debug)]
 pub struct Error(Box<ErrorImpl>);
 
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug, Error)]
 pub enum ErrorImpl {
-    #[error("addr parse exception")]
+    #[error("addr parse error, detail: {0:?}")]
     AddrParse(#[from] net::AddrParseError),
-    #[error("env exception")]
+    #[error("env error, detail: {0:?}")]
     Env(#[from] env::VarError),
-    #[error("etcd client exception")]
+    #[error("etcd client error, detail: {0:?}")]
     Etcd(#[from] etcd_client::Error),
-    #[error("io exception")]
+    #[error("io error, detail: {0:?}")]
     Io(#[from] io::Error),
-    #[error("json exception")]
+    #[error("json error, detail: {0:?}")]
     Json(#[from] serde_json::Error),
-    #[error("tonic transport exception")]
+    #[error("tonic transport error, detail: {0:?}")]
     TonicTransport(#[from] tonic::transport::Error),
-    #[error("yaml exception")]
+    #[error("yaml error, detail: {0:?}")]
     Yaml(#[from] serde_yaml::Error),
-    #[error("rpc exception")]
+    #[error("rpc error, detail: {0:?}")]
     Rpc(#[from] tonic::Status),
-    #[error("pipegen exception")]
+    #[error("pipegen error, detail: {0:?}")]
     Pipegen(#[from] pipegen::error::Error),
-    #[error("toml deserialize exception")]
+    #[error("toml deserialize error, detail: {0:?}")]
     TomlDe(#[from] toml::de::Error),
-    #[error("toml Serialize exception")]
+    #[error("toml Serialize error, detail: {0:?}")]
     TomlSer(#[from] toml::ser::Error),
-    #[error("utf8 exception")]
+    #[error("utf8 error, detail: {0:?}")]
     Utf8(#[from] FromUtf8Error),
-    #[error("cargo {cmd:?} error")]
+    #[error("cargo {cmd:?} error, code: {code:?}, message: {msg:?}")]
     Cargo { cmd: String, code: i32, msg: String },
-    #[error("reqwest exception")]
+    #[error("reqwest error, detail: {0:?}")]
     Reqwest(#[from] reqwest::Error),
-    #[error("http header name exception")]
+    #[error("http header name error, detail: {0:?}")]
     HttpHeaderName(#[from] http::header::InvalidHeaderName),
-    #[error("http header value exception")]
+    #[error("http header value error, detail: {0:?}")]
     HttpHeaderValue(#[from] http::header::InvalidHeaderValue),
-    #[error("api client exception")]
+    #[error(
+        "api client error, status_code: {status_code:?}, reason: {reason:?}, message: {message:?}"
+    )]
     ApiClient {
         status_code: u16,
-        reason: Option<String>,
+        reason: String,
+        message: String,
     },
-    #[error("api server exception")]
+    #[error(
+        "api server error, status_code: {status_code:?}, reason: {reason:?}, message: {message:?}"
+    )]
     ApiServer {
         status_code: u16,
-        reason: Option<String>,
+        reason: String,
+        message: String,
     },
 }
 
@@ -151,16 +163,35 @@ pub fn cargo_error(cmd: &str, code: i32, msg: String) -> Error {
     }))
 }
 
-pub fn api_client_error(status_code: u16, reason: Option<String>) -> Error {
+pub fn api_client_error(
+    status_code: u16,
+    reason: Option<String>,
+    message: Option<String>,
+) -> Error {
     Error(Box::new(ErrorImpl::ApiClient {
         status_code,
-        reason,
+        reason: reason.unwrap_or_default(),
+        message: message.unwrap_or_default(),
     }))
 }
 
-pub fn api_server_error(status_code: u16, reason: Option<String>) -> Error {
+pub fn api_server_error(
+    status_code: u16,
+    reason: Option<String>,
+    message: Option<String>,
+) -> Error {
     Error(Box::new(ErrorImpl::ApiServer {
         status_code,
-        reason,
+        reason: reason.unwrap_or_default(),
+        message: message.unwrap_or_default(),
     }))
+}
+
+// rpc status
+pub fn rpc_internal_error(error: Error) -> tonic::Status {
+    tonic::Status::internal(format!("{:#?}", error))
+}
+
+pub fn rpc_not_found(message: &str) -> tonic::Status {
+    tonic::Status::not_found(message)
 }

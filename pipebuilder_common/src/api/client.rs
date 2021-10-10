@@ -7,7 +7,7 @@ use super::{
         PutManifestRequest, PutManifestResponse, VersionBuild,
     },
 };
-use crate::{api_client_error, api_server_error, Result};
+use crate::{api::models::Failure, api_client_error, api_server_error, Result};
 use reqwest::{
     header::{HeaderMap, HeaderName},
     Body, Client, Response,
@@ -203,11 +203,18 @@ impl ApiClient {
         }
         let status_code = status.as_u16();
         let reason = status.canonical_reason().map(String::from);
+        // parse failure message
+        let buffer = response.bytes().await?;
+        let buffer = buffer.to_vec();
+        let message = match serde_json::from_slice::<Failure>(&buffer) {
+            Ok(failure) => Some(failure.error),
+            Err(_) => None,
+        };
         if status.is_client_error() {
-            return Err(api_client_error(status_code, reason));
+            return Err(api_client_error(status_code, reason, message));
         }
         if status.is_server_error() {
-            return Err(api_server_error(status_code, reason));
+            return Err(api_server_error(status_code, reason, message));
         }
         unreachable!()
     }

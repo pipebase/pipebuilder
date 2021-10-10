@@ -188,7 +188,7 @@ pub struct CancelBuildRequest {
 #[derive(Serialize, Deserialize)]
 pub struct CancelBuildResponse {}
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Failure {
     pub error: String,
 }
@@ -270,6 +270,6 @@ impl From<manifest::GetManifestResponse> for GetManifestResponse {
 
 impl From<Error> for Failure {
     fn from(error: Error) -> Self {
-        Failure::new(format!("{:#?}", error))
+        Failure::new(format!("{}", error))
     }
 }

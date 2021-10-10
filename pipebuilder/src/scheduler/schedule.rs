@@ -46,7 +46,7 @@ impl SchedulerService {
             let (watcher, stream) = match register.watch_builders().await {
                 Ok((watcher, stream)) => (watcher, stream),
                 Err(e) => {
-                    error!("scheduler service watch failed: {:?}", e);
+                    error!("scheduler service watch fail, error '{}'", e);
                     return;
                 }
             };
@@ -57,7 +57,7 @@ impl SchedulerService {
                     info!("watcher {} exit ...", watcher_id)
                 }
                 Err(e) => {
-                    error!("watcher {} exit with error {:?}", watcher_id, e)
+                    error!("watcher {} exit with error '{}'", watcher_id, e)
                 }
             };
             // cleanup if stop watching

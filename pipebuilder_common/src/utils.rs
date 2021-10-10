@@ -1,5 +1,5 @@
 use crate::{
-    errors::{cargo_error, Error, Result},
+    errors::{cargo_error, Result},
     grpc::manifest::GetManifestRequest,
 };
 use etcd_client::{Event, EventType};
@@ -293,15 +293,6 @@ pub fn remove_resource_namespace<'a>(key: &'a str, resource: &str, namespace: &s
     let pattern = format!("{}/{}", resource, namespace);
     key.strip_prefix(pattern.as_str())
         .unwrap_or_else(|| panic!("key '{}' not start with '/{}/{}'", key, resource, namespace))
-}
-
-// rpc status
-pub fn internal_error(error: Error) -> tonic::Status {
-    tonic::Status::internal(format!("{:#?}", error))
-}
-
-pub fn not_found(message: &str) -> tonic::Status {
-    tonic::Status::not_found(message)
 }
 
 // rpc request

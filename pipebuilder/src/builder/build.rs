@@ -161,7 +161,7 @@ fn start_build(
                 Err(err) => {
                     let (namespace, id, _, build_version) = build.get_build_meta();
                     error!(
-                        "update build status failed for key: '{}/{}:{}', error: '{:#?}'",
+                        "update build status for '{}/{}:{}' fail, error: '{}'",
                         namespace, id, build_version, err
                     );
                     break;
@@ -172,12 +172,17 @@ fn start_build(
             let next_status = match result {
                 Ok(next_status) => next_status,
                 Err(err) => {
+                    let (namespace, id, _, build_version) = build.get_build_meta();
+                    error!(
+                        "run build for '{}/{}:{}' fail, status: '{}', error: '{}'",
+                        namespace, id, build_version, status, err
+                    );
                     let _ = update(
                         &mut register,
                         lease_id,
                         &build,
                         BuildStatus::Fail,
-                        Some(format!("{:#?}", err)),
+                        Some(format!("{}", err)),
                     )
                     .await;
                     break;
