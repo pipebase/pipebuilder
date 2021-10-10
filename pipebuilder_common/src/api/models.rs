@@ -25,6 +25,12 @@ pub struct BuildResponse {
     pub build_version: u64,
 }
 
+impl Display for BuildResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "build version: {}", self.build_version)
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct GetBuildRequest {
     // namespace
@@ -46,6 +52,19 @@ pub struct PutManifestRequest {
 pub struct PutManifestResponse {
     pub id: String,
     pub version: u64,
+}
+
+impl Display for PutManifestResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:>id_width$}{version:>version_width$}",
+            id = self.id,
+            version = self.version,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
 }
 
 #[derive(Serialize, Deserialize)]

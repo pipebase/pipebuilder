@@ -1,4 +1,3 @@
-use crate::config::Config;
 use pipebuilder_common::{api::client::ApiClient, Result};
 
 pub(crate) mod create;
@@ -23,7 +22,8 @@ pub async fn exec(
         ("get", "build") => get::exec_build(client, args).await,
         ("create", "manifest") => create::exec_manifest(client, args).await,
         ("create", "build") => create::exec_build(client, args).await,
-        ("list", "snapshot") => list::exec_snapshot(client, args).await,
+        ("list", "build-snapshot") => list::exec_build_snapshot(client, args).await,
+        ("list", "manifest-snapshot") => list::exec_manifest_snapshot(client, args).await,
         ("list", "build") => list::exec_build(client, args).await,
         _ => unreachable!("unknown cmd ({}, {})", action, resource),
     }

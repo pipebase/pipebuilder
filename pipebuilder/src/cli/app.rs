@@ -38,5 +38,5 @@ async fn run() -> Result<()> {
     // parse (action, resource) cmds
     let (action, matches) = matches.subcommand().unwrap();
     let (resource, matches) = matches.subcommand().unwrap();
-    commands::exec(action, resource, api_client, &matches).await
+    commands::exec(action, resource, api_client, matches).await
 }

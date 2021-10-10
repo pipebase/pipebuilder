@@ -13,7 +13,7 @@ use reqwest::{
     Body, Client, Response,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Clone, Deserialize)]
 pub struct BasicAuth {
@@ -210,5 +210,12 @@ impl ApiClient {
             return Err(api_server_error(status_code, reason));
         }
         unreachable!()
+    }
+
+    pub fn validate_manifest(&self, path: &str) -> Result<()> {
+        let path = PathBuf::from(path);
+        let app = pipegen::models::App::read_from_path(path.as_path())?;
+        app.validate()?;
+        Ok(())
     }
 }
