@@ -7,7 +7,7 @@ use pipebuilder_common::{
 };
 use std::sync::Arc;
 use tonic::Response;
-use tracing::{error, info};
+use tracing::{error, info, log::warn};
 
 use crate::config::SchedulerConfig;
 
@@ -75,11 +75,18 @@ impl SchedulerService {
                 log_event(event)?;
                 if let Some((event_ty, key, node)) = deserialize_event::<NodeState>(event)? {
                     let builders_ref = builders.pin();
-                    match event_ty {
-                        EventType::Put => {
-                            builders_ref.insert(key, node.expect("undefined node state"))
+                    let node = match event_ty {
+                        EventType::Put => node,
+                        EventType::Delete => {
+                            builders_ref.remove(&key);
+                            continue;
                         }
-                        EventType::Delete => builders_ref.remove(&key),
+                    };
+                    match node {
+                        Some(node) => {
+                            builders_ref.insert(key, node);
+                        }
+                        None => warn!("node state undefined for {}", key),
                     };
                 }
             }
