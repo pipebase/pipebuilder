@@ -1,6 +1,6 @@
 use pipebuilder_common::{
     grpc::manifest::{manifest_server::Manifest, GetManifestResponse, PutManifestResponse},
-    read_file, rpc_internal_error, rpc_not_found, write_file, Register,
+    read_file, rpc_internal_error, rpc_not_found, write_file, create_directory, Register,
 };
 use tonic::Response;
 use tracing::error;
@@ -103,11 +103,17 @@ fn write_manifest_into_repo(
     buffer: &[u8],
 ) -> pipebuilder_common::Result<()> {
     let path = get_manifest_path(repository, namespace, id, version);
+    let directory = get_manifest_directory(repository, namespace, id, version);
+    create_directory(directory)?;
     write_file(path, buffer)?;
     // TODO S3 backup
     Ok(())
 }
 
-fn get_manifest_path(repository: &str, namespace: &str, id: &str, version: u64) -> String {
+fn get_manifest_directory(repository: &str, namespace: &str, id: &str, version: u64) -> String {
     format!("{}/{}/{}/{}", repository, namespace, id, version)
+}
+
+fn get_manifest_path(repository: &str, namespace: &str, id: &str, version: u64) -> String {
+    format!("{}/{}/{}/{}/pipe.yml", repository, namespace, id, version)
 }

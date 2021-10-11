@@ -41,7 +41,7 @@ pub mod filters {
         manifest_client: ManifestClient<Channel>,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "manifest")
-            .and(warp::put())
+            .and(warp::post())
             .and(with_manifest_client(manifest_client))
             .and(json_request::<models::PutManifestRequest>())
             .and_then(handlers::put_manifest)
