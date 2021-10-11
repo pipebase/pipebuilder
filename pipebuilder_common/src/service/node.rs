@@ -1,6 +1,6 @@
 use crate::{
     Period, Register, DEFAULT_NODE_HEARTBEAT_PERIOD, ENV_PIPEBUILDER_EXTERNAL_ADDR,
-    ENV_PIPEBUILDER_NODE_ID, REGISTER_KEY_API_NODE_KEY_PREFIX, REGISTER_KEY_PREFIX_BUILDER,
+    ENV_PIPEBUILDER_NODE_ID, REGISTER_KEY_PREFIX_API, REGISTER_KEY_PREFIX_BUILDER,
     REGISTER_KEY_PREFIX_MANIFEST, REGISTER_KEY_PREFIX_SCHEDULER,
 };
 use chrono::{DateTime, Utc};
@@ -18,7 +18,7 @@ pub enum NodeRole {
 
 pub fn role_prefix(role: NodeRole) -> &'static str {
     match role {
-        NodeRole::Api => REGISTER_KEY_API_NODE_KEY_PREFIX,
+        NodeRole::Api => REGISTER_KEY_PREFIX_API,
         NodeRole::Builder => REGISTER_KEY_PREFIX_BUILDER,
         NodeRole::Manifest => REGISTER_KEY_PREFIX_MANIFEST,
         NodeRole::Scheduler => REGISTER_KEY_PREFIX_SCHEDULER,

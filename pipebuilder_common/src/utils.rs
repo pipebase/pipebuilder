@@ -264,8 +264,8 @@ where
         let value = kv.value();
         // in case delete, value is empty
         let value = match value.is_empty() {
-            true => Some(serde_json::from_slice::<T>(value)?),
-            false => None,
+            false => Some(serde_json::from_slice::<T>(value)?),
+            true => None,
         };
         return Ok(Some((event.event_type(), key.to_owned(), value)));
     }
