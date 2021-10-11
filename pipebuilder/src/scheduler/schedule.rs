@@ -73,10 +73,12 @@ impl SchedulerService {
         while let Some(resp) = stream.message().await? {
             for event in resp.events() {
                 log_event(event)?;
-                if let Some((event_ty, key, node)) = deserialize_event(event)? {
+                if let Some((event_ty, key, node)) = deserialize_event::<NodeState>(event)? {
                     let builders_ref = builders.pin();
                     match event_ty {
-                        EventType::Put => builders_ref.insert(key, node),
+                        EventType::Put => {
+                            builders_ref.insert(key, node.expect("undefined node state"))
+                        }
                         EventType::Delete => builders_ref.remove(&key),
                     };
                 }

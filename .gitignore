@@ -12,5 +12,4 @@ Cargo.lock
 # etcd test data volume
 e2e/data
 # data volume for apps
-pipebuilder/data/build/*/*
-pipebuilder/data/manifest/*
+pipebuilder/data/*

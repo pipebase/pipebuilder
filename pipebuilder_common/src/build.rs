@@ -3,8 +3,8 @@ use std::fmt::Display;
 use crate::{
     errors::Result,
     utils::{
-        app_build_log_path, app_build_release_path, app_build_target_path, app_directory,
-        app_main_path, app_publish_path, app_restore_path, app_toml_manifest_path,
+        app_build_log_directory, app_build_log_path, app_build_release_path, app_build_target_path,
+        app_directory, app_main_path, app_publish_path, app_restore_path, app_toml_manifest_path,
         build_get_manifest_request, cargo_build, cargo_fmt, cargo_init, copy_directory, copy_file,
         create_directory, move_directory, parse_toml, remove_directory, write_file, write_toml,
         TomlManifest,
@@ -140,6 +140,7 @@ pub struct Build {
     pub manifest_client: ManifestClient<Channel>,
     pub build_version: u64,
     pub build_context: LocalBuildContext,
+    // https://doc.rust-lang.org/nightly/rustc/platform-support.html
     pub target_platform: String,
     pub app: Option<App>,
 }
@@ -307,8 +308,11 @@ impl Build {
         // cargo build and stream log to file
         let target_platform = self.target_platform.as_str();
         let toml_path = app_toml_manifest_path(workspace, namespace, id, build_version);
-        let log_path = app_build_log_path(log_directory, namespace, id, build_version);
         let target_path = app_build_target_path(workspace, namespace, id, build_version);
+        // prepare log directory
+        let log_directory = app_build_log_directory(log_directory, namespace, id, build_version);
+        create_directory(log_directory.as_str())?;
+        let log_path = app_build_log_path(log_directory.as_str());
         cargo_build(
             toml_path.as_str(),
             target_platform,
@@ -331,6 +335,7 @@ impl Build {
         let release_path = app_build_release_path(workspace, namespace, id.as_str(), build_version);
         let publish_path =
             app_publish_path(publish_directory, namespace, id.as_str(), build_version);
+        create_directory(publish_path.as_str())?;
         let size = copy_file(release_path.as_str(), publish_path.as_str())?;
         info!("published app binariy size: {} Mb", size / 1024 / 1024);
         Ok(Some(BuildStatus::Store))

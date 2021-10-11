@@ -109,16 +109,17 @@ pub fn app_build_release_path(
     )
 }
 
-pub fn app_build_log_path(
+pub fn app_build_log_directory(
     log_directory: &str,
     namespace: &str,
     id: &str,
     build_version: u64,
 ) -> String {
-    format!(
-        "{}/{}/{}/{}/build.log",
-        log_directory, namespace, id, build_version
-    )
+    format!("{}/{}/{}/{}", log_directory, namespace, id, build_version)
+}
+
+pub fn app_build_log_path(app_log_directory: &str) -> String {
+    format!("{}/build.log", app_log_directory)
 }
 
 pub fn app_restore_path(
@@ -238,11 +239,7 @@ pub fn cargo_build(
     let (code, _) = run_cmd(cmd)?;
     match code == 0 {
         true => Ok(()),
-        false => Err(cargo_error(
-            "build",
-            code,
-            String::from("checkout build log"),
-        )),
+        false => Err(cargo_error("build", code, String::from("check build log"))),
     }
 }
 
@@ -258,14 +255,18 @@ pub fn log_event(event: &Event) -> Result<()> {
     Ok(())
 }
 
-pub fn deserialize_event<T>(event: &Event) -> Result<Option<(EventType, String, T)>>
+pub fn deserialize_event<T>(event: &Event) -> Result<Option<(EventType, String, Option<T>)>>
 where
     T: DeserializeOwned,
 {
     if let Some(kv) = event.kv() {
         let key = kv.key_str()?;
         let value = kv.value();
-        let value = serde_json::from_slice::<T>(value)?;
+        // in case delete, value is empty
+        let value = match value.is_empty() {
+            true => Some(serde_json::from_slice::<T>(value)?),
+            false => None,
+        };
         return Ok(Some((event.event_type(), key.to_owned(), value)));
     }
     Ok(None)
