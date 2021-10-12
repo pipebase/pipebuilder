@@ -1,13 +1,14 @@
 use std::fmt::Display;
 
 use crate::{
+    app_directory, app_publish_directory,
     errors::Result,
     utils::{
         app_build_log_directory, app_build_log_path, app_build_release_path, app_build_target_path,
-        app_directory, app_main_path, app_publish_path, app_restore_path, app_toml_manifest_path,
-        build_get_manifest_request, cargo_build, cargo_fmt, cargo_init, copy_directory, copy_file,
-        create_directory, move_directory, parse_toml, remove_directory, write_file, write_toml,
-        TomlManifest,
+        app_main_path, app_path, app_publish_path, app_restore_directory, app_restore_path,
+        app_toml_manifest_path, build_get_manifest_request, cargo_build, cargo_fmt, cargo_init,
+        copy_directory, copy_file, create_directory, move_directory, parse_toml, remove_directory,
+        write_file, write_toml, TomlManifest,
     },
 };
 use chrono::{DateTime, Utc};
@@ -209,9 +210,9 @@ impl Build {
         match status {
             BuildStatus::Pull => self.pull_manifest().await,
             BuildStatus::Validate => self.validate_manifest(),
-            BuildStatus::Create => self.create_build_workspace(),
-            BuildStatus::Generate => self.generate_app(),
-            BuildStatus::Build => self.build_app(),
+            BuildStatus::Create => self.create_build_workspace().await,
+            BuildStatus::Generate => self.generate_app().await,
+            BuildStatus::Build => self.build_app().await,
             BuildStatus::Publish => self.publish_app().await,
             BuildStatus::Store => self.store_app().await,
             BuildStatus::Succeed => self.succeed(),
@@ -248,7 +249,7 @@ impl Build {
         Ok(Some(BuildStatus::Create))
     }
 
-    pub fn create_build_workspace(&mut self) -> Result<Option<BuildStatus>> {
+    pub async fn create_build_workspace(&mut self) -> Result<Option<BuildStatus>> {
         let (namespace, id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "create build workspace for manifest '{}/{}:({}, {})'",
@@ -258,17 +259,18 @@ impl Build {
         let restore_directory = self.get_restore_directory().as_str();
         let namespace = self.namespace.as_str();
         let app_directory = app_directory(workspace, namespace, id, build_version);
-        let app_restore_directory =
-            app_restore_path(restore_directory, namespace, id, build_version);
-        if !copy_directory(app_restore_directory.as_str(), app_directory.as_str())? {
+        let app_path = app_path(workspace, namespace, id, build_version);
+        create_directory(app_directory.as_str())?;
+        let app_restore_path = app_restore_path(restore_directory, namespace, id);
+        if !copy_directory(app_restore_path.as_str(), app_directory.as_str()).await? {
             // cargo init
-            create_directory(app_directory.as_str())?;
-            cargo_init(app_directory.as_str())?;
+            create_directory(app_path.as_str())?;
+            cargo_init(app_path.as_str()).await?;
         }
         Ok(Some(BuildStatus::Generate))
     }
 
-    pub fn generate_app(&mut self) -> Result<Option<BuildStatus>> {
+    pub async fn generate_app(&mut self) -> Result<Option<BuildStatus>> {
         let (namespace, id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "generate app for '{}/{}:({}, {})'",
@@ -291,11 +293,11 @@ impl Build {
         let main_path = app_main_path(workspace, namespace, id, build_version);
         write_file(main_path.as_str(), generated_code.as_bytes())?;
         // fmt code
-        cargo_fmt(toml_path.as_str())?;
+        cargo_fmt(toml_path.as_str()).await?;
         Ok(Some(BuildStatus::Build))
     }
 
-    pub fn build_app(&mut self) -> Result<Option<BuildStatus>> {
+    pub async fn build_app(&mut self) -> Result<Option<BuildStatus>> {
         let (namespace, id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "build app for '{}/{}:({}, {})'",
@@ -318,7 +320,8 @@ impl Build {
             target_platform,
             target_path.as_str(),
             log_path.as_str(),
-        )?;
+        )
+        .await?;
         Ok(Some(BuildStatus::Publish))
     }
 
@@ -332,11 +335,19 @@ impl Build {
         let workspace = self.get_workspace().as_str();
         let publish_directory = self.get_publish_directory().as_str();
         let namespace = self.namespace.as_str();
-        let release_path = app_build_release_path(workspace, namespace, id.as_str(), build_version);
-        let publish_path =
-            app_publish_path(publish_directory, namespace, id.as_str(), build_version);
-        create_directory(publish_path.as_str())?;
-        let size = copy_file(release_path.as_str(), publish_path.as_str())?;
+        let target_platform = self.target_platform.as_str();
+        let release_path = app_build_release_path(
+            workspace,
+            namespace,
+            id.as_str(),
+            build_version,
+            target_platform,
+        );
+        let app_publish_directory =
+            app_publish_directory(publish_directory, namespace, id, build_version);
+        let app_publish_path = app_publish_path(app_publish_directory.as_str());
+        create_directory(app_publish_directory.as_str())?;
+        let size = copy_file(release_path.as_str(), app_publish_path.as_str())?;
         info!("published app binariy size: {} Mb", size / 1024 / 1024);
         Ok(Some(BuildStatus::Store))
     }
@@ -350,15 +361,16 @@ impl Build {
         let workspace = self.get_workspace().as_str();
         let restore_directory = self.get_restore_directory().as_str();
         let namespace = self.namespace.as_str();
-        let app_directory = app_directory(workspace, namespace, id, build_version);
-        let app_restore_directory =
-            app_restore_path(restore_directory, namespace, id, build_version);
+        let app_path = app_path(workspace, namespace, id, build_version);
+        let app_restore_directory = app_restore_directory(restore_directory, namespace, id);
+        let app_restore_path = app_restore_path(restore_directory, namespace, id);
         // cleanup previous app build cache if any
-        let _ = remove_directory(app_restore_directory.as_str())?;
-        if !move_directory(app_directory.as_str(), app_restore_directory.as_str())? {
+        let _ = remove_directory(app_restore_path.as_str()).await?;
+        create_directory(app_restore_directory.as_str())?;
+        if !move_directory(app_path.as_str(), app_restore_directory.as_str()).await? {
             error!(
                 "store app from '{}' to '{}' failed",
-                app_directory, app_restore_directory
+                app_path, app_restore_directory
             )
         }
         Ok(Some(BuildStatus::Succeed))

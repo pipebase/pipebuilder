@@ -12,8 +12,8 @@ use std::{
     fs::{self, File},
     io::{BufReader, BufWriter, Read, Write},
     path::Path,
-    process::Command,
 };
+use tokio::process::Command;
 use tracing::info;
 
 // filesystem ops
@@ -63,6 +63,10 @@ where
 }
 
 pub fn app_directory(workspace: &str, namespace: &str, id: &str, build_version: u64) -> String {
+    format!("{}/{}/{}/{}", workspace, namespace, id, build_version)
+}
+
+pub fn app_path(workspace: &str, namespace: &str, id: &str, build_version: u64) -> String {
     format!("{}/{}/{}/{}/app", workspace, namespace, id, build_version)
 }
 
@@ -102,10 +106,11 @@ pub fn app_build_release_path(
     namespace: &str,
     id: &str,
     build_version: u64,
+    target_platform: &str,
 ) -> String {
     format!(
-        "{}/{}/{}/{}/app/target/release/app",
-        workspace, namespace, id, build_version
+        "{}/{}/{}/{}/app/target/{}/release/app",
+        workspace, namespace, id, build_version, target_platform
     )
 }
 
@@ -122,51 +127,51 @@ pub fn app_build_log_path(app_log_directory: &str) -> String {
     format!("{}/build.log", app_log_directory)
 }
 
-pub fn app_restore_path(
-    restore_directory: &str,
-    namespace: &str,
-    id: &str,
-    build_version: u64,
-) -> String {
-    format!(
-        "{}/{}/{}/{}/app",
-        restore_directory, namespace, id, build_version
-    )
+pub fn app_restore_directory(restore_directory: &str, namespace: &str, id: &str) -> String {
+    format!("{}/{}/{}", restore_directory, namespace, id)
 }
 
-pub fn app_publish_path(
+pub fn app_restore_path(restore_directory: &str, namespace: &str, id: &str) -> String {
+    format!("{}/{}/{}/app", restore_directory, namespace, id)
+}
+
+pub fn app_publish_directory(
     publish_directory: &str,
     namespace: &str,
     id: &str,
     build_version: u64,
 ) -> String {
     format!(
-        "{}/{}/{}/{}/app",
+        "{}/{}/{}/{}",
         publish_directory, namespace, id, build_version
     )
 }
 
+pub fn app_publish_path(app_publish_directory: &str) -> String {
+    format!("{}/app", app_publish_directory)
+}
+
 // remove directory and return success flag
-pub fn remove_directory(path: &str) -> Result<bool> {
+pub async fn remove_directory(path: &str) -> Result<bool> {
     let mut cmd = Command::new("rm");
     cmd.arg("-r").arg(path);
-    let (code, _) = run_cmd(cmd)?;
+    let (code, _) = cmd_status_output(cmd).await?;
     Ok(code == 0)
 }
 
 // copy directory and return success flag
-pub fn copy_directory(src: &str, dst: &str) -> Result<bool> {
+pub async fn copy_directory(src: &str, dst: &str) -> Result<bool> {
     let mut cmd = Command::new("cp");
     cmd.arg("-r").arg(src).arg(dst);
-    let (code, _) = run_cmd(cmd)?;
+    let (code, _) = cmd_status_output(cmd).await?;
     Ok(code == 0)
 }
 
 // move directory and return success flag
-pub fn move_directory(src: &str, dst: &str) -> Result<bool> {
+pub async fn move_directory(src: &str, dst: &str) -> Result<bool> {
     let mut cmd = Command::new("mv");
     cmd.arg(src).arg(dst);
-    let (code, _) = run_cmd(cmd)?;
+    let (code, _) = cmd_status_output(cmd).await?;
     Ok(code == 0)
 }
 
@@ -175,9 +180,9 @@ pub fn copy_file(from: &str, to: &str) -> Result<u64> {
     Ok(size)
 }
 
-// cmd ops
-fn run_cmd(mut cmd: Command) -> Result<(i32, String)> {
-    let output = cmd.output()?;
+// run cmd and collect status and output
+async fn cmd_status_output(mut cmd: Command) -> Result<(i32, String)> {
+    let output = cmd.output().await?;
     match output.status.success() {
         true => {
             let stderr = String::from_utf8(output.stderr)?;
@@ -191,6 +196,15 @@ fn run_cmd(mut cmd: Command) -> Result<(i32, String)> {
     }
 }
 
+// run cmd and collect status
+async fn cmd_status(mut cmd: Command) -> Result<i32> {
+    let status = cmd.status().await?;
+    match status.success() {
+        true => Ok(0),
+        false => Ok(status.code().unwrap_or(1)),
+    }
+}
+
 // cargo ops
 fn cargo_binary() -> OsString {
     match std::env::var_os("CARGO") {
@@ -199,20 +213,20 @@ fn cargo_binary() -> OsString {
     }
 }
 
-pub fn cargo_init(path: &str) -> Result<()> {
+pub async fn cargo_init(path: &str) -> Result<()> {
     let mut cmd = Command::new(cargo_binary());
     cmd.arg("init").arg(path);
-    let (code, out) = run_cmd(cmd)?;
+    let (code, out) = cmd_status_output(cmd).await?;
     match code == 0 {
         true => Ok(()),
         false => Err(cargo_error("init", code, out)),
     }
 }
 
-pub fn cargo_fmt(manifest_path: &str) -> Result<()> {
+pub async fn cargo_fmt(manifest_path: &str) -> Result<()> {
     let mut cmd = Command::new(cargo_binary());
     cmd.arg("fmt").arg("--manifest-path").arg(manifest_path);
-    let (code, out) = run_cmd(cmd)?;
+    let (code, out) = cmd_status_output(cmd).await?;
     match code == 0 {
         true => Ok(()),
         false => Err(cargo_error("fmt", code, out)),
@@ -220,12 +234,13 @@ pub fn cargo_fmt(manifest_path: &str) -> Result<()> {
 }
 
 // target platform: https://doc.rust-lang.org/cargo/commands/cargo-build.html#compilation-options
-pub fn cargo_build(
+pub async fn cargo_build(
     manifest_path: &str,
     target_platform: &str,
     target_directory: &str,
     log_path: &str,
 ) -> Result<()> {
+    let log_file = fs::File::create(log_path)?;
     let mut cmd = Command::new(cargo_binary());
     cmd.arg("build")
         .arg("--manifest-path")
@@ -235,11 +250,14 @@ pub fn cargo_build(
         .arg("--target-dir")
         .arg(target_directory)
         .arg("--release");
-    cmd.arg("&>").arg(log_path);
-    let (code, _) = run_cmd(cmd)?;
+    cmd.stderr(log_file);
+    let code = cmd_status(cmd).await?;
     match code == 0 {
         true => Ok(()),
-        false => Err(cargo_error("build", code, String::from("check build log"))),
+        false => {
+            Err(cargo_error("build", code, String::from("check build log")))
+            // Err(cargo_error("build", code, message))
+        }
     }
 }
 
@@ -289,9 +307,9 @@ pub fn resource_namespace(resource: &str, namespace: &str) -> String {
     format!("{}/{}", resource, namespace)
 }
 
-// remove /resource/namespace and return id/<suffix> given a key
+// remove /resource/namespace/ and return id/<suffix> given a key
 pub fn remove_resource_namespace<'a>(key: &'a str, resource: &str, namespace: &str) -> &'a str {
-    let pattern = format!("{}/{}", resource, namespace);
+    let pattern = format!("{}/{}/", resource, namespace);
     key.strip_prefix(pattern.as_str())
         .unwrap_or_else(|| panic!("key '{}' not start with '/{}/{}'", key, resource, namespace))
 }

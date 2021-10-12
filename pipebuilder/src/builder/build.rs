@@ -1,7 +1,7 @@
 use chrono::Utc;
 use flurry::HashMap;
 use pipebuilder_common::{
-    app_directory,
+    app_path,
     grpc::build::{builder_server::Builder, BuildResponse, CancelResponse, VersionBuildKey},
     grpc::{build::ListResponse, manifest::manifest_client::ManifestClient},
     remove_directory, Build, BuildStatus, LocalBuildContext, Register, VersionBuild,
@@ -66,6 +66,8 @@ impl Builder for BuilderService {
         let manifest_client = self.manifest_client.clone();
         let build_context = self.context.to_owned();
         let target_platform = request.target_platform;
+        // start build
+        info!("start build {}/{}/{}", namespace, id, build_version);
         let build = Build::new(
             namespace,
             id,
@@ -75,7 +77,6 @@ impl Builder for BuilderService {
             build_context,
             target_platform,
         );
-        // start build
         let lease_id = self.lease_id;
         let register = self.register.to_owned();
         let builds = self.builds.clone();
@@ -94,14 +95,23 @@ impl Builder for BuilderService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.build_version;
+        info!("cancel build {}/{}/{}", namespace, id, version);
         let builds = self.builds.clone();
         let workspace = self.context.workspace.as_str();
-        match cancel_local_build(builds, workspace, namespace.as_str(), id.as_str(), version) {
-            Ok(succeed) => info!("cancel local build succeed: {}", succeed),
+        if !cancel_local_build(builds, namespace.as_str(), id.as_str(), version) {
+            return Err(tonic::Status::invalid_argument(format!(
+                "local build not found for {}/{}/{}",
+                namespace, id, version
+            )));
+        }
+        // cleanup local build workspace
+        let app_directory = app_path(workspace, namespace.as_str(), id.as_str(), version);
+        match remove_directory(app_directory.as_str()).await {
+            Ok(_) => (),
             Err(err) => {
                 return Err(tonic::Status::internal(format!(
-                    "cancel local build failed, error: '{:#?}'",
-                    err
+                    "clean app directory failed for {}/{}/{}, error: '{}'",
+                    namespace, id, version, err
                 )))
             }
         };
@@ -234,24 +244,22 @@ async fn update(
 
 fn cancel_local_build(
     builds: Arc<HashMap<(String, String, u64), tokio::task::JoinHandle<()>>>,
-    workspace: &str,
     namespace: &str,
     id: &str,
     version: u64,
-) -> pipebuilder_common::Result<bool> {
+) -> bool {
     let key_tuple = (namespace.to_owned(), id.to_owned(), version);
     let builds_ref = builds.pin();
     match builds_ref.remove(&key_tuple) {
-        Some(jh) => jh.abort(),
+        Some(jh) => {
+            jh.abort();
+            true
+        }
         None => {
             warn!("cancel non-extists build {}/{}/{}", namespace, id, version);
-            return Ok(false);
+            false
         }
-    };
-    // cleanup local build workspace
-    let path = app_directory(workspace, namespace, id, version);
-    let succeed = remove_directory(path.as_str())?;
-    Ok(succeed)
+    }
 }
 
 async fn cancel_version_build(
