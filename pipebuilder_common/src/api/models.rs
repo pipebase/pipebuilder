@@ -58,7 +58,7 @@ impl Display for PutManifestResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "{id:>id_width$}{version:>version_width$}",
+            "{id:<id_width$}{version:<version_width$}",
             id = self.id,
             version = self.version,
             id_width = DISPLAY_ID_WIDTH,
@@ -94,7 +94,7 @@ impl Display for ManifestSnapshot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "{id:>id_width$}{latest_version:>version_width$}",
+            "{id:<id_width$}{latest_version:<version_width$}",
             id = self.id,
             latest_version = self.latest_version,
             id_width = DISPLAY_ID_WIDTH,
@@ -118,7 +118,7 @@ impl Display for BuildSnapshot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "{id:>id_width$}{latest_version:>version_width$}",
+            "{id:<id_width$}{latest_version:<version_width$}",
             id = self.id,
             latest_version = self.latest_version,
             id_width = DISPLAY_ID_WIDTH,
@@ -152,12 +152,14 @@ impl Display for VersionBuild {
             Some(message) => message.as_str(),
             None => "",
         };
+        let status = self.status.to_string();
+        let timestamp = self.timestamp.to_string();
         writeln!(f,
-                "{id:>id_width$}{version:>version_width$}{status:>status_width$}{timestamp:>timestamp_width$}{builder_id:>id_width$}{builder_address:>address_width$}{message:>message_width$}",
+                "{id:<id_width$}{version:<version_width$}{status:<status_width$}{builder_id:<id_width$}{builder_address:<address_width$}{timestamp:<timestamp_width$}{message:<message_width$}",
                 id = self.id,
                 version = self.version,
-                status = self.status,
-                timestamp = self.timestamp,
+                status = status,
+                timestamp = timestamp,
                 builder_id = self.builder_id,
                 builder_address = self.builder_address,
                 message = message,

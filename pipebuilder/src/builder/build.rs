@@ -185,7 +185,7 @@ fn start_build(
                     let (namespace, id, _, build_version) = build.get_build_meta();
                     error!(
                         "run build for '{}/{}:{}' fail, status: '{}', error: '{}'",
-                        namespace, id, build_version, status, err
+                        namespace, id, build_version, status.to_string(), err
                     );
                     let _ = update(
                         &mut register,

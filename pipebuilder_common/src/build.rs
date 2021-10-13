@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use crate::{
     app_directory, app_publish_directory,
     errors::Result,
@@ -43,8 +41,8 @@ pub enum BuildStatus {
     Cancel,
 }
 
-impl Display for BuildStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl ToString for BuildStatus {
+    fn to_string(&self) -> String {
         let status_text = match self {
             Self::Pull => "Pull",
             Self::Validate => "Validate",
@@ -57,7 +55,7 @@ impl Display for BuildStatus {
             Self::Fail => "Fail",
             Self::Cancel => "Cancel",
         };
-        write!(f, "{}", status_text)
+        String::from(status_text)
     }
 }
 
@@ -258,12 +256,13 @@ impl Build {
         let workspace = self.get_workspace().as_str();
         let restore_directory = self.get_restore_directory().as_str();
         let namespace = self.namespace.as_str();
+        // try restore app build workspace
         let app_directory = app_directory(workspace, namespace, id, build_version);
-        let app_path = app_path(workspace, namespace, id, build_version);
         create_directory(app_directory.as_str())?;
         let app_restore_path = app_restore_path(restore_directory, namespace, id);
         if !copy_directory(app_restore_path.as_str(), app_directory.as_str()).await? {
             // cargo init
+            let app_path = app_path(workspace, namespace, id, build_version);
             create_directory(app_path.as_str())?;
             cargo_init(app_path.as_str()).await?;
         }
