@@ -1,12 +1,13 @@
 use crate::{
-    app_directory, app_publish_directory,
+    app_directory,
     errors::Result,
+    read_file,
     utils::{
         app_build_log_directory, app_build_log_path, app_build_release_path, app_build_target_path,
-        app_main_path, app_path, app_publish_path, app_restore_directory, app_restore_path,
-        app_toml_manifest_path, build_get_manifest_request, cargo_build, cargo_fmt, cargo_init,
-        copy_directory, copy_file, create_directory, move_directory, parse_toml, remove_directory,
-        write_file, write_toml, TomlManifest,
+        app_main_path, app_path, app_restore_directory, app_restore_path, app_toml_manifest_path,
+        build_get_manifest_request, build_post_app_request, cargo_build, cargo_fmt, cargo_init,
+        copy_directory, create_directory, move_directory, parse_toml, remove_directory, write_file,
+        write_toml, TomlManifest,
     },
 };
 use chrono::{DateTime, Utc};
@@ -15,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use tonic::transport::Channel;
 use tracing::{error, info};
 
-use crate::grpc::manifest::manifest_client::ManifestClient;
+use crate::grpc::repository::repository_client::RepositoryClient;
 
 #[derive(Deserialize, Serialize, Clone)]
 pub enum BuildStatus {
@@ -108,7 +109,6 @@ pub struct LocalBuildContext {
     pub workspace: String,
     pub restore_directory: String,
     pub log_directory: String,
-    pub publish_directory: String,
 }
 
 impl LocalBuildContext {
@@ -118,7 +118,6 @@ impl LocalBuildContext {
         workspace: String,
         restore_directory: String,
         log_directory: String,
-        publish_directory: String,
     ) -> Self {
         LocalBuildContext {
             id,
@@ -126,7 +125,6 @@ impl LocalBuildContext {
             workspace,
             restore_directory,
             log_directory,
-            publish_directory,
         }
     }
 }
@@ -136,7 +134,7 @@ pub struct Build {
     pub namespace: String,
     pub id: String,
     pub manifest_version: u64,
-    pub manifest_client: ManifestClient<Channel>,
+    pub repository_client: RepositoryClient<Channel>,
     pub build_version: u64,
     pub build_context: LocalBuildContext,
     // https://doc.rust-lang.org/nightly/rustc/platform-support.html
@@ -149,7 +147,7 @@ impl Build {
         namespace: String,
         id: String,
         manifest_version: u64,
-        manifest_client: ManifestClient<Channel>,
+        repository_client: RepositoryClient<Channel>,
         build_version: u64,
         build_context: LocalBuildContext,
         target_platform: String,
@@ -158,7 +156,7 @@ impl Build {
             namespace,
             id,
             manifest_version,
-            manifest_client,
+            repository_client,
             build_version,
             build_context,
             target_platform,
@@ -181,10 +179,6 @@ impl Build {
 
     fn get_restore_directory(&self) -> &String {
         &self.build_context.restore_directory
-    }
-
-    fn get_publish_directory(&self) -> &String {
-        &self.build_context.publish_directory
     }
 
     pub fn get_build_meta(&self) -> (&String, &String, u64, u64) {
@@ -227,7 +221,7 @@ impl Build {
         let request =
             build_get_manifest_request(namespace.to_owned(), id.to_owned(), manifest_version);
         let response = self
-            .manifest_client
+            .repository_client
             .get_manifest(request)
             .await?
             .into_inner();
@@ -324,6 +318,7 @@ impl Build {
         Ok(Some(BuildStatus::Publish))
     }
 
+    // publish app binary
     pub async fn publish_app(&mut self) -> Result<Option<BuildStatus>> {
         let (namespace, id, manifest_version, build_version) = self.get_build_meta();
         info!(
@@ -332,7 +327,6 @@ impl Build {
         );
         // publish app binaries
         let workspace = self.get_workspace().as_str();
-        let publish_directory = self.get_publish_directory().as_str();
         let namespace = self.namespace.as_str();
         let target_platform = self.target_platform.as_str();
         let release_path = app_build_release_path(
@@ -342,15 +336,14 @@ impl Build {
             build_version,
             target_platform,
         );
-        let app_publish_directory =
-            app_publish_directory(publish_directory, namespace, id, build_version);
-        let app_publish_path = app_publish_path(app_publish_directory.as_str());
-        create_directory(app_publish_directory.as_str())?;
-        let size = copy_file(release_path.as_str(), app_publish_path.as_str())?;
-        info!("published app binariy size: {} Mb", size / 1024 / 1024);
+        let buffer = read_file(release_path.as_str())?;
+        let request =
+            build_post_app_request(namespace.to_owned(), id.to_owned(), build_version, buffer);
+        let _ = self.repository_client.post_app(request).await?.into_inner();
         Ok(Some(BuildStatus::Store))
     }
 
+    // store cargo project
     pub async fn store_app(&mut self) -> Result<Option<BuildStatus>> {
         let (namespace, id, manifest_version, build_version) = self.get_build_meta();
         info!(

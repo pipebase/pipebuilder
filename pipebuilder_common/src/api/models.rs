@@ -4,7 +4,7 @@ use super::constants::{
 };
 use crate::{
     api::constants::DISPLAY_ADDRESS_WIDTH,
-    grpc::{build, manifest},
+    grpc::{build, repository},
     BuildStatus, Error,
 };
 use chrono::{DateTime, Utc};
@@ -190,6 +190,18 @@ pub struct CancelBuildRequest {
 #[derive(Serialize, Deserialize)]
 pub struct CancelBuildResponse {}
 
+#[derive(Serialize, Deserialize)]
+pub struct GetAppRequest {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetAppResponse {
+    pub binary: Vec<u8>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Failure {
     pub error: String,
@@ -229,12 +241,12 @@ impl From<build::CancelResponse> for CancelBuildResponse {
     }
 }
 
-impl From<PutManifestRequest> for manifest::PutManifestRequest {
+impl From<PutManifestRequest> for repository::PutManifestRequest {
     fn from(origin: PutManifestRequest) -> Self {
         let namespace = origin.namespace;
         let id = origin.id;
         let buffer = origin.buffer;
-        manifest::PutManifestRequest {
+        repository::PutManifestRequest {
             namespace,
             id,
             buffer,
@@ -242,20 +254,20 @@ impl From<PutManifestRequest> for manifest::PutManifestRequest {
     }
 }
 
-impl From<manifest::PutManifestResponse> for PutManifestResponse {
-    fn from(origin: manifest::PutManifestResponse) -> Self {
+impl From<repository::PutManifestResponse> for PutManifestResponse {
+    fn from(origin: repository::PutManifestResponse) -> Self {
         let id = origin.id;
         let version = origin.version;
         PutManifestResponse { id, version }
     }
 }
 
-impl From<GetManifestRequest> for manifest::GetManifestRequest {
+impl From<GetManifestRequest> for repository::GetManifestRequest {
     fn from(origin: GetManifestRequest) -> Self {
         let namespace = origin.namespace;
         let id = origin.id;
         let version = origin.version;
-        manifest::GetManifestRequest {
+        repository::GetManifestRequest {
             namespace,
             id,
             version,
@@ -263,8 +275,8 @@ impl From<GetManifestRequest> for manifest::GetManifestRequest {
     }
 }
 
-impl From<manifest::GetManifestResponse> for GetManifestResponse {
-    fn from(origin: manifest::GetManifestResponse) -> Self {
+impl From<repository::GetManifestResponse> for GetManifestResponse {
+    fn from(origin: repository::GetManifestResponse) -> Self {
         let buffer = origin.buffer;
         GetManifestResponse { buffer }
     }

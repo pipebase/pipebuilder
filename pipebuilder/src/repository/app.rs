@@ -1,6 +1,6 @@
 mod bootstrap;
 mod config;
-mod manifest;
+mod repository;
 
 use bootstrap::bootstrap;
 use config::Config;
@@ -19,22 +19,22 @@ async fn main() -> Result<()> {
     // bootstrap base svc
     let (register, node_svc, health_svc, lease_svc) =
         pipebuilder_common::bootstrap(config.base).await?;
-    // bootstrap manifest svc
+    // bootstrap repository svc
     let lease_id = lease_svc.get_lease_id();
-    let manifest_svc = bootstrap(config.manifest, register, lease_id);
+    let repository_svc = bootstrap(config.repository, register, lease_id);
     // bootstrap server
     let node_id = node_svc.get_id().to_owned();
     let internal_address = node_svc.get_internal_address().to_owned();
     let addr: SocketAddr = internal_address.parse()?;
     info!(
-        "run manifest server {:?}, internal address {:?}...",
+        "run repository server {:?}, internal address {:?}...",
         node_id, internal_address
     );
     Server::builder()
         .add_service(health_svc)
-        .add_service(manifest_svc)
+        .add_service(repository_svc)
         .serve(addr)
         .await?;
-    info!("manifest server {:?} exit ...", node_id);
+    info!("repository server {:?} exit ...", node_id);
     Ok(())
 }

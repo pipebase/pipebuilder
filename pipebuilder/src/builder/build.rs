@@ -3,7 +3,7 @@ use flurry::HashMap;
 use pipebuilder_common::{
     app_path,
     grpc::build::{builder_server::Builder, BuildResponse, CancelResponse, VersionBuildKey},
-    grpc::{build::ListResponse, manifest::manifest_client::ManifestClient},
+    grpc::{build::ListResponse, repository::repository_client::RepositoryClient},
     remove_directory, Build, BuildStatus, LocalBuildContext, Register, VersionBuild,
 };
 use std::sync::Arc;
@@ -13,7 +13,7 @@ use tracing::{error, info, warn};
 pub struct BuilderService {
     lease_id: i64,
     register: Register,
-    manifest_client: ManifestClient<Channel>,
+    repository_client: RepositoryClient<Channel>,
     context: LocalBuildContext,
     // builds in progress, namespace/id/version -> join handle
     builds: Arc<HashMap<(String, String, u64), tokio::task::JoinHandle<()>>>,
@@ -23,13 +23,13 @@ impl BuilderService {
     pub fn new(
         lease_id: i64,
         register: Register,
-        manifest_client: ManifestClient<Channel>,
+        repository_client: RepositoryClient<Channel>,
         context: LocalBuildContext,
     ) -> Self {
         BuilderService {
             lease_id,
             register,
-            manifest_client,
+            repository_client,
             context,
             builds: Arc::new(HashMap::new()),
         }
@@ -63,7 +63,7 @@ impl Builder for BuilderService {
         };
         // prepare build contexts
         let build_version = snapshot.latest_version;
-        let manifest_client = self.manifest_client.clone();
+        let manifest_client = self.repository_client.clone();
         let build_context = self.context.to_owned();
         let target_platform = request.target_platform;
         // start build
@@ -185,7 +185,11 @@ fn start_build(
                     let (namespace, id, _, build_version) = build.get_build_meta();
                     error!(
                         "run build for '{}/{}:{}' fail, status: '{}', error: '{}'",
-                        namespace, id, build_version, status.to_string(), err
+                        namespace,
+                        id,
+                        build_version,
+                        status.to_string(),
+                        err
                     );
                     let _ = update(
                         &mut register,

@@ -3,7 +3,8 @@ pub mod filters {
     use pipebuilder_common::{
         api::models,
         grpc::{
-            manifest::manifest_client::ManifestClient, schedule::scheduler_client::SchedulerClient,
+            repository::repository_client::RepositoryClient,
+            schedule::scheduler_client::SchedulerClient,
         },
         Register,
     };
@@ -12,7 +13,7 @@ pub mod filters {
     use warp::Filter;
 
     pub fn api(
-        manifest_client: ManifestClient<Channel>,
+        manifest_client: RepositoryClient<Channel>,
         scheduler_client: SchedulerClient<Channel>,
         register: Register,
         lease_id: i64,
@@ -38,21 +39,21 @@ pub mod filters {
     }
 
     pub fn v1_manifest_put(
-        manifest_client: ManifestClient<Channel>,
+        manifest_client: RepositoryClient<Channel>,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "manifest")
             .and(warp::post())
-            .and(with_manifest_client(manifest_client))
+            .and(with_repository_client(manifest_client))
             .and(json_request::<models::PutManifestRequest>())
             .and_then(handlers::put_manifest)
     }
 
     pub fn v1_manifest_get(
-        manifest_client: ManifestClient<Channel>,
+        manifest_client: RepositoryClient<Channel>,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "manifest")
             .and(warp::get())
-            .and(with_manifest_client(manifest_client))
+            .and(with_repository_client(manifest_client))
             .and(warp::query::<models::GetManifestRequest>())
             .and_then(handlers::get_manifest)
     }
@@ -118,9 +119,9 @@ pub mod filters {
         warp::any().map(move || client.clone())
     }
 
-    fn with_manifest_client(
-        client: ManifestClient<Channel>,
-    ) -> impl Filter<Extract = (ManifestClient<Channel>,), Error = std::convert::Infallible> + Clone
+    fn with_repository_client(
+        client: RepositoryClient<Channel>,
+    ) -> impl Filter<Extract = (RepositoryClient<Channel>,), Error = std::convert::Infallible> + Clone
     {
         warp::any().map(move || client.clone())
     }
@@ -151,7 +152,9 @@ mod handlers {
         api::models::{self, Failure},
         grpc::{
             build::{builder_client::BuilderClient, BuildRequest, CancelRequest},
-            manifest::{manifest_client::ManifestClient, GetManifestRequest, PutManifestRequest},
+            repository::{
+                repository_client::RepositoryClient, GetManifestRequest, PutManifestRequest,
+            },
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
         remove_resource_namespace, Register, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
@@ -202,7 +205,7 @@ mod handlers {
     }
 
     pub async fn put_manifest(
-        mut client: ManifestClient<Channel>,
+        mut client: RepositoryClient<Channel>,
         request: models::PutManifestRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         match do_put_manifest(&mut client, request).await {
@@ -212,7 +215,7 @@ mod handlers {
     }
 
     async fn do_put_manifest(
-        client: &mut ManifestClient<Channel>,
+        client: &mut RepositoryClient<Channel>,
         request: models::PutManifestRequest,
     ) -> pipebuilder_common::Result<models::PutManifestResponse> {
         let request: PutManifestRequest = request.into();
@@ -221,7 +224,7 @@ mod handlers {
     }
 
     pub async fn get_manifest(
-        mut client: ManifestClient<Channel>,
+        mut client: RepositoryClient<Channel>,
         request: models::GetManifestRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         match do_get_manifest(&mut client, request).await {
@@ -231,7 +234,7 @@ mod handlers {
     }
 
     async fn do_get_manifest(
-        client: &mut ManifestClient<Channel>,
+        client: &mut RepositoryClient<Channel>,
         request: models::GetManifestRequest,
     ) -> pipebuilder_common::Result<models::GetManifestResponse> {
         let request: GetManifestRequest = request.into();
@@ -502,7 +505,7 @@ mod models {
 
     use chrono::{DateTime, Utc};
     use pipebuilder_common::{
-        grpc::{build, manifest},
+        grpc::{build, repository},
         BuildStatus,
     };
     use serde::{Deserialize, Serialize};
@@ -653,12 +656,12 @@ mod models {
         }
     }
 
-    impl From<PutManifestRequest> for manifest::PutManifestRequest {
+    impl From<PutManifestRequest> for repository::PutManifestRequest {
         fn from(origin: PutManifestRequest) -> Self {
             let namespace = origin.namespace;
             let id = origin.id;
             let buffer = origin.buffer;
-            manifest::PutManifestRequest {
+            repository::PutManifestRequest {
                 namespace,
                 id,
                 buffer,
@@ -666,20 +669,20 @@ mod models {
         }
     }
 
-    impl From<manifest::PutManifestResponse> for PutManifestResponse {
-        fn from(origin: manifest::PutManifestResponse) -> Self {
+    impl From<repository::PutManifestResponse> for PutManifestResponse {
+        fn from(origin: repository::PutManifestResponse) -> Self {
             let id = origin.id;
             let version = origin.version;
             PutManifestResponse { id, version }
         }
     }
 
-    impl From<GetManifestRequest> for manifest::GetManifestRequest {
+    impl From<GetManifestRequest> for repository::GetManifestRequest {
         fn from(origin: GetManifestRequest) -> Self {
             let namespace = origin.namespace;
             let id = origin.id;
             let version = origin.version;
-            manifest::GetManifestRequest {
+            repository::GetManifestRequest {
                 namespace,
                 id,
                 version,
@@ -687,8 +690,8 @@ mod models {
         }
     }
 
-    impl From<manifest::GetManifestResponse> for GetManifestResponse {
-        fn from(origin: manifest::GetManifestResponse) -> Self {
+    impl From<repository::GetManifestResponse> for GetManifestResponse {
+        fn from(origin: repository::GetManifestResponse) -> Self {
             let buffer = origin.buffer;
             GetManifestResponse { buffer }
         }

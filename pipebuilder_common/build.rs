@@ -13,6 +13,6 @@ fn main() {
         .unwrap();
     tonic_build::configure()
         .out_dir("src/grpc")
-        .compile(&["proto/manifest.proto"], &["proto"])
+        .compile(&["proto/repository.proto"], &["proto"])
         .unwrap();
 }

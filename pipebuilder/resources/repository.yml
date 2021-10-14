@@ -7,5 +7,6 @@ base:
     ttl: 30
   register:
     endpoints: ["localhost:2379"]
-manifest:
-  repository: data/manifest
+repository:
+  manifest: data/manifest
+  apps: data/apps

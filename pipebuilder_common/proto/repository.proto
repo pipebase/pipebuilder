@@ -1,5 +1,5 @@
 syntax = "proto3";
-package manifest;
+package repository;
 
 message GetManifestRequest {
     // app namespace
@@ -31,7 +31,36 @@ message PutManifestResponse {
     uint64 version = 2;
 }
 
-service Manifest {
+message GetAppRequest {
+    // app namespace
+    string namespace = 1;
+    // app id
+    string id = 2;
+    // app build version
+    uint64 version = 3;
+}
+
+message GetAppResponse {
+    // app binaries
+    bytes buffer = 1;
+}
+
+message PostAppRequest {
+    // app namespace
+    string namespace = 1;
+    // app id
+    string id = 2;
+    // app build version
+    uint64 version = 3;
+    // app binaries
+    bytes buffer = 4;
+}
+
+message PostAppResponse {}
+
+service Repository {
     rpc GetManifest(GetManifestRequest) returns (GetManifestResponse) {}
     rpc PutManifest(PutManifestRequest) returns (PutManifestResponse) {}
+    rpc GetApp(GetAppRequest) returns (GetAppResponse) {}
+    rpc PostApp(PostAppRequest) returns (PostAppResponse) {}
 }

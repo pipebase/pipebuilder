@@ -1,6 +1,6 @@
 use crate::{
     errors::{cargo_error, Result},
-    grpc::manifest::GetManifestRequest,
+    grpc::repository::{GetManifestRequest, PostAppRequest},
 };
 use etcd_client::{Event, EventType};
 use pipegen::models::Dependency;
@@ -324,6 +324,20 @@ pub fn build_get_manifest_request(
         namespace,
         id,
         version,
+    }
+}
+
+pub fn build_post_app_request(
+    namespace: String,
+    id: String,
+    version: u64,
+    buffer: Vec<u8>,
+) -> PostAppRequest {
+    PostAppRequest {
+        namespace,
+        id,
+        version,
+        buffer,
     }
 }
 

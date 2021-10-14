@@ -21,8 +21,8 @@ name = "scheduler"
 path = "src/scheduler/app.rs"
 
 [[bin]]
-name = "manifest"
-path = "src/manifest/app.rs"
+name = "repository"
+path = "src/repository/app.rs"
 
 [dependencies]
 chrono = { version = "0.4" }

@@ -1,6 +1,6 @@
 use crate::{build::BuilderService, config::BuilderConfig};
 use pipebuilder_common::{
-    grpc::{build::builder_server::BuilderServer, manifest::manifest_client::ManifestClient},
+    grpc::{build::builder_server::BuilderServer, repository::repository_client::RepositoryClient},
     LocalBuildContext, Register, Result,
 };
 use tonic::transport::Channel;
@@ -8,15 +8,15 @@ use tonic::transport::Channel;
 fn build_builder_service(
     lease_id: i64,
     register: Register,
-    manifest_client: ManifestClient<Channel>,
+    repository_client: RepositoryClient<Channel>,
     context: LocalBuildContext,
 ) -> BuilderService {
-    BuilderService::new(lease_id, register, manifest_client, context)
+    BuilderService::new(lease_id, register, repository_client, context)
 }
 
-async fn build_manifest_client(endpoint: String) -> Result<ManifestClient<Channel>> {
-    let manifest_client = ManifestClient::connect(endpoint).await?;
-    Ok(manifest_client)
+async fn build_repository_client(endpoint: String) -> Result<RepositoryClient<Channel>> {
+    let repository_client = RepositoryClient::connect(endpoint).await?;
+    Ok(repository_client)
 }
 
 pub async fn bootstrap(
@@ -26,20 +26,18 @@ pub async fn bootstrap(
     lease_id: i64,
     register: Register,
 ) -> Result<BuilderServer<BuilderService>> {
-    let manifest_endpoint = config.manifest_endpoint;
-    let manifest_client = build_manifest_client(manifest_endpoint).await?;
+    let repository_endpoint = config.repository_endpoint;
+    let repository_client = build_repository_client(repository_endpoint).await?;
     let workspace = config.workspace;
     let restore_directory = config.restore_directory;
     let log_directory = config.log_directory;
-    let publish_directory = config.publish_directory;
     let build_context = LocalBuildContext::new(
         node_id,
         external_address,
         workspace,
         restore_directory,
         log_directory,
-        publish_directory,
     );
-    let builder_svc = build_builder_service(lease_id, register, manifest_client, build_context);
+    let builder_svc = build_builder_service(lease_id, register, repository_client, build_context);
     Ok(BuilderServer::new(builder_svc))
 }
