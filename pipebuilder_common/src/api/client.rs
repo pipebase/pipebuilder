@@ -1,9 +1,9 @@
 use super::{
-    constants::{BUILD, BUILD_SNAPSHOT, CANCEL_BUILD, MANIFEST, MANIFEST_SNAPSHOT},
+    constants::{APP, BUILD, BUILD_SNAPSHOT, CANCEL_BUILD, MANIFEST, MANIFEST_SNAPSHOT},
     models::{
         BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
-        GetBuildRequest, GetManifestRequest, GetManifestResponse, ListBuildRequest,
-        ListBuildSnapshotRequest, ListManifestSnapshotRequest, ManifestSnapshot,
+        GetAppRequest, GetAppResponse, GetBuildRequest, GetManifestRequest, GetManifestResponse,
+        ListBuildRequest, ListBuildSnapshotRequest, ListManifestSnapshotRequest, ManifestSnapshot,
         PutManifestRequest, PutManifestResponse, VersionBuild,
     },
 };
@@ -179,6 +179,12 @@ impl ApiClient {
     ) -> Result<Vec<ManifestSnapshot>> {
         let response = self.query(MANIFEST_SNAPSHOT, request).await?;
         let response = Self::get_response_body::<Vec<ManifestSnapshot>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn get_app(&self, request: &GetAppRequest) -> Result<GetAppResponse> {
+        let response = self.query(APP, request).await?;
+        let response = Self::get_response_body::<GetAppResponse>(response).await?;
         Ok(response)
     }
 

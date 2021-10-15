@@ -199,7 +199,7 @@ pub struct GetAppRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct GetAppResponse {
-    pub binary: Vec<u8>,
+    pub buffer: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -279,6 +279,26 @@ impl From<repository::GetManifestResponse> for GetManifestResponse {
     fn from(origin: repository::GetManifestResponse) -> Self {
         let buffer = origin.buffer;
         GetManifestResponse { buffer }
+    }
+}
+
+impl From<GetAppRequest> for repository::GetAppRequest {
+    fn from(origin: GetAppRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let version = origin.version;
+        repository::GetAppRequest {
+            namespace,
+            id,
+            version,
+        }
+    }
+}
+
+impl From<repository::GetAppResponse> for GetAppResponse {
+    fn from(origin: repository::GetAppResponse) -> Self {
+        let buffer = origin.buffer;
+        GetAppResponse { buffer }
     }
 }
 

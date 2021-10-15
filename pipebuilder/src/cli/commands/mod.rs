@@ -20,6 +20,7 @@ pub async fn exec(
     match (action, resource) {
         ("get", "manifest") => get::exec_manifest(client, args).await,
         ("get", "build") => get::exec_build(client, args).await,
+        ("get", "app") => get::exec_app(client, args).await,
         ("create", "manifest") => create::exec_manifest(client, args).await,
         ("create", "build") => create::exec_build(client, args).await,
         ("list", "build-snapshot") => list::exec_build_snapshot(client, args).await,

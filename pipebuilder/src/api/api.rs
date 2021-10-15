@@ -13,19 +13,20 @@ pub mod filters {
     use warp::Filter;
 
     pub fn api(
-        manifest_client: RepositoryClient<Channel>,
+        repository_client: RepositoryClient<Channel>,
         scheduler_client: SchedulerClient<Channel>,
         register: Register,
         lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_build(scheduler_client)
-            .or(v1_manifest_put(manifest_client.to_owned()))
-            .or(v1_manifest_get(manifest_client))
+            .or(v1_manifest_put(repository_client.to_owned()))
+            .or(v1_manifest_get(repository_client.to_owned()))
             .or(v1_manifest_snapshot_list(register.to_owned()))
             .or(v1_build_snapshot_list(register.to_owned()))
             .or(v1_build_get(register.to_owned(), lease_id))
             .or(v1_build_list(register.to_owned()))
             .or(v1_build_cancel(register, lease_id))
+            .or(v1_app_get(repository_client))
     }
 
     pub fn v1_build(
@@ -39,21 +40,21 @@ pub mod filters {
     }
 
     pub fn v1_manifest_put(
-        manifest_client: RepositoryClient<Channel>,
+        repository_client: RepositoryClient<Channel>,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "manifest")
             .and(warp::post())
-            .and(with_repository_client(manifest_client))
+            .and(with_repository_client(repository_client))
             .and(json_request::<models::PutManifestRequest>())
             .and_then(handlers::put_manifest)
     }
 
     pub fn v1_manifest_get(
-        manifest_client: RepositoryClient<Channel>,
+        repository_client: RepositoryClient<Channel>,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "manifest")
             .and(warp::get())
-            .and(with_repository_client(manifest_client))
+            .and(with_repository_client(repository_client))
             .and(warp::query::<models::GetManifestRequest>())
             .and_then(handlers::get_manifest)
     }
@@ -112,6 +113,16 @@ pub mod filters {
             .and_then(handlers::cancel_build)
     }
 
+    pub fn v1_app_get(
+        repository_client: RepositoryClient<Channel>,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "app")
+            .and(warp::get())
+            .and(with_repository_client(repository_client))
+            .and(warp::query::<models::GetAppRequest>())
+            .and_then(handlers::get_app)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -153,7 +164,8 @@ mod handlers {
         grpc::{
             build::{builder_client::BuilderClient, BuildRequest, CancelRequest},
             repository::{
-                repository_client::RepositoryClient, GetManifestRequest, PutManifestRequest,
+                repository_client::RepositoryClient, GetAppRequest, GetManifestRequest,
+                PutManifestRequest,
             },
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
@@ -460,6 +472,25 @@ mod handlers {
         Ok(resp.into_inner().into())
     }
 
+    pub async fn get_app(
+        mut client: RepositoryClient<Channel>,
+        request: models::GetAppRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_get_app(&mut client, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_not_found(err.into())),
+        }
+    }
+
+    async fn do_get_app(
+        client: &mut RepositoryClient<Channel>,
+        request: models::GetAppRequest,
+    ) -> pipebuilder_common::Result<models::GetAppResponse> {
+        let request: GetAppRequest = request.into();
+        let response = client.get_app(request).await?;
+        Ok(response.into_inner().into())
+    }
+
     async fn schedule(
         client: &mut SchedulerClient<Channel>,
     ) -> pipebuilder_common::Result<ScheduleResponse> {
@@ -498,202 +529,5 @@ mod handlers {
         Response::builder()
             .status(StatusCode::OK)
             .body(serde_json::to_string::<T>(t).unwrap())
-    }
-}
-
-mod models {
-
-    use chrono::{DateTime, Utc};
-    use pipebuilder_common::{
-        grpc::{build, repository},
-        BuildStatus,
-    };
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize)]
-    pub struct BuildRequest {
-        pub namespace: String,
-        pub id: String,
-        pub manifest_version: u64,
-        pub target_platform: String,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct BuildResponse {
-        pub build_version: u64,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct GetBuildRequest {
-        pub namespace: String,
-        pub id: String,
-        pub build_version: u64,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct GetBuildResponse {
-        pub status: BuildStatus,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct PutManifestRequest {
-        pub namespace: String,
-        pub id: String,
-        pub buffer: Vec<u8>,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct PutManifestResponse {
-        pub id: String,
-        pub version: u64,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct GetManifestRequest {
-        pub namespace: String,
-        pub id: String,
-        pub version: u64,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct GetManifestResponse {
-        pub buffer: Vec<u8>,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct ListManifestSnapshotRequest {
-        pub namespace: String,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct ManifestSnapshot {
-        pub id: String,
-        pub latest_version: u64,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct ListBuildSnapshotRequest {
-        pub namespace: String,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct BuildSnapshot {
-        pub id: String,
-        pub latest_version: u64,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct GetVersionBuildRequest {
-        pub namespace: String,
-        pub id: String,
-        pub version: u64,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct VersionBuild {
-        // id
-        pub id: String,
-        // version
-        pub version: u64,
-        // build status
-        pub status: BuildStatus,
-        // timestamp
-        pub timestamp: DateTime<Utc>,
-        // builder id
-        pub builder_id: String,
-        // builder address
-        pub builder_address: String,
-        // message
-        pub message: Option<String>,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct ListBuildRequest {
-        pub namespace: String,
-        pub id: String,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct CancelBuildRequest {
-        pub namespace: String,
-        pub id: String,
-        pub version: u64,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    pub struct CancelBuildResponse {}
-
-    #[derive(Serialize, Deserialize)]
-    pub struct Failure {
-        pub error: String,
-    }
-
-    impl From<BuildRequest> for build::BuildRequest {
-        fn from(origin: BuildRequest) -> Self {
-            let namespace = origin.namespace;
-            let id = origin.id;
-            let manifest_version = origin.manifest_version;
-            let target_platform = origin.target_platform;
-            build::BuildRequest {
-                namespace,
-                id,
-                manifest_version,
-                target_platform,
-            }
-        }
-    }
-
-    impl From<build::BuildResponse> for BuildResponse {
-        fn from(origin: build::BuildResponse) -> Self {
-            let build_version = origin.version;
-            BuildResponse { build_version }
-        }
-    }
-
-    impl From<build::CancelResponse> for CancelBuildResponse {
-        fn from(_origin: build::CancelResponse) -> Self {
-            CancelBuildResponse {}
-        }
-    }
-
-    impl From<PutManifestRequest> for repository::PutManifestRequest {
-        fn from(origin: PutManifestRequest) -> Self {
-            let namespace = origin.namespace;
-            let id = origin.id;
-            let buffer = origin.buffer;
-            repository::PutManifestRequest {
-                namespace,
-                id,
-                buffer,
-            }
-        }
-    }
-
-    impl From<repository::PutManifestResponse> for PutManifestResponse {
-        fn from(origin: repository::PutManifestResponse) -> Self {
-            let id = origin.id;
-            let version = origin.version;
-            PutManifestResponse { id, version }
-        }
-    }
-
-    impl From<GetManifestRequest> for repository::GetManifestRequest {
-        fn from(origin: GetManifestRequest) -> Self {
-            let namespace = origin.namespace;
-            let id = origin.id;
-            let version = origin.version;
-            repository::GetManifestRequest {
-                namespace,
-                id,
-                version,
-            }
-        }
-    }
-
-    impl From<repository::GetManifestResponse> for GetManifestResponse {
-        fn from(origin: repository::GetManifestResponse) -> Self {
-            let buffer = origin.buffer;
-            GetManifestResponse { buffer }
-        }
     }
 }
