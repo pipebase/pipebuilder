@@ -2,8 +2,8 @@ use pipebuilder_common::{
     api::{
         client::ApiClient,
         models::{
-            BuildRequest, BuildResponse, BuildSnapshot, GetBuildRequest, ListBuildRequest,
-            ListBuildSnapshotRequest, VersionBuild,
+            BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
+            GetBuildRequest, ListBuildRequest, ListBuildSnapshotRequest, VersionBuild,
         },
     },
     Result,
@@ -54,4 +54,18 @@ pub(crate) async fn list_build_snapshot(
 ) -> Result<Vec<BuildSnapshot>> {
     let request = ListBuildSnapshotRequest { namespace };
     client.list_build_snapshot(&request).await
+}
+
+pub(crate) async fn cancel_build(
+    client: &ApiClient,
+    namespace: String,
+    id: String,
+    version: u64,
+) -> Result<CancelBuildResponse> {
+    let request = CancelBuildRequest {
+        namespace,
+        id,
+        version,
+    };
+    client.cancel_build(&request).await
 }

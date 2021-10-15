@@ -1,5 +1,6 @@
 use pipebuilder_common::{api::client::ApiClient, Result};
 
+pub(crate) mod cancel;
 pub(crate) mod create;
 pub(crate) mod get;
 pub(crate) mod list;
@@ -7,7 +8,7 @@ pub(crate) mod list;
 pub type Cmd = clap::App<'static>;
 
 pub fn cmds() -> Vec<Cmd> {
-    vec![create::cmd(), get::cmd(), list::cmd()]
+    vec![create::cmd(), get::cmd(), list::cmd(), cancel::cmd()]
 }
 
 // exec given cmds (action, resource), client and args
@@ -26,6 +27,7 @@ pub async fn exec(
         ("list", "build-snapshot") => list::exec_build_snapshot(client, args).await,
         ("list", "manifest-snapshot") => list::exec_manifest_snapshot(client, args).await,
         ("list", "build") => list::exec_build(client, args).await,
+        ("cancel", "build") => cancel::exec_build(client, args).await,
         _ => unreachable!("unknown cmd ({}, {})", action, resource),
     }
 }
