@@ -22,6 +22,7 @@ impl Scheduler for SchedulerService {
         _request: tonic::Request<pipebuilder_common::grpc::schedule::ScheduleRequest>,
     ) -> Result<tonic::Response<pipebuilder_common::grpc::schedule::ScheduleResponse>, tonic::Status>
     {
+        info!("schedule build");
         let builders_ref = self.builders.pin();
         let builder = builders_ref.values().next();
         let builder_info = builder.map(|b| {

@@ -47,6 +47,7 @@ impl Builder for BuilderService {
         let namespace = request.namespace;
         let id = request.id;
         let manifest_version = request.manifest_version;
+        info!("build {}/{}/{}", namespace, id, manifest_version);
         // lock build snapshot with manifest id
         // update latest build version
         let mut register = self.register.clone();
@@ -140,6 +141,7 @@ impl Builder for BuilderService {
         &self,
         _request: tonic::Request<pipebuilder_common::grpc::build::ListRequest>,
     ) -> Result<tonic::Response<pipebuilder_common::grpc::build::ListResponse>, tonic::Status> {
+        info!("list local build");
         let builds_ref = self.builds.pin();
         let builds = builds_ref
             .keys()

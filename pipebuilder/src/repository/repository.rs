@@ -7,7 +7,7 @@ use pipebuilder_common::{
     read_file, rpc_internal_error, rpc_not_found, write_file, Register,
 };
 use tonic::Response;
-use tracing::error;
+use tracing::{error, info};
 
 pub const TARGET_MANIFEST: &str = "pipe.yml";
 pub const TARGET_APP: &str = "app";
@@ -51,6 +51,7 @@ impl Repository for RepositoryService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
+        info!("get manifest {}/{}/{}", namespace, id, version);
         let repository = self.manifest_repository.as_str();
         match read_target_from_repo(
             repository,
@@ -80,6 +81,7 @@ impl Repository for RepositoryService {
         let request = request.into_inner();
         let namespace = request.namespace;
         let id = request.id;
+        info!("get manifest {}/{}", namespace, id);
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         let version = match register
@@ -119,6 +121,7 @@ impl Repository for RepositoryService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
+        info!("get app {}/{}/{}", namespace, id, version);
         let repository = self.app_repository.as_str();
         match read_target_from_repo(
             repository,
@@ -147,6 +150,7 @@ impl Repository for RepositoryService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
+        info!("post app {}/{}/{}", namespace, id, version);
         let buffer = request.buffer.as_slice();
         let repository = self.app_repository.as_str();
         match write_target_into_repo(
