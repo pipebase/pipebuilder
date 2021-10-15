@@ -1,8 +1,8 @@
 pipebuilder apps
 ### Run Apps
-manifest
+repository
 ```sh
-RUST_LOG=info PIPEBUILDER_CONFIG_FILE=resources/manifest.yml cargo run --bin manifest
+RUST_LOG=info PIPEBUILDER_CONFIG_FILE=resources/repository.yml cargo run --bin repository
 ```
 builder
 ```sh

@@ -1,7 +1,7 @@
 use crate::{
     Period, Register, DEFAULT_NODE_HEARTBEAT_PERIOD, ENV_PIPEBUILDER_EXTERNAL_ADDR,
     ENV_PIPEBUILDER_NODE_ID, REGISTER_KEY_PREFIX_API, REGISTER_KEY_PREFIX_BUILDER,
-    REGISTER_KEY_PREFIX_MANIFEST, REGISTER_KEY_PREFIX_SCHEDULER,
+    REGISTER_KEY_PREFIX_REPOSITORY, REGISTER_KEY_PREFIX_SCHEDULER,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,7 @@ pub fn role_prefix(role: NodeRole) -> &'static str {
     match role {
         NodeRole::Api => REGISTER_KEY_PREFIX_API,
         NodeRole::Builder => REGISTER_KEY_PREFIX_BUILDER,
-        NodeRole::Manifest => REGISTER_KEY_PREFIX_MANIFEST,
+        NodeRole::Manifest => REGISTER_KEY_PREFIX_REPOSITORY,
         NodeRole::Scheduler => REGISTER_KEY_PREFIX_SCHEDULER,
     }
 }

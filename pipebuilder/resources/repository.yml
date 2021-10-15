@@ -1,6 +1,6 @@
 base:
   node:
-    id: manifest0
+    id: repository0
     role: Manifest
     internal_address: 127.0.0.1:17000
   lease:
@@ -8,5 +8,5 @@ base:
   register:
     endpoints: ["localhost:2379"]
 repository:
-  manifest: data/manifest
-  apps: data/apps
+  manifest: data/manifests
+  app: data/apps
