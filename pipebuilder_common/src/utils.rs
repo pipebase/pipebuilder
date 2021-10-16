@@ -127,12 +127,28 @@ pub fn app_build_log_path(app_log_directory: &str) -> String {
     format!("{}/build.log", app_log_directory)
 }
 
-pub fn app_restore_directory(restore_directory: &str, namespace: &str, id: &str) -> String {
-    format!("{}/{}/{}", restore_directory, namespace, id)
+pub fn app_restore_directory(
+    restore_directory: &str,
+    namespace: &str,
+    id: &str,
+    target_platform: &str,
+) -> String {
+    format!(
+        "{}/{}/{}/{}",
+        restore_directory, namespace, id, target_platform
+    )
 }
 
-pub fn app_restore_path(restore_directory: &str, namespace: &str, id: &str) -> String {
-    format!("{}/{}/{}/app", restore_directory, namespace, id)
+pub fn app_restore_path(
+    restore_directory: &str,
+    namespace: &str,
+    id: &str,
+    target_platform: &str,
+) -> String {
+    format!(
+        "{}/{}/{}/{}/app",
+        restore_directory, namespace, id, target_platform
+    )
 }
 
 pub fn app_publish_directory(

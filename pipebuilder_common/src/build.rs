@@ -267,7 +267,8 @@ impl Build {
         // try restore app build workspace
         let app_directory = app_directory(workspace, namespace, id, build_version);
         create_directory(app_directory.as_str())?;
-        let app_restore_path = app_restore_path(restore_directory, namespace, id);
+        let target_platform = self.target_platform.as_str();
+        let app_restore_path = app_restore_path(restore_directory, namespace, id, target_platform);
         if !copy_directory(app_restore_path.as_str(), app_directory.as_str()).await? {
             // cargo init
             let app_path = app_path(workspace, namespace, id, build_version);
@@ -368,8 +369,10 @@ impl Build {
         let restore_directory = self.get_restore_directory().as_str();
         let namespace = self.namespace.as_str();
         let app_path = app_path(workspace, namespace, id, build_version);
-        let app_restore_directory = app_restore_directory(restore_directory, namespace, id);
-        let app_restore_path = app_restore_path(restore_directory, namespace, id);
+        let target_platform = self.target_platform.as_str();
+        let app_restore_directory =
+            app_restore_directory(restore_directory, namespace, id, target_platform);
+        let app_restore_path = app_restore_path(restore_directory, namespace, id, target_platform);
         // cleanup previous app build cache if any
         let _ = remove_directory(app_restore_path.as_str()).await?;
         create_directory(app_restore_directory.as_str())?;
