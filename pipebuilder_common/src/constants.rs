@@ -11,3 +11,10 @@ pub const REGISTER_KEY_PREFIX_REPOSITORY: &str = "/repository";
 pub const REGISTER_KEY_PREFIX_BUILD_SNAPSHOT: &str = "/build-snapshot";
 pub const REGISTER_KEY_PREFIX_VERSION_BUILD: &str = "/build";
 pub const REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT: &str = "/manifest-snapshot";
+
+pub const PATH_APP: &str = "app";
+pub const PATH_APP_BUILD_LOG: &str = "build.log";
+pub const PATH_APP_TOML_MANIFEST: &str = "app/Cargo.toml";
+pub const PATH_APP_MAIN: &str = "app/src/main.rs";
+pub const PATH_APP_TARGET: &str = "app/target";
+pub const PATH_APP_RELEASE_BINARY: &str = "release/app";

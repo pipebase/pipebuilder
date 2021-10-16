@@ -1,10 +1,11 @@
 use chrono::Utc;
 use flurry::HashMap;
 use pipebuilder_common::{
-    app_path,
+    app_workspace,
     grpc::build::{builder_server::Builder, BuildResponse, CancelResponse, VersionBuildKey},
     grpc::{build::ListResponse, repository::repository_client::RepositoryClient},
-    remove_directory, Build, BuildStatus, LocalBuildContext, Register, VersionBuild,
+    remove_directory, sub_path, Build, BuildStatus, LocalBuildContext, Register, VersionBuild,
+    PATH_APP,
 };
 use std::sync::Arc;
 use tonic::{transport::Channel, Response};
@@ -106,8 +107,9 @@ impl Builder for BuilderService {
             )));
         }
         // cleanup local build workspace
-        let app_directory = app_path(workspace, namespace.as_str(), id.as_str(), version);
-        match remove_directory(app_directory.as_str()).await {
+        let app_directory = app_workspace(workspace, namespace.as_str(), id.as_str(), version);
+        let app_path = sub_path(app_directory.as_str(), PATH_APP);
+        match remove_directory(app_path.as_str()).await {
             Ok(_) => (),
             Err(err) => {
                 return Err(tonic::Status::internal(format!(

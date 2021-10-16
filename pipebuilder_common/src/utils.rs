@@ -62,56 +62,9 @@ where
     Ok(config)
 }
 
-pub fn app_directory(workspace: &str, namespace: &str, id: &str, build_version: u64) -> String {
+// app build workspace
+pub fn app_workspace(workspace: &str, namespace: &str, id: &str, build_version: u64) -> String {
     format!("{}/{}/{}/{}", workspace, namespace, id, build_version)
-}
-
-pub fn app_path(workspace: &str, namespace: &str, id: &str, build_version: u64) -> String {
-    format!("{}/{}/{}/{}/app", workspace, namespace, id, build_version)
-}
-
-pub fn app_toml_manifest_path(
-    workspace: &str,
-    namespace: &str,
-    id: &str,
-    build_version: u64,
-) -> String {
-    format!(
-        "{}/{}/{}/{}/app/Cargo.toml",
-        workspace, namespace, id, build_version
-    )
-}
-
-pub fn app_main_path(workspace: &str, namespace: &str, id: &str, build_version: u64) -> String {
-    format!(
-        "{}/{}/{}/{}/app/src/main.rs",
-        workspace, namespace, id, build_version
-    )
-}
-
-pub fn app_build_target_path(
-    workspace: &str,
-    namespace: &str,
-    id: &str,
-    build_version: u64,
-) -> String {
-    format!(
-        "{}/{}/{}/{}/app/target",
-        workspace, namespace, id, build_version
-    )
-}
-
-pub fn app_build_release_path(
-    workspace: &str,
-    namespace: &str,
-    id: &str,
-    build_version: u64,
-    target_platform: &str,
-) -> String {
-    format!(
-        "{}/{}/{}/{}/app/target/{}/release/app",
-        workspace, namespace, id, build_version, target_platform
-    )
 }
 
 pub fn app_build_log_directory(
@@ -121,10 +74,6 @@ pub fn app_build_log_directory(
     build_version: u64,
 ) -> String {
     format!("{}/{}/{}/{}", log_directory, namespace, id, build_version)
-}
-
-pub fn app_build_log_path(app_log_directory: &str) -> String {
-    format!("{}/build.log", app_log_directory)
 }
 
 pub fn app_restore_directory(
@@ -139,32 +88,8 @@ pub fn app_restore_directory(
     )
 }
 
-pub fn app_restore_path(
-    restore_directory: &str,
-    namespace: &str,
-    id: &str,
-    target_platform: &str,
-) -> String {
-    format!(
-        "{}/{}/{}/{}/app",
-        restore_directory, namespace, id, target_platform
-    )
-}
-
-pub fn app_publish_directory(
-    publish_directory: &str,
-    namespace: &str,
-    id: &str,
-    build_version: u64,
-) -> String {
-    format!(
-        "{}/{}/{}/{}",
-        publish_directory, namespace, id, build_version
-    )
-}
-
-pub fn app_publish_path(app_publish_directory: &str) -> String {
-    format!("{}/app", app_publish_directory)
+pub fn sub_path(parent_directory: &str, path: &str) -> String {
+    format!("{}/{}", parent_directory, path)
 }
 
 // remove directory and return success flag

@@ -1,12 +1,15 @@
 use crate::{
-    app_directory,
+    app_workspace,
+    constants::{
+        PATH_APP, PATH_APP_BUILD_LOG, PATH_APP_MAIN, PATH_APP_RELEASE_BINARY, PATH_APP_TARGET,
+        PATH_APP_TOML_MANIFEST,
+    },
     errors::Result,
     read_file,
     utils::{
-        app_build_log_directory, app_build_log_path, app_build_release_path, app_build_target_path,
-        app_main_path, app_path, app_restore_directory, app_restore_path, app_toml_manifest_path,
-        build_get_manifest_request, build_post_app_request, cargo_build, cargo_fmt, cargo_init,
-        copy_directory, create_directory, move_directory, parse_toml, remove_directory, write_file,
+        app_build_log_directory, app_restore_directory, build_get_manifest_request,
+        build_post_app_request, cargo_build, cargo_fmt, cargo_init, copy_directory,
+        create_directory, move_directory, parse_toml, remove_directory, sub_path, write_file,
         write_toml, TomlManifest,
     },
 };
@@ -265,13 +268,15 @@ impl Build {
         let restore_directory = self.get_restore_directory().as_str();
         let namespace = self.namespace.as_str();
         // try restore app build workspace
-        let app_directory = app_directory(workspace, namespace, id, build_version);
-        create_directory(app_directory.as_str())?;
+        let app_workspace = app_workspace(workspace, namespace, id, build_version);
+        create_directory(app_workspace.as_str())?;
         let target_platform = self.target_platform.as_str();
-        let app_restore_path = app_restore_path(restore_directory, namespace, id, target_platform);
-        if !copy_directory(app_restore_path.as_str(), app_directory.as_str()).await? {
+        let app_restore_directory =
+            app_restore_directory(restore_directory, namespace, id, target_platform);
+        let app_restore_path = sub_path(app_restore_directory.as_str(), "app");
+        if !copy_directory(app_restore_path.as_str(), app_workspace.as_str()).await? {
             // cargo init
-            let app_path = app_path(workspace, namespace, id, build_version);
+            let app_path = sub_path(app_workspace.as_str(), PATH_APP);
             create_directory(app_path.as_str())?;
             cargo_init(app_path.as_str()).await?;
         }
@@ -287,7 +292,8 @@ impl Build {
         // update dependency Cargo.toml
         let workspace = self.get_workspace().as_str();
         let namespace = self.namespace.as_str();
-        let toml_path = app_toml_manifest_path(workspace, namespace, id, build_version);
+        let app_workspace = app_workspace(workspace, namespace, id, build_version);
+        let toml_path = sub_path(app_workspace.as_str(), PATH_APP_TOML_MANIFEST);
         let mut toml_manifest: TomlManifest = parse_toml(toml_path.as_str())?;
         toml_manifest.init();
         let app = self.app.as_ref().expect("app not initialized");
@@ -298,7 +304,7 @@ impl Build {
         write_toml(&toml_manifest, toml_path.as_str())?;
         // generate src/main.rs
         let generated_code = self.app.as_ref().expect("app not initialized").generate();
-        let main_path = app_main_path(workspace, namespace, id, build_version);
+        let main_path = sub_path(app_workspace.as_str(), PATH_APP_MAIN);
         write_file(main_path.as_str(), generated_code.as_bytes())?;
         // fmt code
         cargo_fmt(toml_path.as_str()).await?;
@@ -316,13 +322,14 @@ impl Build {
         let log_directory = self.get_log_directory().as_str();
         let namespace = self.namespace.as_str();
         // cargo build and stream log to file
+        let app_workspace = app_workspace(workspace, namespace, id, build_version);
         let target_platform = self.target_platform.as_str();
-        let toml_path = app_toml_manifest_path(workspace, namespace, id, build_version);
-        let target_path = app_build_target_path(workspace, namespace, id, build_version);
+        let toml_path = sub_path(app_workspace.as_str(), PATH_APP_TOML_MANIFEST);
+        let target_path = sub_path(app_workspace.as_str(), PATH_APP_TARGET);
         // prepare log directory
         let log_directory = app_build_log_directory(log_directory, namespace, id, build_version);
         create_directory(log_directory.as_str())?;
-        let log_path = app_build_log_path(log_directory.as_str());
+        let log_path = sub_path(log_directory.as_str(), PATH_APP_BUILD_LOG);
         cargo_build(
             toml_path.as_str(),
             target_platform,
@@ -343,13 +350,14 @@ impl Build {
         // publish app binaries
         let workspace = self.get_workspace().as_str();
         let namespace = self.namespace.as_str();
+        let app_workspace = app_workspace(workspace, namespace, id, build_version);
+        let target_path = sub_path(app_workspace.as_str(), PATH_APP_TARGET);
         let target_platform = self.target_platform.as_str();
-        let release_path = app_build_release_path(
-            workspace,
-            namespace,
-            id.as_str(),
-            build_version,
-            target_platform,
+        let target_platform_release_binary =
+            format!("{}/{}", target_platform, PATH_APP_RELEASE_BINARY);
+        let release_path = sub_path(
+            target_path.as_str(),
+            target_platform_release_binary.as_str(),
         );
         let buffer = read_file(release_path.as_str())?;
         let request =
@@ -368,11 +376,12 @@ impl Build {
         let workspace = self.get_workspace().as_str();
         let restore_directory = self.get_restore_directory().as_str();
         let namespace = self.namespace.as_str();
-        let app_path = app_path(workspace, namespace, id, build_version);
+        let app_directory = app_workspace(workspace, namespace, id, build_version);
+        let app_path = sub_path(app_directory.as_str(), PATH_APP);
         let target_platform = self.target_platform.as_str();
         let app_restore_directory =
             app_restore_directory(restore_directory, namespace, id, target_platform);
-        let app_restore_path = app_restore_path(restore_directory, namespace, id, target_platform);
+        let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
         // cleanup previous app build cache if any
         let _ = remove_directory(app_restore_path.as_str()).await?;
         create_directory(app_restore_directory.as_str())?;
