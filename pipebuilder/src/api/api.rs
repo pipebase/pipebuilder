@@ -159,6 +159,7 @@ pub mod filters {
 }
 
 mod handlers {
+    use super::validate;
     use pipebuilder_common::{
         api::models::{self, Failure},
         grpc::{
@@ -182,6 +183,10 @@ mod handlers {
         mut client: SchedulerClient<Channel>,
         request: models::BuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        match validate::validate_build_request(&request) {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         let response = match schedule(&mut client).await {
             Ok(response) => response,
             Err(err) => return Ok(http_internal_error(err.into())),
@@ -522,6 +527,10 @@ mod handlers {
         failure(StatusCode::NOT_FOUND, f)
     }
 
+    fn http_bad_request(f: Failure) -> http::Result<Response<String>> {
+        failure(StatusCode::BAD_REQUEST, f)
+    }
+
     fn ok<T>(t: &T) -> http::Result<Response<String>>
     where
         T: ?Sized + Serialize,
@@ -529,5 +538,20 @@ mod handlers {
         Response::builder()
             .status(StatusCode::OK)
             .body(serde_json::to_string::<T>(t).unwrap())
+    }
+}
+
+mod validate {
+
+    use pipebuilder_common::{api::models, invalid_api_request, Build, Result};
+
+    pub fn validate_build_request(request: &models::BuildRequest) -> Result<()> {
+        if !Build::is_target_platform_support(request.target_platform.as_str()) {
+            return Err(invalid_api_request(format!(
+                "target platform '{}' not support",
+                request.target_platform
+            )));
+        }
+        Ok(())
     }
 }

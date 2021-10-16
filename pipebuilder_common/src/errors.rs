@@ -63,6 +63,8 @@ pub enum ErrorImpl {
         reason: String,
         message: String,
     },
+    #[error("invalid api request, message: {message:?}")]
+    ApiRequest { message: String },
 }
 
 impl From<std::io::Error> for Error {
@@ -185,6 +187,10 @@ pub fn api_server_error(
         reason: reason.unwrap_or_default(),
         message: message.unwrap_or_default(),
     }))
+}
+
+pub fn invalid_api_request(message: String) -> Error {
+    Error(Box::new(ErrorImpl::ApiRequest { message }))
 }
 
 // rpc status
