@@ -2,8 +2,13 @@ use chrono::Utc;
 use flurry::HashMap;
 use pipebuilder_common::{
     app_workspace,
-    grpc::build::{builder_server::Builder, BuildResponse, CancelResponse, VersionBuildKey},
-    grpc::{build::ListResponse, repository::repository_client::RepositoryClient},
+    grpc::{
+        build::{
+            builder_server::Builder, BuildResponse, CancelResponse, GetLogResponse, ListResponse,
+            VersionBuildKey,
+        },
+        repository::repository_client::RepositoryClient,
+    },
     remove_directory, sub_path, Build, BuildStatus, LocalBuildContext, Register, VersionBuild,
     PATH_APP,
 };
@@ -48,7 +53,7 @@ impl Builder for BuilderService {
         let namespace = request.namespace;
         let id = request.id;
         let manifest_version = request.manifest_version;
-        info!("build {}/{}/{}", namespace, id, manifest_version);
+        info!("build '{}/{}/{}'", namespace, id, manifest_version);
         // lock build snapshot with manifest id
         // update latest build version
         let mut register = self.register.clone();
@@ -69,7 +74,7 @@ impl Builder for BuilderService {
         let build_context = self.context.to_owned();
         let target_platform = request.target_platform;
         // start build
-        info!("start build {}/{}/{}", namespace, id, build_version);
+        info!("start build '{}/{}/{}'", namespace, id, build_version);
         let build = Build::new(
             namespace,
             id,
@@ -97,12 +102,12 @@ impl Builder for BuilderService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.build_version;
-        info!("cancel build {}/{}/{}", namespace, id, version);
+        info!("cancel build '{}/{}/{}'", namespace, id, version);
         let builds = self.builds.clone();
         let workspace = self.context.workspace.as_str();
         if !cancel_local_build(builds, namespace.as_str(), id.as_str(), version) {
             return Err(tonic::Status::invalid_argument(format!(
-                "local build not found for {}/{}/{}",
+                "local build not found for '{}/{}/{}'",
                 namespace, id, version
             )));
         }
@@ -113,7 +118,7 @@ impl Builder for BuilderService {
             Ok(_) => (),
             Err(err) => {
                 return Err(tonic::Status::internal(format!(
-                    "clean app directory failed for {}/{}/{}, error: '{}'",
+                    "clean app directory failed for '{}/{}/{}', error: '{}'",
                     namespace, id, version, err
                 )))
             }
@@ -130,12 +135,10 @@ impl Builder for BuilderService {
         .await
         {
             Ok(_) => Ok(Response::new(CancelResponse {})),
-            Err(err) => {
-                return Err(tonic::Status::internal(format!(
-                    "cancel version build failed, error: '{:#?}'",
-                    err
-                )))
-            }
+            Err(err) => Err(tonic::Status::internal(format!(
+                "cancel version build failed, error: '{:#?}'",
+                err
+            ))),
         }
     }
 
@@ -155,6 +158,26 @@ impl Builder for BuilderService {
             })
             .collect::<Vec<VersionBuildKey>>();
         Ok(Response::new(ListResponse { builds }))
+    }
+
+    async fn get_log(
+        &self,
+        request: tonic::Request<pipebuilder_common::grpc::build::GetLogRequest>,
+    ) -> Result<tonic::Response<pipebuilder_common::grpc::build::GetLogResponse>, tonic::Status>
+    {
+        let request = request.into_inner();
+        let namespace = request.namespace;
+        let id = request.id;
+        let version = request.build_version;
+        info!("get build log for '{}/{}/{}'", namespace, id, version);
+        let log_directory = self.context.log_directory.as_str();
+        match Build::read_log(log_directory, namespace.as_str(), id.as_str(), version) {
+            Ok(buffer) => Ok(Response::new(GetLogResponse { buffer })),
+            Err(err) => Err(tonic::Status::not_found(format!(
+                "build log for '{}/{}/{}' not found, error: '{}'",
+                namespace, id, version, err
+            ))),
+        }
     }
 }
 
@@ -264,7 +287,10 @@ fn cancel_local_build(
             true
         }
         None => {
-            warn!("cancel non-extists build {}/{}/{}", namespace, id, version);
+            warn!(
+                "cancel non-extists build '{}/{}/{}'",
+                namespace, id, version
+            );
             false
         }
     }
@@ -283,7 +309,10 @@ async fn cancel_version_build(
     {
         Some(version_build) => version_build,
         None => {
-            warn!("cancel non-extists build {}/{}/{}", namespace, id, version);
+            warn!(
+                "cancel non-extists build '{}/{}/{}'",
+                namespace, id, version
+            );
             return Ok(());
         }
     };

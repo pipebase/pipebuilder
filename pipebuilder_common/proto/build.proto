@@ -43,8 +43,23 @@ message ListResponse {
     repeated VersionBuildKey builds = 1;
 }
 
+message GetLogRequest {
+    // app namespace
+    string namespace = 1;
+    // app id
+    string id = 2;
+    // app build version
+    uint64 build_version = 3;
+}
+
+message GetLogResponse {
+    // log context
+    bytes buffer = 1;
+}
+
 service Builder {
     rpc Build(BuildRequest) returns (BuildResponse) {}
     rpc Cancel(CancelRequest) returns (CancelResponse) {}
     rpc List(ListRequest) returns (ListResponse) {}
+    rpc GetLog(GetLogRequest) returns (GetLogResponse) {}
 }

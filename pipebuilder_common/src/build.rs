@@ -160,6 +160,18 @@ impl Build {
         )
     }
 
+    // read app build log
+    pub fn read_log(
+        log_directory: &str,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> Result<Vec<u8>> {
+        let app_log_directory = app_build_log_directory(log_directory, namespace, id, version);
+        let app_log_path = sub_path(app_log_directory.as_str(), PATH_APP_BUILD_LOG);
+        read_file(app_log_path.as_str())
+    }
+
     pub fn new(
         namespace: String,
         id: String,

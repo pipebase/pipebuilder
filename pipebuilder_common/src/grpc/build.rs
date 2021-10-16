@@ -52,6 +52,24 @@ pub struct ListResponse {
     #[prost(message, repeated, tag = "1")]
     pub builds: ::prost::alloc::vec::Vec<VersionBuildKey>,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetLogRequest {
+    /// app namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// app id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
+    /// app build version
+    #[prost(uint64, tag = "3")]
+    pub build_version: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetLogResponse {
+    /// log context
+    #[prost(bytes = "vec", tag = "1")]
+    pub buffer: ::prost::alloc::vec::Vec<u8>,
+}
 #[doc = r" Generated client implementations."]
 pub mod builder_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -154,6 +172,20 @@ pub mod builder_client {
             let path = http::uri::PathAndQuery::from_static("/build.Builder/List");
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn get_log(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetLogRequest>,
+        ) -> Result<tonic::Response<super::GetLogResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/build.Builder/GetLog");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
     }
 }
 #[doc = r" Generated server implementations."]
@@ -175,6 +207,10 @@ pub mod builder_server {
             &self,
             request: tonic::Request<super::ListRequest>,
         ) -> Result<tonic::Response<super::ListResponse>, tonic::Status>;
+        async fn get_log(
+            &self,
+            request: tonic::Request<super::GetLogRequest>,
+        ) -> Result<tonic::Response<super::GetLogResponse>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct BuilderServer<T: Builder> {
@@ -298,6 +334,37 @@ pub mod builder_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = ListSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/build.Builder/GetLog" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetLogSvc<T: Builder>(pub Arc<T>);
+                    impl<T: Builder> tonic::server::UnaryService<super::GetLogRequest> for GetLogSvc<T> {
+                        type Response = super::GetLogResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetLogRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).get_log(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetLogSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
                             accept_compression_encodings,
