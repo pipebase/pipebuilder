@@ -25,8 +25,9 @@ pub mod filters {
             .or(v1_build_snapshot_list(register.to_owned()))
             .or(v1_build_get(register.to_owned(), lease_id))
             .or(v1_build_list(register.to_owned()))
-            .or(v1_build_cancel(register, lease_id))
+            .or(v1_build_cancel(register.to_owned(), lease_id))
             .or(v1_app_get(repository_client))
+            .or(v1_build_log_get(register, lease_id))
     }
 
     pub fn v1_build(
@@ -123,6 +124,18 @@ pub mod filters {
             .and_then(handlers::get_app)
     }
 
+    pub fn v1_build_log_get(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "build" / "log")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(warp::query::<models::GetBuildLogRequest>())
+            .and_then(handlers::get_build_log)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -163,7 +176,7 @@ mod handlers {
     use pipebuilder_common::{
         api::models::{self, Failure},
         grpc::{
-            build::{builder_client::BuilderClient, BuildRequest, CancelRequest},
+            build::{builder_client::BuilderClient, BuildRequest, CancelRequest, GetLogRequest},
             repository::{
                 repository_client::RepositoryClient, GetAppRequest, GetManifestRequest,
                 PutManifestRequest,
@@ -413,6 +426,7 @@ mod handlers {
         lease_id: i64,
         request: models::CancelBuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        let request_clone = request.clone();
         // query version build for builder address
         let namespace = request.namespace;
         let id = request.id;
@@ -443,19 +457,15 @@ mod handlers {
         // cancel local build at builder
         let builder_id = version_build.builder_id;
         let builder_address = version_build.builder_address;
-        info!("scheduled builder ({}, {})", builder_id, builder_address);
+        info!(
+            "cancel build at builder ({}, {})",
+            builder_id, builder_address
+        );
         let mut builder_client = match builder_client(builder_address).await {
             Ok(builder_client) => builder_client,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
-        match do_cancel_build(
-            &mut builder_client,
-            namespace.as_str(),
-            id.as_str(),
-            version,
-        )
-        .await
-        {
+        match do_cancel_build(&mut builder_client, request_clone).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
@@ -463,17 +473,10 @@ mod handlers {
 
     async fn do_cancel_build(
         client: &mut BuilderClient<Channel>,
-        namespace: &str,
-        id: &str,
-        version: u64,
+        request: models::CancelBuildRequest,
     ) -> pipebuilder_common::Result<models::CancelBuildResponse> {
-        let resp = client
-            .cancel(CancelRequest {
-                namespace: namespace.to_owned(),
-                id: id.to_owned(),
-                build_version: version,
-            })
-            .await?;
+        let request: CancelRequest = request.into();
+        let resp = client.cancel(request).await?;
         Ok(resp.into_inner().into())
     }
 
@@ -494,6 +497,64 @@ mod handlers {
         let request: GetAppRequest = request.into();
         let response = client.get_app(request).await?;
         Ok(response.into_inner().into())
+    }
+
+    pub async fn get_build_log(
+        mut register: Register,
+        lease_id: i64,
+        request: models::GetBuildLogRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        let request_clone = request.clone();
+        let namespace = request.namespace;
+        let id = request.id;
+        let version = request.version;
+        let version_build = match do_get_build(
+            &mut register,
+            lease_id,
+            models::GetBuildRequest {
+                namespace: namespace.clone(),
+                id: id.clone(),
+                version,
+            },
+        )
+        .await
+        {
+            Ok(version_build) => version_build,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        let version_build = match version_build {
+            Some(version_build) => version_build,
+            None => {
+                return Ok(http_not_found(Failure::new(format!(
+                    "version build {}/{}/{} not found",
+                    namespace, id, version
+                ))))
+            }
+        };
+        // get local build log at builder
+        let builder_id = version_build.builder_id;
+        let builder_address = version_build.builder_address;
+        info!(
+            "get build log at builder ({}, {})",
+            builder_id, builder_address
+        );
+        let mut builder_client = match builder_client(builder_address).await {
+            Ok(builder_client) => builder_client,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match do_get_build_log(&mut builder_client, request_clone).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_get_build_log(
+        client: &mut BuilderClient<Channel>,
+        request: models::GetBuildLogRequest,
+    ) -> pipebuilder_common::Result<models::GetBuildLogResponse> {
+        let request: GetLogRequest = request.into();
+        let resp = client.get_log(request).await?;
+        Ok(resp.into_inner().into())
     }
 
     async fn schedule(

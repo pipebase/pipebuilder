@@ -180,7 +180,7 @@ pub struct ListBuildRequest {
     pub id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct CancelBuildRequest {
     pub namespace: String,
     pub id: String,
@@ -194,11 +194,23 @@ pub struct CancelBuildResponse {}
 pub struct GetAppRequest {
     pub namespace: String,
     pub id: String,
-    pub version: u64,
+    pub build_version: u64,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct GetAppResponse {
+    pub buffer: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct GetBuildLogRequest {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetBuildLogResponse {
     pub buffer: Vec<u8>,
 }
 
@@ -232,6 +244,19 @@ impl From<build::BuildResponse> for BuildResponse {
     fn from(origin: build::BuildResponse) -> Self {
         let build_version = origin.version;
         BuildResponse { build_version }
+    }
+}
+
+impl From<CancelBuildRequest> for build::CancelRequest {
+    fn from(origin: CancelBuildRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let version = origin.version;
+        build::CancelRequest {
+            namespace,
+            id,
+            build_version: version,
+        }
     }
 }
 
@@ -286,7 +311,7 @@ impl From<GetAppRequest> for repository::GetAppRequest {
     fn from(origin: GetAppRequest) -> Self {
         let namespace = origin.namespace;
         let id = origin.id;
-        let version = origin.version;
+        let version = origin.build_version;
         repository::GetAppRequest {
             namespace,
             id,
@@ -299,6 +324,26 @@ impl From<repository::GetAppResponse> for GetAppResponse {
     fn from(origin: repository::GetAppResponse) -> Self {
         let buffer = origin.buffer;
         GetAppResponse { buffer }
+    }
+}
+
+impl From<GetBuildLogRequest> for build::GetLogRequest {
+    fn from(origin: GetBuildLogRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let build_version = origin.version;
+        build::GetLogRequest {
+            namespace,
+            id,
+            build_version,
+        }
+    }
+}
+
+impl From<build::GetLogResponse> for GetBuildLogResponse {
+    fn from(origin: build::GetLogResponse) -> Self {
+        let buffer = origin.buffer;
+        GetBuildLogResponse { buffer }
     }
 }
 

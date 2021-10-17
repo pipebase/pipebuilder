@@ -1,13 +1,14 @@
 use super::{
-    constants::{APP, BUILD, BUILD_SNAPSHOT, CANCEL_BUILD, MANIFEST, MANIFEST_SNAPSHOT},
+    constants::{APP, BUILD, BUILD_LOG, BUILD_SNAPSHOT, CANCEL_BUILD, MANIFEST, MANIFEST_SNAPSHOT},
     models::{
         BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
-        GetAppRequest, GetAppResponse, GetBuildRequest, GetManifestRequest, GetManifestResponse,
-        ListBuildRequest, ListBuildSnapshotRequest, ListManifestSnapshotRequest, ManifestSnapshot,
+        Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest, GetBuildLogResponse,
+        GetBuildRequest, GetManifestRequest, GetManifestResponse, ListBuildRequest,
+        ListBuildSnapshotRequest, ListManifestSnapshotRequest, ManifestSnapshot,
         PutManifestRequest, PutManifestResponse, VersionBuild,
     },
 };
-use crate::{api::models::Failure, api_client_error, api_server_error, Result};
+use crate::{api_client_error, api_server_error, Result};
 use reqwest::{
     header::{HeaderMap, HeaderName},
     Body, Client, Response,
@@ -185,6 +186,12 @@ impl ApiClient {
     pub async fn get_app(&self, request: &GetAppRequest) -> Result<GetAppResponse> {
         let response = self.query(APP, request).await?;
         let response = Self::get_response_body::<GetAppResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn get_build_log(&self, request: &GetBuildLogRequest) -> Result<GetBuildLogResponse> {
+        let response = self.query(BUILD_LOG, request).await?;
+        let response = Self::get_response_body::<GetBuildLogResponse>(response).await?;
         Ok(response)
     }
 

@@ -3,7 +3,8 @@ use pipebuilder_common::{
         client::ApiClient,
         models::{
             BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
-            GetBuildRequest, ListBuildRequest, ListBuildSnapshotRequest, VersionBuild,
+            GetBuildLogRequest, GetBuildLogResponse, GetBuildRequest, ListBuildRequest,
+            ListBuildSnapshotRequest, VersionBuild,
         },
     },
     Result,
@@ -68,4 +69,18 @@ pub(crate) async fn cancel_build(
         version,
     };
     client.cancel_build(&request).await
+}
+
+pub(crate) async fn get_build_log(
+    client: &ApiClient,
+    namespace: String,
+    id: String,
+    version: u64,
+) -> Result<GetBuildLogResponse> {
+    let request = GetBuildLogRequest {
+        namespace,
+        id,
+        version,
+    };
+    client.get_build_log(&request).await
 }

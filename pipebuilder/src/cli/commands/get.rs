@@ -1,7 +1,7 @@
 use super::Cmd;
 use crate::ops::{
     do_app::get_app,
-    do_build::get_build,
+    do_build::{get_build, get_build_log},
     do_manifest::get_manifest,
     print::{print_record, print_utf8},
 };
@@ -12,9 +12,12 @@ use clap::Arg;
 pub(crate) const DEFAULT_APP_DOWNLOAD_PATH: &str = "./app";
 
 pub fn cmd() -> Cmd {
-    Cmd::new("get")
-        .about("Get resources")
-        .subcommands(vec![manifest(), build(), app()])
+    Cmd::new("get").about("Get resources").subcommands(vec![
+        manifest(),
+        build(),
+        app(),
+        build_log(),
+    ])
 }
 
 pub fn manifest() -> Cmd {
@@ -54,8 +57,7 @@ pub async fn exec_manifest(client: ApiClient, args: &clap::ArgMatches) -> Result
         manifest_version,
     )
     .await?;
-    print_utf8(response.buffer)?;
-    Ok(())
+    print_utf8(response.buffer)
 }
 
 pub fn build() -> Cmd {
@@ -100,15 +102,18 @@ pub fn app() -> Cmd {
             Arg::new("namespace")
                 .short('n')
                 .about("Specify namespace")
-                .takes_value(true),
+                .takes_value(true)
+                .required(true),
             Arg::new("id")
                 .short('i')
                 .about("Specify app id")
-                .takes_value(true),
+                .takes_value(true)
+                .required(true),
             Arg::new("version")
                 .short('v')
                 .about("Specify app build version")
-                .takes_value(true),
+                .takes_value(true)
+                .required(true),
             Arg::new("path")
                 .short('p')
                 .about("Specify app download path")
@@ -129,4 +134,39 @@ pub async fn exec_app(client: ApiClient, args: &clap::ArgMatches) -> Result<()> 
     let buffer = response.buffer;
     write_file(path, buffer.as_slice())?;
     Ok(())
+}
+
+pub fn build_log() -> Cmd {
+    Cmd::new("log")
+        .about("Get build given namespace, app id and build version")
+        .args(vec![
+            Arg::new("namespace")
+                .short('n')
+                .about("Specify namespace")
+                .takes_value(true)
+                .required(true),
+            Arg::new("id")
+                .short('i')
+                .about("Specify app id")
+                .takes_value(true)
+                .required(true),
+            Arg::new("version")
+                .short('v')
+                .about("Specify app build version")
+                .takes_value(true)
+                .required(true),
+        ])
+}
+
+pub async fn exec_build_log(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+    let namespace = args.value_of("namespace").unwrap();
+    let id = args.value_of("id").unwrap();
+    let build_version = args
+        .value_of("version")
+        .unwrap()
+        .parse()
+        .expect("invalid build version");
+    let response =
+        get_build_log(&client, namespace.to_owned(), id.to_owned(), build_version).await?;
+    print_utf8(response.buffer)
 }

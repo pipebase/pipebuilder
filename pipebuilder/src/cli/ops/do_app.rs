@@ -10,12 +10,12 @@ pub(crate) async fn get_app(
     client: &ApiClient,
     namespace: String,
     id: String,
-    version: u64,
+    build_version: u64,
 ) -> Result<GetAppResponse> {
     let request = GetAppRequest {
         namespace,
         id,
-        version,
+        build_version,
     };
     client.get_app(&request).await
 }
