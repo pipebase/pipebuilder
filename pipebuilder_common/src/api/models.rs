@@ -352,3 +352,53 @@ impl From<Error> for Failure {
         Failure::new(format!("{}", error))
     }
 }
+
+pub trait PrintHeader {
+    fn print_header();
+}
+
+impl PrintHeader for ManifestSnapshot {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}",
+            col0 = "Id",
+            col1 = "Latest Version",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for BuildSnapshot {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}",
+            col0 = "Id",
+            col1 = "Latest Version",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for VersionBuild {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}{col5:<col5_width$}{col6:<col6_width$}",
+            col0 = "Id",
+            col1 = "Version",
+            col2 = "Status",
+            col3 = "Builder Id",
+            col4 = "Builder Address",
+            col5 = "Timestamp",
+            col6 = "Message",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+            col2_width = DISPLAY_BUILD_STATUS_WIDTH,
+            col3_width = DISPLAY_ID_WIDTH,
+            col4_width = DISPLAY_ADDRESS_WIDTH,
+            col5_width = DISPLAY_TIMESTAMP_WIDTH,
+            col6_width = DISPLAY_MESSAGE_WIDTH,
+        )
+    }
+}

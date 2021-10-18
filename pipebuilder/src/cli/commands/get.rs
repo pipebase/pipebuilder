@@ -3,7 +3,7 @@ use crate::ops::{
     do_app::get_app,
     do_build::{get_build, get_build_log},
     do_manifest::get_manifest,
-    print::{print_record, print_utf8},
+    print::{print_records, print_utf8},
 };
 use pipebuilder_common::{api::client::ApiClient, write_file, Result};
 
@@ -91,7 +91,8 @@ pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()
         .parse()
         .expect("invalid build version");
     let response = get_build(&client, namespace.to_owned(), id.to_owned(), build_version).await?;
-    print_record(&response);
+    let responses = vec![response];
+    print_records(responses.as_slice());
     Ok(())
 }
 

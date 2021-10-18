@@ -1,4 +1,4 @@
-use pipebuilder_common::Result;
+use pipebuilder_common::{api::models::PrintHeader, Result};
 use std::fmt::Display;
 
 pub(crate) fn print_record<T>(record: &T)
@@ -10,8 +10,9 @@ where
 
 pub(crate) fn print_records<T>(records: &[T])
 where
-    T: Display,
+    T: Display + PrintHeader,
 {
+    T::print_header();
     for record in records {
         print_record(record)
     }
