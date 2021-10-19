@@ -3,7 +3,11 @@ mod config;
 mod schedule;
 
 use config::Config;
-use pipebuilder_common::{bootstrap, open_file, parse_config, Result, ENV_PIPEBUILDER_CONFIG_FILE};
+use pipebuilder_common::{
+    bootstrap,
+    grpc::{health::health_server::HealthServer, schedule::scheduler_server::SchedulerServer},
+    open_file, parse_config, Result, ENV_PIPEBUILDER_CONFIG_FILE,
+};
 use std::net::SocketAddr;
 use tonic::transport::Server;
 use tracing::{info, instrument};
@@ -28,8 +32,8 @@ async fn main() -> Result<()> {
     // bootstrap schedluer services
     let scheduler_svc = bootstrap::bootstrap(SchedulerConfig {}, register);
     Server::builder()
-        .add_service(health_svc)
-        .add_service(scheduler_svc)
+        .add_service(HealthServer::new(health_svc))
+        .add_service(SchedulerServer::new(scheduler_svc))
         .serve(addr)
         .await?;
     info!("scheduler server {:?} exit ...", node_id);

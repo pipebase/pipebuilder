@@ -4,7 +4,10 @@ mod repository;
 
 use bootstrap::bootstrap;
 use config::Config;
-use pipebuilder_common::{open_file, parse_config, Result, ENV_PIPEBUILDER_CONFIG_FILE};
+use pipebuilder_common::{
+    grpc::{health::health_server::HealthServer, repository::repository_server::RepositoryServer},
+    open_file, parse_config, Result, ENV_PIPEBUILDER_CONFIG_FILE,
+};
 use std::net::SocketAddr;
 use tonic::transport::Server;
 use tracing::{info, instrument};
@@ -31,8 +34,8 @@ async fn main() -> Result<()> {
         node_id, internal_address
     );
     Server::builder()
-        .add_service(health_svc)
-        .add_service(repository_svc)
+        .add_service(HealthServer::new(health_svc))
+        .add_service(RepositoryServer::new(repository_svc))
         .serve(addr)
         .await?;
     info!("repository server {:?} exit ...", node_id);

@@ -1,7 +1,6 @@
 use crate::{build::BuilderService, config::BuilderConfig};
 use pipebuilder_common::{
-    grpc::{build::builder_server::BuilderServer, repository::repository_client::RepositoryClient},
-    LocalBuildContext, Register, Result,
+    grpc::repository::repository_client::RepositoryClient, LocalBuildContext, Register, Result,
 };
 use tonic::transport::Channel;
 
@@ -25,7 +24,7 @@ pub async fn bootstrap(
     config: BuilderConfig,
     lease_id: i64,
     register: Register,
-) -> Result<BuilderServer<BuilderService>> {
+) -> Result<BuilderService> {
     let repository_endpoint = config.repository_endpoint;
     let repository_client = build_repository_client(repository_endpoint).await?;
     let workspace = config.workspace;
@@ -39,5 +38,5 @@ pub async fn bootstrap(
         log_directory,
     );
     let builder_svc = build_builder_service(lease_id, register, repository_client, build_context);
-    Ok(BuilderServer::new(builder_svc))
+    Ok(builder_svc)
 }
