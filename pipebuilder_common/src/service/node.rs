@@ -5,7 +5,13 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tracing::error;
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -29,6 +35,16 @@ pub fn role_prefix(role: NodeRole) -> &'static str {
 pub enum NodeStatus {
     Active,
     InActive,
+}
+
+impl From<u8> for NodeStatus {
+    fn from(origin: u8) -> Self {
+        match origin {
+            0 => NodeStatus::Active,
+            1 => NodeStatus::InActive,
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Clone, Deserialize)]
@@ -69,8 +85,8 @@ pub struct NodeService {
     lease_id: i64,
     // node heartbeat period
     heartbeat_period: Duration,
-    // node runtime status
-    status: NodeStatus,
+    // node runtime status code
+    status_code: Arc<AtomicU8>,
 }
 
 impl NodeService {
@@ -97,7 +113,7 @@ impl NodeService {
             external_address,
             lease_id,
             heartbeat_period: heartbeat_period.into(),
-            status: NodeStatus::Active,
+            status_code: Arc::new(AtomicU8::new(NodeStatus::Active as u8)),
         }
     }
 
@@ -120,19 +136,20 @@ impl NodeService {
         let role = self.role.to_owned();
         let internal_address = self.internal_address.to_owned();
         let external_address = self.external_address.to_owned();
-        let status = self.status.to_owned();
+        let status_code = self.status_code.clone();
         let lease_id = self.lease_id;
         let _ = tokio::spawn(async move {
             loop {
                 interval.tick().await;
                 // register or patch local node state
                 let timestamp = Utc::now();
+                let status_code = status_code.load(Ordering::Acquire);
                 let state = NodeState {
                     id: id.clone(),
                     role: role.clone(),
                     internal_address: internal_address.clone(),
                     external_address: external_address.clone(),
-                    status: status.clone(),
+                    status: status_code.into(),
                     timestamp,
                 };
                 match register
