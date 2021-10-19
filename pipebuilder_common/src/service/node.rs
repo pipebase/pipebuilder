@@ -1,4 +1,5 @@
 use crate::{
+    grpc::node::{self, node_server::Node},
     Period, Register, DEFAULT_NODE_HEARTBEAT_PERIOD, ENV_PIPEBUILDER_EXTERNAL_ADDR,
     ENV_PIPEBUILDER_NODE_ID, REGISTER_KEY_PREFIX_API, REGISTER_KEY_PREFIX_BUILDER,
     REGISTER_KEY_PREFIX_REPOSITORY, REGISTER_KEY_PREFIX_SCHEDULER,
@@ -117,16 +118,20 @@ impl NodeService {
         }
     }
 
-    pub fn get_id(&self) -> &String {
-        &self.id
+    pub fn get_id(&self) -> String {
+        self.id.to_owned()
     }
 
-    pub fn get_internal_address(&self) -> &String {
-        &self.internal_address
+    pub fn get_internal_address(&self) -> String {
+        self.internal_address.to_owned()
     }
 
-    pub fn get_external_address(&self) -> &String {
-        &self.external_address
+    pub fn get_external_address(&self) -> String {
+        self.external_address.to_owned()
+    }
+
+    pub fn get_status_code(&self) -> Arc<AtomicU8> {
+        self.status_code.clone()
     }
 
     pub fn run(&self, mut register: Register) {
@@ -167,5 +172,38 @@ impl NodeService {
                 }
             }
         });
+    }
+}
+
+#[tonic::async_trait]
+impl Node for NodeService {
+    async fn activate(
+        &self,
+        _request: tonic::Request<node::ActivateRequest>,
+    ) -> Result<tonic::Response<node::ActivateResponse>, tonic::Status> {
+        self.status_code
+            .store(NodeStatus::Active as u8, Ordering::Release);
+        Ok(tonic::Response::new(node::ActivateResponse {}))
+    }
+
+    async fn deactivate(
+        &self,
+        _request: tonic::Request<node::DeactivateRequest>,
+    ) -> Result<tonic::Response<node::DeactivateResponse>, tonic::Status> {
+        self.status_code
+            .store(NodeStatus::InActive as u8, Ordering::Release);
+        Ok(tonic::Response::new(node::DeactivateResponse {}))
+    }
+
+    async fn status(
+        &self,
+        _request: tonic::Request<node::StatusRequest>,
+    ) -> Result<tonic::Response<node::StatusResponse>, tonic::Status> {
+        let status: NodeStatus = self.status_code.load(Ordering::Acquire).into();
+        let active = match status {
+            NodeStatus::Active => true,
+            NodeStatus::InActive => false,
+        };
+        Ok(tonic::Response::new(node::StatusResponse { active }))
     }
 }

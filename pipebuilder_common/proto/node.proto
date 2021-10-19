@@ -1,0 +1,23 @@
+syntax = "proto3";
+package node;
+
+message ActivateRequest {}
+
+message ActivateResponse {}
+
+message DeactivateRequest {}
+
+message DeactivateResponse {}
+
+message StatusRequest {}
+
+message StatusResponse {
+    // node active or not
+    bool active = 1;
+}
+
+service Node {
+    rpc Activate(ActivateRequest) returns (ActivateResponse) {}
+    rpc Deactivate(DeactivateRequest) returns (DeactivateResponse) {}
+    rpc Status(StatusRequest) returns (StatusResponse) {}
+}

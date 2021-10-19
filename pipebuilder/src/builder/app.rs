@@ -5,7 +5,10 @@ mod config;
 use bootstrap::bootstrap;
 use config::Config;
 use pipebuilder_common::{
-    grpc::{build::builder_server::BuilderServer, health::health_server::HealthServer},
+    grpc::{
+        build::builder_server::BuilderServer, health::health_server::HealthServer,
+        node::node_server::NodeServer,
+    },
     open_file, parse_config, Result, ENV_PIPEBUILDER_CONFIG_FILE,
 };
 use std::net::SocketAddr;
@@ -28,7 +31,7 @@ async fn main() -> Result<()> {
     let external_address = node_svc.get_external_address();
     let builder_svc = bootstrap(
         node_id.clone(),
-        external_address.clone(),
+        external_address,
         config.builder,
         lease_id,
         register,
@@ -44,6 +47,7 @@ async fn main() -> Result<()> {
     Server::builder()
         .add_service(HealthServer::new(health_svc))
         .add_service(BuilderServer::new(builder_svc))
+        .add_service(NodeServer::new(node_svc))
         .serve(addr)
         .await?;
     info!("builder server {:?} exit ...", node_id);

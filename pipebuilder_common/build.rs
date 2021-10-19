@@ -15,4 +15,8 @@ fn main() {
         .out_dir("src/grpc")
         .compile(&["proto/repository.proto"], &["proto"])
         .unwrap();
+    tonic_build::configure()
+        .out_dir("src/grpc")
+        .compile(&["proto/node.proto"], &["proto"])
+        .unwrap();
 }

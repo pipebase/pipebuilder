@@ -5,7 +5,10 @@ mod repository;
 use bootstrap::bootstrap;
 use config::Config;
 use pipebuilder_common::{
-    grpc::{health::health_server::HealthServer, repository::repository_server::RepositoryServer},
+    grpc::{
+        health::health_server::HealthServer, node::node_server::NodeServer,
+        repository::repository_server::RepositoryServer,
+    },
     open_file, parse_config, Result, ENV_PIPEBUILDER_CONFIG_FILE,
 };
 use std::net::SocketAddr;
@@ -26,8 +29,8 @@ async fn main() -> Result<()> {
     let lease_id = lease_svc.get_lease_id();
     let repository_svc = bootstrap(config.repository, register, lease_id);
     // bootstrap server
-    let node_id = node_svc.get_id().to_owned();
-    let internal_address = node_svc.get_internal_address().to_owned();
+    let node_id = node_svc.get_id();
+    let internal_address = node_svc.get_internal_address();
     let addr: SocketAddr = internal_address.parse()?;
     info!(
         "run repository server {:?}, internal address {:?}...",
@@ -36,6 +39,7 @@ async fn main() -> Result<()> {
     Server::builder()
         .add_service(HealthServer::new(health_svc))
         .add_service(RepositoryServer::new(repository_svc))
+        .add_service(NodeServer::new(node_svc))
         .serve(addr)
         .await?;
     info!("repository server {:?} exit ...", node_id);
