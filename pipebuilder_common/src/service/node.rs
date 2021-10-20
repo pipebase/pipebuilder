@@ -57,7 +57,7 @@ pub struct NodeConfig {
     pub heartbeat_period: Option<Period>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct NodeState {
     // node id
     pub id: String,

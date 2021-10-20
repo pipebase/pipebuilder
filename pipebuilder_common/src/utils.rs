@@ -1,6 +1,9 @@
 use crate::{
     errors::{cargo_error, Result},
-    grpc::repository::{GetManifestRequest, PostAppRequest},
+    grpc::{
+        build::builder_client::BuilderClient,
+        node::node_client::NodeClient,
+    }
 };
 use etcd_client::{Event, EventType};
 use pipegen::models::Dependency;
@@ -14,6 +17,7 @@ use std::{
     path::Path,
 };
 use tokio::process::Command;
+use tonic::transport::Channel;
 use tracing::info;
 
 // filesystem ops
@@ -255,31 +259,15 @@ pub fn remove_resource_namespace<'a>(key: &'a str, resource: &str, namespace: &s
         .unwrap_or_else(|| panic!("key '{}' not start with '/{}/{}'", key, resource, namespace))
 }
 
-// rpc request
-pub fn build_get_manifest_request(
-    namespace: String,
-    id: String,
-    version: u64,
-) -> GetManifestRequest {
-    GetManifestRequest {
-        namespace,
-        id,
-        version,
-    }
+// rpc
+pub async fn build_builder_client(protocol: &str, address: &str) -> Result<BuilderClient<Channel>> {
+    let client = BuilderClient::connect(format!("{}://{}", protocol, address)).await?;
+    Ok(client)
 }
 
-pub fn build_post_app_request(
-    namespace: String,
-    id: String,
-    version: u64,
-    buffer: Vec<u8>,
-) -> PostAppRequest {
-    PostAppRequest {
-        namespace,
-        id,
-        version,
-        buffer,
-    }
+pub async fn build_node_client(protocol: &str, address: &str) -> Result<NodeClient<Channel>> {
+    let client = NodeClient::connect(format!("{}://{}", protocol, address)).await?;
+    Ok(client)
 }
 
 // App cargo.toml

@@ -175,6 +175,7 @@ mod handlers {
     use super::validate;
     use pipebuilder_common::{
         api::models::{self, Failure},
+        build_builder_client,
         grpc::{
             build::{builder_client::BuilderClient, BuildRequest, CancelRequest, GetLogRequest},
             repository::{
@@ -215,7 +216,7 @@ mod handlers {
         let builder_id = builder_info.id;
         let builder_address = builder_info.address;
         info!("scheduled builder ({}, {})", builder_id, builder_address);
-        let mut builder_client = match builder_client(builder_address).await {
+        let mut builder_client = match builder_client(builder_address.as_str()).await {
             Ok(builder_client) => builder_client,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
@@ -461,7 +462,7 @@ mod handlers {
             "cancel build at builder ({}, {})",
             builder_id, builder_address
         );
-        let mut builder_client = match builder_client(builder_address).await {
+        let mut builder_client = match builder_client(builder_address.as_str()).await {
             Ok(builder_client) => builder_client,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
@@ -538,7 +539,7 @@ mod handlers {
             "get build log at builder ({}, {})",
             builder_id, builder_address
         );
-        let mut builder_client = match builder_client(builder_address).await {
+        let mut builder_client = match builder_client(builder_address.as_str()).await {
             Ok(builder_client) => builder_client,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
@@ -564,10 +565,9 @@ mod handlers {
         Ok(response.into_inner())
     }
 
-    async fn builder_client(address: String) -> pipebuilder_common::Result<BuilderClient<Channel>> {
+    async fn builder_client(address: &str) -> pipebuilder_common::Result<BuilderClient<Channel>> {
         // TODO (Li Yu): configurable protocol
-        let client = BuilderClient::connect(format!("http://{}", address)).await?;
-        Ok(client)
+        build_builder_client("http", address).await
     }
 
     fn failure(status_code: StatusCode, failure: Failure) -> http::Result<Response<String>> {

@@ -5,12 +5,12 @@ use crate::{
         PATH_APP_TOML_MANIFEST,
     },
     errors::Result,
+    grpc::repository::{GetManifestRequest, PostAppRequest},
     read_file,
     utils::{
-        app_build_log_directory, app_restore_directory, build_get_manifest_request,
-        build_post_app_request, cargo_build, cargo_fmt, cargo_init, copy_directory,
-        create_directory, move_directory, parse_toml, remove_directory, sub_path, write_file,
-        write_toml, TomlManifest,
+        app_build_log_directory, app_restore_directory, cargo_build, cargo_fmt, cargo_init,
+        copy_directory, create_directory, move_directory, parse_toml, remove_directory, sub_path,
+        write_file, write_toml, TomlManifest,
     },
 };
 use chrono::{DateTime, Utc};
@@ -241,14 +241,36 @@ impl Build {
         }
     }
 
+    fn build_get_manifest_request(&self) -> GetManifestRequest {
+        let namespace = self.namespace.to_owned();
+        let id = self.id.to_owned();
+        let version = self.manifest_version;
+        GetManifestRequest {
+            namespace,
+            id,
+            version,
+        }
+    }
+
+    pub fn build_post_app_request(&self, buffer: Vec<u8>) -> PostAppRequest {
+        let namespace = self.namespace.to_owned();
+        let id = self.id.to_owned();
+        let version = self.build_version;
+        PostAppRequest {
+            namespace,
+            id,
+            version,
+            buffer,
+        }
+    }
+
     pub async fn pull_manifest(&mut self) -> Result<Option<BuildStatus>> {
         let (namespace, id, manifest_version, build_version) = self.get_build_meta();
         info!(
             "pull manifest '{}/{}:({}, {})'",
             namespace, id, manifest_version, build_version
         );
-        let request =
-            build_get_manifest_request(namespace.to_owned(), id.to_owned(), manifest_version);
+        let request = self.build_get_manifest_request();
         let response = self
             .repository_client
             .get_manifest(request)
@@ -372,8 +394,7 @@ impl Build {
             target_platform_release_binary.as_str(),
         );
         let buffer = read_file(release_path.as_str())?;
-        let request =
-            build_post_app_request(namespace.to_owned(), id.to_owned(), build_version, buffer);
+        let request = self.build_post_app_request(buffer);
         let _ = self.repository_client.post_app(request).await?.into_inner();
         Ok(Some(BuildStatus::Store))
     }

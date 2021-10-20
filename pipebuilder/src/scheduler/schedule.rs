@@ -24,6 +24,7 @@ impl Scheduler for SchedulerService {
     {
         info!("schedule build");
         let builders_ref = self.builders.pin();
+        // TODO: check whether builder is active or not on demand
         let builder = builders_ref.values().next();
         let builder_info = builder.map(|b| {
             let id = b.id.to_owned();
