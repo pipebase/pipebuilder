@@ -270,7 +270,6 @@ pub async fn build_node_client(protocol: &str, address: &str) -> Result<NodeClie
 }
 
 // hash
-
 fn fnv1a<T>(t: &T) -> u64
 where
     T: Hash,
