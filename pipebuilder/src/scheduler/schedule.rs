@@ -3,7 +3,7 @@ use flurry::HashMap;
 use pipebuilder_common::{
     deserialize_event,
     grpc::schedule::{scheduler_server::Scheduler, BuilderInfo, ScheduleResponse},
-    log_event, NodeState, Register,
+    hash_distance, log_event, NodeState, NodeStatus, Register,
 };
 use std::sync::Arc;
 use tonic::Response;
@@ -19,19 +19,30 @@ pub struct SchedulerService {
 impl Scheduler for SchedulerService {
     async fn schedule(
         &self,
-        _request: tonic::Request<pipebuilder_common::grpc::schedule::ScheduleRequest>,
+        request: tonic::Request<pipebuilder_common::grpc::schedule::ScheduleRequest>,
     ) -> Result<tonic::Response<pipebuilder_common::grpc::schedule::ScheduleResponse>, tonic::Status>
     {
         info!("schedule build");
+        // select builder using consistent hash, build of same app (namespace, id) landed on same builder for compilcation cache hit
+        let request = request.into_inner();
+        let request_key = format!("{}/{}", request.namespace, request.id);
         let builders_ref = self.builders.pin();
-        // TODO: check whether builder is active or not on demand
-        let builder = builders_ref.values().next();
-        let builder_info = builder.map(|b| {
-            let id = b.id.to_owned();
-            let address = b.external_address.to_owned();
-            BuilderInfo { id, address }
-        });
-        Ok(Response::new(ScheduleResponse { builder_info }))
+        let mut selected_builder_info: Option<BuilderInfo> = None;
+        let mut min_hash_distance: u64 = u64::MAX;
+        for builder in builders_ref.values() {
+            let builder_key = match builder.status {
+                NodeStatus::Active => builder.id.to_owned(),
+                NodeStatus::InActive => continue,
+            };
+            let distance = hash_distance(&request_key, &builder_key);
+            if distance < min_hash_distance {
+                selected_builder_info = Some(Self::builder_info(builder));
+                min_hash_distance = distance;
+            }
+        }
+        Ok(Response::new(ScheduleResponse {
+            builder_info: selected_builder_info,
+        }))
     }
 }
 
@@ -94,5 +105,11 @@ impl SchedulerService {
             }
         }
         Ok(())
+    }
+
+    fn builder_info(state: &NodeState) -> BuilderInfo {
+        let id = state.id.to_owned();
+        let address = state.external_address.to_owned();
+        BuilderInfo { id, address }
     }
 }

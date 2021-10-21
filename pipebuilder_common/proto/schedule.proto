@@ -1,7 +1,12 @@
 syntax = "proto3";
 package schedule;
 
-message ScheduleRequest {}
+message ScheduleRequest {
+    // app namespace
+    string namespace = 1;
+    // app id
+    string id = 2;
+}
 
 message BuilderInfo {
     // builder id

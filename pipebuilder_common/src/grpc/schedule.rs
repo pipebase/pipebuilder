@@ -1,5 +1,12 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ScheduleRequest {}
+pub struct ScheduleRequest {
+    /// app namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// app id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
+}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BuilderInfo {
     /// builder id

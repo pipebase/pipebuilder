@@ -203,8 +203,10 @@ mod handlers {
             Ok(_) => (),
             Err(err) => return Ok(http_bad_request(err.into())),
         };
+        let namespace = request.namespace.clone();
+        let id = request.id.clone();
         // find a builder
-        let response = match schedule(&mut client).await {
+        let response = match schedule(&mut client, namespace, id).await {
             Ok(response) => response,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
@@ -587,8 +589,10 @@ mod handlers {
 
     async fn schedule(
         client: &mut SchedulerClient<Channel>,
+        namespace: String,
+        id: String,
     ) -> pipebuilder_common::Result<ScheduleResponse> {
-        let response = client.schedule(ScheduleRequest {}).await?;
+        let response = client.schedule(ScheduleRequest { namespace, id }).await?;
         Ok(response.into_inner())
     }
 

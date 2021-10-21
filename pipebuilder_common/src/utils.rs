@@ -3,6 +3,7 @@ use crate::{
     grpc::{build::builder_client::BuilderClient, node::node_client::NodeClient},
 };
 use etcd_client::{Event, EventType};
+use fnv::FnvHasher;
 use pipegen::models::Dependency;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -10,6 +11,7 @@ use std::{
     collections::HashMap,
     ffi::OsString,
     fs::{self, File},
+    hash::{Hash, Hasher},
     io::{BufReader, BufWriter, Read, Write},
     path::Path,
 };
@@ -265,6 +267,29 @@ pub async fn build_builder_client(protocol: &str, address: &str) -> Result<Build
 pub async fn build_node_client(protocol: &str, address: &str) -> Result<NodeClient<Channel>> {
     let client = NodeClient::connect(format!("{}://{}", protocol, address)).await?;
     Ok(client)
+}
+
+// hash
+
+fn fnv1a<T>(t: &T) -> u64
+where
+    T: Hash,
+{
+    let mut hasher = FnvHasher::default();
+    t.hash(&mut hasher);
+    hasher.finish()
+}
+
+pub fn hash_distance<T>(t0: &T, t1: &T) -> u64
+where
+    T: Hash,
+{
+    let h0 = fnv1a(t0);
+    let h1 = fnv1a(t1);
+    if h0 > h1 {
+        return h0 - h1;
+    }
+    h1 - h0
 }
 
 // App cargo.toml
