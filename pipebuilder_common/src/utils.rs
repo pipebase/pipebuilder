@@ -1,9 +1,6 @@
 use crate::{
     errors::{cargo_error, Result},
-    grpc::{
-        build::builder_client::BuilderClient,
-        node::node_client::NodeClient,
-    }
+    grpc::{build::builder_client::BuilderClient, node::node_client::NodeClient},
 };
 use etcd_client::{Event, EventType};
 use pipegen::models::Dependency;

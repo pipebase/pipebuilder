@@ -175,9 +175,10 @@ mod handlers {
     use super::validate;
     use pipebuilder_common::{
         api::models::{self, Failure},
-        build_builder_client,
+        build_builder_client, build_node_client,
         grpc::{
             build::{builder_client::BuilderClient, BuildRequest, CancelRequest, GetLogRequest},
+            node::{node_client::NodeClient, StatusRequest},
             repository::{
                 repository_client::RepositoryClient, GetAppRequest, GetManifestRequest,
                 PutManifestRequest,
@@ -197,10 +198,12 @@ mod handlers {
         mut client: SchedulerClient<Channel>,
         request: models::BuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate build request
         match validate::validate_build_request(&request) {
             Ok(_) => (),
             Err(err) => return Ok(http_bad_request(err.into())),
         };
+        // find a builder
         let response = match schedule(&mut client).await {
             Ok(response) => response,
             Err(err) => return Ok(http_internal_error(err.into())),
@@ -216,6 +219,22 @@ mod handlers {
         let builder_id = builder_info.id;
         let builder_address = builder_info.address;
         info!("scheduled builder ({}, {})", builder_id, builder_address);
+        // check whether builder is active
+        let mut node_client = match node_client(builder_address.as_str()).await {
+            Ok(node_client) => node_client,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        let active = match is_node_status_active(&mut node_client).await {
+            Ok(active) => active,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        if !active {
+            return Ok(http_service_unavailable(Failure::new(format!(
+                "builder '{}' is inactive",
+                builder_id
+            ))));
+        }
+        // trigger the build
         let mut builder_client = match builder_client(builder_address.as_str()).await {
             Ok(builder_client) => builder_client,
             Err(err) => return Ok(http_internal_error(err.into())),
@@ -233,6 +252,14 @@ mod handlers {
         let request: BuildRequest = request.into();
         let response = client.build(request).await?;
         Ok(response.into_inner().into())
+    }
+
+    async fn is_node_status_active(
+        client: &mut NodeClient<Channel>,
+    ) -> pipebuilder_common::Result<bool> {
+        let response = client.status(StatusRequest {}).await?;
+        let active = response.into_inner().active;
+        Ok(active)
     }
 
     pub async fn put_manifest(
@@ -568,6 +595,10 @@ mod handlers {
     async fn builder_client(address: &str) -> pipebuilder_common::Result<BuilderClient<Channel>> {
         // TODO (Li Yu): configurable protocol
         build_builder_client("http", address).await
+    }
+
+    async fn node_client(address: &str) -> pipebuilder_common::Result<NodeClient<Channel>> {
+        build_node_client("http", address).await
     }
 
     fn failure(status_code: StatusCode, failure: Failure) -> http::Result<Response<String>> {
