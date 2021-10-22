@@ -4,7 +4,7 @@ use pipebuilder_common::{
     app_workspace,
     grpc::{
         build::{
-            builder_server::Builder, BuildResponse, CancelResponse, GetLogResponse, ListResponse,
+            builder_server::Builder, BuildResponse, CancelResponse, GetLogResponse, ScanResponse,
             VersionBuildKey,
         },
         repository::repository_client::RepositoryClient,
@@ -142,10 +142,10 @@ impl Builder for BuilderService {
         }
     }
 
-    async fn list(
+    async fn scan(
         &self,
-        _request: tonic::Request<pipebuilder_common::grpc::build::ListRequest>,
-    ) -> Result<tonic::Response<pipebuilder_common::grpc::build::ListResponse>, tonic::Status> {
+        _request: tonic::Request<pipebuilder_common::grpc::build::ScanRequest>,
+    ) -> Result<tonic::Response<pipebuilder_common::grpc::build::ScanResponse>, tonic::Status> {
         info!("list local build");
         let builds_ref = self.builds.pin();
         let builds = builds_ref
@@ -157,7 +157,7 @@ impl Builder for BuilderService {
                 build_version: build_version.to_owned(),
             })
             .collect::<Vec<VersionBuildKey>>();
-        Ok(Response::new(ListResponse { builds }))
+        Ok(Response::new(ScanResponse { builds }))
     }
 
     async fn get_log(

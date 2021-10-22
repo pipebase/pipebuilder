@@ -28,7 +28,7 @@ message CancelRequest {
 
 message CancelResponse {}
 
-message ListRequest {}
+message ScanRequest {}
 
 message VersionBuildKey {
     // app namespace
@@ -39,7 +39,7 @@ message VersionBuildKey {
     uint64 build_version = 3;
 }
 
-message ListResponse {
+message ScanResponse {
     repeated VersionBuildKey builds = 1;
 }
 
@@ -60,6 +60,6 @@ message GetLogResponse {
 service Builder {
     rpc Build(BuildRequest) returns (BuildResponse) {}
     rpc Cancel(CancelRequest) returns (CancelResponse) {}
-    rpc List(ListRequest) returns (ListResponse) {}
     rpc GetLog(GetLogRequest) returns (GetLogResponse) {}
+    rpc Scan(ScanRequest) returns (ScanResponse) {}
 }
