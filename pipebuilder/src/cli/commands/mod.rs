@@ -28,6 +28,7 @@ pub async fn exec(
         ("list", "build-snapshot") => list::exec_build_snapshot(client, args).await,
         ("list", "manifest-snapshot") => list::exec_manifest_snapshot(client, args).await,
         ("list", "build") => list::exec_build(client, args).await,
+        ("list", "node") => list::exec_node(client, args).await,
         ("cancel", "build") => cancel::exec_build(client, args).await,
         _ => unreachable!("unknown cmd ({}, {})", action, resource),
     }

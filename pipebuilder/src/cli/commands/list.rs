@@ -2,9 +2,10 @@ use super::Cmd;
 use crate::ops::{
     do_build::{list_build, list_build_snapshot},
     do_manifest::list_manifest_snapshot,
+    do_node::list_node_state,
     print::print_records,
 };
-use pipebuilder_common::{api::client::ApiClient, Result};
+use pipebuilder_common::{api::client::ApiClient, NodeRole, Result};
 
 use clap::Arg;
 
@@ -13,6 +14,7 @@ pub fn cmd() -> Cmd {
         build_snapshot(),
         manifest_snapshot(),
         build(),
+        node(),
     ])
 }
 
@@ -71,6 +73,23 @@ pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()
     let namespace = args.value_of("namespace").unwrap();
     let id = args.value_of("id").unwrap();
     let response = list_build(&client, namespace.to_owned(), id.to_owned()).await?;
+    print_records(response.as_slice());
+    Ok(())
+}
+
+pub fn node() -> Cmd {
+    Cmd::new("node")
+        .about("List node given role")
+        .args(vec![Arg::new("role")
+            .short('r')
+            .about("Specify node role")
+            .takes_value(true)])
+}
+
+pub async fn exec_node(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+    let role = args.value_of("role");
+    let role: Option<NodeRole> = role.map(|role| role.into());
+    let response = list_node_state(&client, role).await?;
     print_records(response.as_slice());
     Ok(())
 }

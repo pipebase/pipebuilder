@@ -27,7 +27,8 @@ pub mod filters {
             .or(v1_build_list(register.to_owned()))
             .or(v1_build_cancel(register.to_owned(), lease_id))
             .or(v1_app_get(repository_client))
-            .or(v1_build_log_get(register, lease_id))
+            .or(v1_build_log_get(register.to_owned(), lease_id))
+            .or(v1_node_state_list(register))
     }
 
     pub fn v1_build(
@@ -136,6 +137,16 @@ pub mod filters {
             .and_then(handlers::get_build_log)
     }
 
+    pub fn v1_node_state_list(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "node")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(warp::query::<models::ListNodeStateRequest>())
+            .and_then(handlers::list_node_state)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -172,7 +183,7 @@ pub mod filters {
 }
 
 mod handlers {
-    use super::validate;
+    use super::validations;
     use pipebuilder_common::{
         api::models::{self, Failure},
         build_builder_client, build_node_client,
@@ -185,8 +196,9 @@ mod handlers {
             },
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
-        remove_resource_namespace, Register, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
-        REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_VERSION_BUILD,
+        node_role_prefix, remove_resource_namespace, Register, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
+        REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_NODE,
+        REGISTER_KEY_PREFIX_VERSION_BUILD,
     };
     use serde::Serialize;
     use std::convert::Infallible;
@@ -199,7 +211,7 @@ mod handlers {
         request: models::BuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         // validate build request
-        match validate::validate_build_request(&request) {
+        match validations::validate_build_request(&request) {
             Ok(_) => (),
             Err(err) => return Ok(http_bad_request(err.into())),
         };
@@ -587,6 +599,38 @@ mod handlers {
         Ok(resp.into_inner().into())
     }
 
+    pub async fn list_node_state(
+        mut register: Register,
+        request: models::ListNodeStateRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        // validate list node state request
+        match validations::validate_list_node_state_request(&request) {
+            Ok(()) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
+        match do_list_node_state(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_list_node_state(
+        register: &mut Register,
+        request: models::ListNodeStateRequest,
+    ) -> pipebuilder_common::Result<Vec<models::NodeState>> {
+        let role = request.role;
+        let prefix = match role {
+            Some(role) => node_role_prefix(role),
+            None => REGISTER_KEY_PREFIX_NODE,
+        };
+        let node_states = register.list_node_state(prefix).await?;
+        let node_states = node_states
+            .into_iter()
+            .map(|(_, node_state)| node_state.into())
+            .collect::<Vec<models::NodeState>>();
+        Ok(node_states)
+    }
+
     async fn schedule(
         client: &mut SchedulerClient<Channel>,
         namespace: String,
@@ -637,9 +681,9 @@ mod handlers {
     }
 }
 
-mod validate {
+mod validations {
 
-    use pipebuilder_common::{api::models, invalid_api_request, Build, Result};
+    use pipebuilder_common::{api::models, invalid_api_request, Build, NodeRole, Result};
 
     pub fn validate_build_request(request: &models::BuildRequest) -> Result<()> {
         if !Build::is_target_platform_support(request.target_platform.as_str()) {
@@ -649,5 +693,17 @@ mod validate {
             )));
         }
         Ok(())
+    }
+
+    pub fn validate_list_node_state_request(request: &models::ListNodeStateRequest) -> Result<()> {
+        let role = request.role.as_ref();
+        let role = match role {
+            Some(role) => role,
+            None => return Ok(()),
+        };
+        match role {
+            NodeRole::Undefined => Err(invalid_api_request(String::from("undefined node role"))),
+            _ => Ok(()),
+        }
     }
 }

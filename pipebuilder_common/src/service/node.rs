@@ -21,14 +21,41 @@ pub enum NodeRole {
     Builder,
     Manifest,
     Scheduler,
+    Undefined,
 }
 
-pub fn role_prefix(role: NodeRole) -> &'static str {
+impl ToString for NodeRole {
+    fn to_string(&self) -> String {
+        let role_text = match self {
+            NodeRole::Api => "Api",
+            NodeRole::Builder => "Builder",
+            NodeRole::Manifest => "Manifest",
+            NodeRole::Scheduler => "Scheduler",
+            NodeRole::Undefined => unreachable!(),
+        };
+        String::from(role_text)
+    }
+}
+
+impl From<&str> for NodeRole {
+    fn from(text: &str) -> Self {
+        match text {
+            "api" | "Api" => NodeRole::Api,
+            "builder" | "Builder" => NodeRole::Builder,
+            "manifest" | "Manifest" => NodeRole::Manifest,
+            "scheduler" | "Scheduler" => NodeRole::Scheduler,
+            _ => NodeRole::Undefined,
+        }
+    }
+}
+
+pub fn node_role_prefix(role: NodeRole) -> &'static str {
     match role {
         NodeRole::Api => REGISTER_KEY_PREFIX_API,
         NodeRole::Builder => REGISTER_KEY_PREFIX_BUILDER,
         NodeRole::Manifest => REGISTER_KEY_PREFIX_REPOSITORY,
         NodeRole::Scheduler => REGISTER_KEY_PREFIX_SCHEDULER,
+        NodeRole::Undefined => unreachable!(),
     }
 }
 
@@ -45,6 +72,16 @@ impl From<u8> for NodeStatus {
             1 => NodeStatus::InActive,
             _ => unreachable!(),
         }
+    }
+}
+
+impl ToString for NodeStatus {
+    fn to_string(&self) -> String {
+        let status_text = match self {
+            NodeStatus::Active => "Active",
+            NodeStatus::InActive => "Inactive",
+        };
+        String::from(status_text)
     }
 }
 
@@ -158,7 +195,7 @@ impl NodeService {
                     timestamp,
                 };
                 match register
-                    .put_node_state(role_prefix(role.clone()), &state, lease_id)
+                    .put_node_state(node_role_prefix(role.clone()), &state, lease_id)
                     .await
                 {
                     Ok(_) => continue,

@@ -1,11 +1,14 @@
 use super::{
-    constants::{APP, BUILD, BUILD_LOG, BUILD_SNAPSHOT, CANCEL_BUILD, MANIFEST, MANIFEST_SNAPSHOT},
+    constants::{
+        APP, BUILD, BUILD_LOG, BUILD_SNAPSHOT, CANCEL_BUILD, MANIFEST, MANIFEST_SNAPSHOT,
+        NODE_STATE,
+    },
     models::{
         BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
         Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest, GetBuildLogResponse,
         GetBuildRequest, GetManifestRequest, GetManifestResponse, ListBuildRequest,
-        ListBuildSnapshotRequest, ListManifestSnapshotRequest, ManifestSnapshot,
-        PutManifestRequest, PutManifestResponse, VersionBuild,
+        ListBuildSnapshotRequest, ListManifestSnapshotRequest, ListNodeStateRequest,
+        ManifestSnapshot, NodeState, PutManifestRequest, PutManifestResponse, VersionBuild,
     },
 };
 use crate::{api_client_error, api_server_error, Result};
@@ -192,6 +195,12 @@ impl ApiClient {
     pub async fn get_build_log(&self, request: &GetBuildLogRequest) -> Result<GetBuildLogResponse> {
         let response = self.query(BUILD_LOG, request).await?;
         let response = Self::get_response_body::<GetBuildLogResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_node_state(&self, request: &ListNodeStateRequest) -> Result<Vec<NodeState>> {
+        let response = self.query(NODE_STATE, request).await?;
+        let response = Self::get_response_body::<Vec<NodeState>>(response).await?;
         Ok(response)
     }
 

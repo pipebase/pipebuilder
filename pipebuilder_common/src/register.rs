@@ -149,7 +149,19 @@ impl Register {
         Ok(resp)
     }
 
-    pub async fn get_json_object<K, V>(
+    // list with key prefix
+    async fn list<V>(&mut self, prefix: &str) -> Result<Vec<(String, V)>>
+    where
+        V: DeserializeOwned,
+    {
+        let resp = self
+            .get(prefix, Some(GetOptions::new().with_prefix()))
+            .await?;
+        let kvs = Self::deserialize_kvs::<V>(resp.kvs())?;
+        Ok(kvs)
+    }
+
+    pub async fn get_json_value<K, V>(
         &mut self,
         key: K,
         options: Option<GetOptions>,
@@ -195,6 +207,11 @@ impl Register {
         let key = format!("{}/{}", prefix, id);
         let resp = self.put(key, value, opts.into()).await?;
         Ok(resp)
+    }
+
+    pub async fn list_node_state(&mut self, prefix: &str) -> Result<Vec<(String, NodeState)>> {
+        let node_states = self.list::<NodeState>(prefix).await?;
+        Ok(node_states)
     }
 
     pub async fn watch(
@@ -253,7 +270,7 @@ impl Register {
     ) -> Result<Option<BuildSnapshot>> {
         let key = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, id);
         let snapshot = self
-            .get_json_object::<String, BuildSnapshot>(key, None)
+            .get_json_value::<String, BuildSnapshot>(key, None)
             .await?;
         Ok(snapshot)
     }
@@ -286,7 +303,7 @@ impl Register {
             version,
         );
         let state = self
-            .get_json_object::<String, VersionBuild>(key, None)
+            .get_json_value::<String, VersionBuild>(key, None)
             .await?;
         Ok(state)
     }
@@ -317,11 +334,8 @@ impl Register {
         namespace: &str,
         id: &str,
     ) -> Result<Vec<(String, VersionBuild)>> {
-        let key_prefix = resource_namespace_id(REGISTER_KEY_PREFIX_VERSION_BUILD, namespace, id);
-        let resp = self
-            .get(key_prefix, Some(GetOptions::new().with_prefix()))
-            .await?;
-        let version_builds = Self::deserialize_kvs::<VersionBuild>(resp.kvs())?;
+        let prefix = resource_namespace_id(REGISTER_KEY_PREFIX_VERSION_BUILD, namespace, id);
+        let version_builds = self.list::<VersionBuild>(prefix.as_str()).await?;
         Ok(version_builds)
     }
 
@@ -407,7 +421,7 @@ impl Register {
     ) -> Result<Option<ManifestSnapshot>> {
         let key = resource_namespace_id(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace, id);
         let snapshot = self
-            .get_json_object::<String, ManifestSnapshot>(key, None)
+            .get_json_value::<String, ManifestSnapshot>(key, None)
             .await?;
         Ok(snapshot)
     }
@@ -432,11 +446,8 @@ impl Register {
         &mut self,
         namespace: &str,
     ) -> Result<Vec<(String, ManifestSnapshot)>> {
-        let key_prefix = resource_namespace(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace);
-        let resp = self
-            .get(key_prefix, Some(GetOptions::new().with_prefix()))
-            .await?;
-        let manifest_snapshots = Self::deserialize_kvs::<ManifestSnapshot>(resp.kvs())?;
+        let prefix = resource_namespace(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace);
+        let manifest_snapshots = self.list::<ManifestSnapshot>(prefix.as_str()).await?;
         Ok(manifest_snapshots)
     }
 
@@ -445,11 +456,8 @@ impl Register {
         &mut self,
         namespace: &str,
     ) -> Result<Vec<(String, BuildSnapshot)>> {
-        let key_prefix = resource_namespace(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace);
-        let resp = self
-            .get(key_prefix, Some(GetOptions::new().with_prefix()))
-            .await?;
-        let build_snapshots = Self::deserialize_kvs::<BuildSnapshot>(resp.kvs())?;
+        let prefix = resource_namespace(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace);
+        let build_snapshots = self.list::<BuildSnapshot>(prefix.as_str()).await?;
         Ok(build_snapshots)
     }
 

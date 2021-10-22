@@ -1,15 +1,19 @@
 use super::constants::{
-    DISPLAY_BUILD_STATUS_WIDTH, DISPLAY_ID_WIDTH, DISPLAY_MESSAGE_WIDTH, DISPLAY_TIMESTAMP_WIDTH,
-    DISPLAY_VERSION_WIDTH,
+    DISPLAY_BUILD_STATUS_WIDTH, DISPLAY_ID_WIDTH, DISPLAY_MESSAGE_WIDTH, DISPLAY_NODE_ROLE_WIDTH,
+    DISPLAY_NODE_STATUS_WIDTH, DISPLAY_TIMESTAMP_WIDTH, DISPLAY_VERSION_WIDTH,
 };
 use crate::{
     api::constants::DISPLAY_ADDRESS_WIDTH,
     grpc::{build, repository},
-    BuildStatus, Error,
+    BuildStatus, Error, NodeRole, NodeState as InternalNodeState, NodeStatus,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
+
+pub trait PrintHeader {
+    fn print_header();
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct BuildRequest {
@@ -103,6 +107,18 @@ impl Display for ManifestSnapshot {
     }
 }
 
+impl PrintHeader for ManifestSnapshot {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}",
+            col0 = "Id",
+            col1 = "Latest Version",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ListBuildSnapshotRequest {
     pub namespace: String,
@@ -123,6 +139,18 @@ impl Display for BuildSnapshot {
             latest_version = self.latest_version,
             id_width = DISPLAY_ID_WIDTH,
             version_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for BuildSnapshot {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}",
+            col0 = "Id",
+            col1 = "Latest Version",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
         )
     }
 }
@@ -173,6 +201,28 @@ impl Display for VersionBuild {
     }
 }
 
+impl PrintHeader for VersionBuild {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}{col5:<col5_width$}{col6:<col6_width$}",
+            col0 = "Id",
+            col1 = "Version",
+            col2 = "Status",
+            col3 = "Builder Id",
+            col4 = "Builder Address",
+            col5 = "Timestamp",
+            col6 = "Message",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+            col2_width = DISPLAY_BUILD_STATUS_WIDTH,
+            col3_width = DISPLAY_ID_WIDTH,
+            col4_width = DISPLAY_ADDRESS_WIDTH,
+            col5_width = DISPLAY_TIMESTAMP_WIDTH,
+            col6_width = DISPLAY_MESSAGE_WIDTH,
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ListBuildRequest {
     pub namespace: String,
@@ -212,6 +262,58 @@ pub struct GetBuildLogRequest {
 #[derive(Serialize, Deserialize)]
 pub struct GetBuildLogResponse {
     pub buffer: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListNodeStateRequest {
+    pub role: Option<NodeRole>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct NodeState {
+    // node id
+    pub id: String,
+    // node role
+    pub role: NodeRole,
+    // status
+    pub status: NodeStatus,
+    // timestamp
+    pub timestamp: DateTime<Utc>,
+}
+
+impl Display for NodeState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let role = self.role.to_string();
+        let status = self.status.to_string();
+        let timestamp = self.timestamp.to_string();
+        writeln!(f,
+                "{id:<id_width$}{role:<role_width$}{status:<status_width$}{timestamp:<timestamp_width$}",
+                id = self.id,
+                role = role,
+                status = status,
+                timestamp = timestamp,
+                id_width = DISPLAY_ID_WIDTH,
+                role_width = DISPLAY_NODE_ROLE_WIDTH,
+                status_width = DISPLAY_NODE_STATUS_WIDTH,
+                timestamp_width = DISPLAY_TIMESTAMP_WIDTH,
+                )
+    }
+}
+
+impl PrintHeader for NodeState {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}",
+            col0 = "Id",
+            col1 = "Role",
+            col2 = "Status",
+            col3 = "Timestamp",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_NODE_ROLE_WIDTH,
+            col2_width = DISPLAY_NODE_STATUS_WIDTH,
+            col3_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -347,58 +449,23 @@ impl From<build::GetLogResponse> for GetBuildLogResponse {
     }
 }
 
+impl From<InternalNodeState> for NodeState {
+    fn from(origin: InternalNodeState) -> Self {
+        let id = origin.id;
+        let role = origin.role;
+        let status = origin.status;
+        let timestamp = origin.timestamp;
+        NodeState {
+            id,
+            role,
+            status,
+            timestamp,
+        }
+    }
+}
+
 impl From<Error> for Failure {
     fn from(error: Error) -> Self {
         Failure::new(format!("{}", error))
-    }
-}
-
-pub trait PrintHeader {
-    fn print_header();
-}
-
-impl PrintHeader for ManifestSnapshot {
-    fn print_header() {
-        println!(
-            "{col0:<col0_width$}{col1:<col1_width$}",
-            col0 = "Id",
-            col1 = "Latest Version",
-            col0_width = DISPLAY_ID_WIDTH,
-            col1_width = DISPLAY_VERSION_WIDTH,
-        )
-    }
-}
-
-impl PrintHeader for BuildSnapshot {
-    fn print_header() {
-        println!(
-            "{col0:<col0_width$}{col1:<col1_width$}",
-            col0 = "Id",
-            col1 = "Latest Version",
-            col0_width = DISPLAY_ID_WIDTH,
-            col1_width = DISPLAY_VERSION_WIDTH,
-        )
-    }
-}
-
-impl PrintHeader for VersionBuild {
-    fn print_header() {
-        println!(
-            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}{col5:<col5_width$}{col6:<col6_width$}",
-            col0 = "Id",
-            col1 = "Version",
-            col2 = "Status",
-            col3 = "Builder Id",
-            col4 = "Builder Address",
-            col5 = "Timestamp",
-            col6 = "Message",
-            col0_width = DISPLAY_ID_WIDTH,
-            col1_width = DISPLAY_VERSION_WIDTH,
-            col2_width = DISPLAY_BUILD_STATUS_WIDTH,
-            col3_width = DISPLAY_ID_WIDTH,
-            col4_width = DISPLAY_ADDRESS_WIDTH,
-            col5_width = DISPLAY_TIMESTAMP_WIDTH,
-            col6_width = DISPLAY_MESSAGE_WIDTH,
-        )
     }
 }
