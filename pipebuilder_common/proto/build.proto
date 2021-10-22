@@ -36,7 +36,7 @@ message VersionBuildKey {
     // app id
     string id = 2;
     // app build version
-    uint64 build_version = 3;
+    uint64 version = 3;
 }
 
 message ScanResponse {

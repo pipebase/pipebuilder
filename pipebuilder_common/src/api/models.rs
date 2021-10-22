@@ -1,9 +1,9 @@
-use super::constants::{
-    DISPLAY_BUILD_STATUS_WIDTH, DISPLAY_ID_WIDTH, DISPLAY_MESSAGE_WIDTH, DISPLAY_NODE_ROLE_WIDTH,
-    DISPLAY_NODE_STATUS_WIDTH, DISPLAY_TIMESTAMP_WIDTH, DISPLAY_VERSION_WIDTH,
-};
 use crate::{
-    api::constants::DISPLAY_ADDRESS_WIDTH,
+    api::constants::{
+        DISPLAY_ADDRESS_WIDTH, DISPLAY_BUILD_STATUS_WIDTH, DISPLAY_ID_WIDTH, DISPLAY_MESSAGE_WIDTH,
+        DISPLAY_NAMESPACE_WIDTH, DISPLAY_NODE_ROLE_WIDTH, DISPLAY_NODE_STATUS_WIDTH,
+        DISPLAY_TIMESTAMP_WIDTH, DISPLAY_VERSION_WIDTH,
+    },
     grpc::{build, repository},
     BuildStatus, Error, NodeRole, NodeState as InternalNodeState, NodeStatus,
 };
@@ -316,6 +316,47 @@ impl PrintHeader for NodeState {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ScanBuilderRequest {
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct VersionBuildKey {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+impl Display for VersionBuildKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{namespace:<namespace_width$}{id:<id_width$}{version:<version_width$}",
+            namespace = self.namespace,
+            id = self.id,
+            version = self.version,
+            namespace_width = DISPLAY_NAMESPACE_WIDTH,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for VersionBuildKey {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}",
+            col0 = "Namespace",
+            col1 = "Id",
+            col2 = "Version",
+            col0_width = DISPLAY_NAMESPACE_WIDTH,
+            col1_width = DISPLAY_ID_WIDTH,
+            col2_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Failure {
     pub error: String,
@@ -461,6 +502,25 @@ impl From<InternalNodeState> for NodeState {
             status,
             timestamp,
         }
+    }
+}
+
+impl From<build::VersionBuildKey> for VersionBuildKey {
+    fn from(origin: build::VersionBuildKey) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let version = origin.version;
+        VersionBuildKey {
+            namespace,
+            id,
+            version,
+        }
+    }
+}
+
+impl From<ScanBuilderRequest> for build::ScanRequest {
+    fn from(_: ScanBuilderRequest) -> Self {
+        build::ScanRequest {}
     }
 }
 

@@ -238,6 +238,10 @@ pub fn resource_namespace_id(resource: &str, namespace: &str, id: &str) -> Strin
     format!("{}/{}/{}", resource, namespace, id)
 }
 
+pub fn resource_id(resource: &str, id: &str) -> String {
+    format!("{}/{}", resource, id)
+}
+
 pub fn resource_namespace_id_version(
     resource: &str,
     namespace: &str,

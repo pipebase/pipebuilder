@@ -45,7 +45,7 @@ pub struct VersionBuildKey {
     pub id: ::prost::alloc::string::String,
     /// app build version
     #[prost(uint64, tag = "3")]
-    pub build_version: u64,
+    pub version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ScanResponse {

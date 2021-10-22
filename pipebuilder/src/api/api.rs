@@ -19,16 +19,17 @@ pub mod filters {
         lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_build(scheduler_client)
-            .or(v1_manifest_put(repository_client.to_owned()))
-            .or(v1_manifest_get(repository_client.to_owned()))
-            .or(v1_manifest_snapshot_list(register.to_owned()))
-            .or(v1_build_snapshot_list(register.to_owned()))
-            .or(v1_build_get(register.to_owned(), lease_id))
-            .or(v1_build_list(register.to_owned()))
-            .or(v1_build_cancel(register.to_owned(), lease_id))
+            .or(v1_manifest_put(repository_client.clone()))
+            .or(v1_manifest_get(repository_client.clone()))
+            .or(v1_manifest_snapshot_list(register.clone()))
+            .or(v1_build_snapshot_list(register.clone()))
+            .or(v1_build_get(register.clone(), lease_id))
+            .or(v1_build_list(register.clone()))
+            .or(v1_build_cancel(register.clone(), lease_id))
             .or(v1_app_get(repository_client))
-            .or(v1_build_log_get(register.to_owned(), lease_id))
-            .or(v1_node_state_list(register))
+            .or(v1_build_log_get(register.clone(), lease_id))
+            .or(v1_node_state_list(register.clone()))
+            .or(v1_builder_scan(register, lease_id))
     }
 
     pub fn v1_build(
@@ -147,6 +148,18 @@ pub mod filters {
             .and_then(handlers::list_node_state)
     }
 
+    pub fn v1_builder_scan(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "builder" / "scan")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(warp::query::<models::ScanBuilderRequest>())
+            .and_then(handlers::scan_builder)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -188,7 +201,10 @@ mod handlers {
         api::models::{self, Failure},
         build_builder_client, build_node_client,
         grpc::{
-            build::{builder_client::BuilderClient, BuildRequest, CancelRequest, GetLogRequest},
+            build::{
+                builder_client::BuilderClient, BuildRequest, CancelRequest, GetLogRequest,
+                ScanRequest,
+            },
             node::{node_client::NodeClient, StatusRequest},
             repository::{
                 repository_client::RepositoryClient, GetAppRequest, GetManifestRequest,
@@ -196,9 +212,9 @@ mod handlers {
             },
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
-        node_role_prefix, remove_resource_namespace, Register, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
-        REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_NODE,
-        REGISTER_KEY_PREFIX_VERSION_BUILD,
+        node_role_prefix, remove_resource_namespace, NodeRole, NodeState as InternalNodeState,
+        Register, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
+        REGISTER_KEY_PREFIX_NODE, REGISTER_KEY_PREFIX_VERSION_BUILD,
     };
     use serde::Serialize;
     use std::convert::Infallible;
@@ -629,6 +645,65 @@ mod handlers {
             .map(|(_, node_state)| node_state.into())
             .collect::<Vec<models::NodeState>>();
         Ok(node_states)
+    }
+
+    pub async fn scan_builder(
+        mut register: Register,
+        lease_id: i64,
+        request: models::ScanBuilderRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        let builder_id = request.id.as_str();
+        let node_state =
+            match get_internal_node_state(&mut register, lease_id, NodeRole::Builder, builder_id)
+                .await
+            {
+                Ok(node_state) => node_state,
+                Err(err) => return Ok(http_internal_error(err.into())),
+            };
+        // find builder address
+        let address = match node_state {
+            Some(node_state) => node_state.external_address,
+            None => {
+                return Ok(http_not_found(Failure::new(format!(
+                    "builder '{}' not found",
+                    builder_id
+                ))))
+            }
+        };
+        let mut client = match builder_client(address.as_str()).await {
+            Ok(client) => client,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match do_scan_builder(&mut client, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_scan_builder(
+        client: &mut BuilderClient<Channel>,
+        request: models::ScanBuilderRequest,
+    ) -> pipebuilder_common::Result<Vec<models::VersionBuildKey>> {
+        let request: ScanRequest = request.into();
+        let response = client.scan(request).await?;
+        let response = response.into_inner();
+        let builds = response.builds;
+        let builds = builds
+            .into_iter()
+            .map(|b| b.into())
+            .collect::<Vec<models::VersionBuildKey>>();
+        Ok(builds)
+    }
+
+    async fn get_internal_node_state(
+        register: &mut Register,
+        lease_id: i64,
+        role: NodeRole,
+        id: &str,
+    ) -> pipebuilder_common::Result<Option<InternalNodeState>> {
+        register
+            .get_node_state(lease_id, node_role_prefix(role), id)
+            .await
     }
 
     async fn schedule(

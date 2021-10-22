@@ -1,14 +1,15 @@
 use super::{
     constants::{
         APP, BUILD, BUILD_LOG, BUILD_SNAPSHOT, CANCEL_BUILD, MANIFEST, MANIFEST_SNAPSHOT,
-        NODE_STATE,
+        NODE_STATE, SCAN_BUILDER,
     },
     models::{
         BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
         Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest, GetBuildLogResponse,
         GetBuildRequest, GetManifestRequest, GetManifestResponse, ListBuildRequest,
         ListBuildSnapshotRequest, ListManifestSnapshotRequest, ListNodeStateRequest,
-        ManifestSnapshot, NodeState, PutManifestRequest, PutManifestResponse, VersionBuild,
+        ManifestSnapshot, NodeState, PutManifestRequest, PutManifestResponse, ScanBuilderRequest,
+        VersionBuild, VersionBuildKey,
     },
 };
 use crate::{api_client_error, api_server_error, Result};
@@ -201,6 +202,12 @@ impl ApiClient {
     pub async fn list_node_state(&self, request: &ListNodeStateRequest) -> Result<Vec<NodeState>> {
         let response = self.query(NODE_STATE, request).await?;
         let response = Self::get_response_body::<Vec<NodeState>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn scan_builder(&self, request: &ScanBuilderRequest) -> Result<Vec<VersionBuildKey>> {
+        let response = self.query(SCAN_BUILDER, request).await?;
+        let response = Self::get_response_body::<Vec<VersionBuildKey>>(response).await?;
         Ok(response)
     }
 

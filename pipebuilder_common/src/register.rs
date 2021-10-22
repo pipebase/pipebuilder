@@ -1,9 +1,9 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
-    read_file, resource_namespace, resource_namespace_id, resource_namespace_id_version,
-    BuildSnapshot, ManifestSnapshot, NodeState, Result, VersionBuild, REGISTER_KEY_PREFIX_BUILDER,
-    REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
-    REGISTER_KEY_PREFIX_VERSION_BUILD,
+    read_file, resource_id, resource_namespace, resource_namespace_id,
+    resource_namespace_id_version, BuildSnapshot, ManifestSnapshot, NodeState, Result,
+    VersionBuild, REGISTER_KEY_PREFIX_BUILDER, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
+    REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_VERSION_BUILD,
 };
 use etcd_client::{
     Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, KeyValue,
@@ -197,14 +197,14 @@ impl Register {
 
     pub async fn put_node_state(
         &mut self,
-        prefix: &str,
+        role_prefix: &str,
         state: &NodeState,
         lease_id: i64,
     ) -> Result<PutResponse> {
         let id = &state.id;
         let value = serde_json::to_vec(state)?;
         let opts = PutOptions::new().with_lease(lease_id);
-        let key = format!("{}/{}", prefix, id);
+        let key = format!("{}/{}", role_prefix, id);
         let resp = self.put(key, value, opts.into()).await?;
         Ok(resp)
     }
@@ -212,6 +212,31 @@ impl Register {
     pub async fn list_node_state(&mut self, prefix: &str) -> Result<Vec<(String, NodeState)>> {
         let node_states = self.list::<NodeState>(prefix).await?;
         Ok(node_states)
+    }
+
+    async fn do_get_node_state(
+        &mut self,
+        role_prefix: &str,
+        id: &str,
+    ) -> Result<Option<NodeState>> {
+        let key = format!("{}/{}", role_prefix, id);
+        let node_state = self.get_json_value::<String, NodeState>(key, None).await?;
+        Ok(node_state)
+    }
+
+    pub async fn get_node_state(
+        &mut self,
+        lease_id: i64,
+        role_prefix: &str,
+        id: &str,
+    ) -> Result<Option<NodeState>> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_name = resource_id(role_prefix, id);
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_get_node_state(role_prefix, id).await?;
+        self.unlock(lock_name.as_str(), key).await?;
+        Ok(resp)
     }
 
     pub async fn watch(

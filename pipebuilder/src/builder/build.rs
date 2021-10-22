@@ -146,7 +146,7 @@ impl Builder for BuilderService {
         &self,
         _request: tonic::Request<pipebuilder_common::grpc::build::ScanRequest>,
     ) -> Result<tonic::Response<pipebuilder_common::grpc::build::ScanResponse>, tonic::Status> {
-        info!("list local build");
+        info!("scan local build");
         let builds_ref = self.builds.pin();
         let builds = builds_ref
             .keys()
@@ -154,7 +154,7 @@ impl Builder for BuilderService {
             .map(|(namespace, id, build_version)| VersionBuildKey {
                 namespace: namespace.to_owned(),
                 id: id.to_owned(),
-                build_version: build_version.to_owned(),
+                version: build_version.to_owned(),
             })
             .collect::<Vec<VersionBuildKey>>();
         Ok(Response::new(ScanResponse { builds }))
