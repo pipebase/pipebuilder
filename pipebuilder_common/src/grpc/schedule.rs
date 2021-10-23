@@ -1,9 +1,9 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ScheduleRequest {
-    /// app namespace
+    /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
-    /// app id
+    /// project id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
 }

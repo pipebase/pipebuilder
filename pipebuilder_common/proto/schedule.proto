@@ -2,9 +2,9 @@ syntax = "proto3";
 package schedule;
 
 message ScheduleRequest {
-    // app namespace
+    // project namespace
     string namespace = 1;
-    // app id
+    // project id
     string id = 2;
 }
 

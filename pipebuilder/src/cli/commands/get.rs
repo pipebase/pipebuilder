@@ -22,7 +22,7 @@ pub fn cmd() -> Cmd {
 
 pub fn manifest() -> Cmd {
     Cmd::new("manifest")
-        .about("Get manifest given namespace, app id and manifest version")
+        .about("Get manifest given namespace, project id and manifest version")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -31,7 +31,7 @@ pub fn manifest() -> Cmd {
                 .takes_value(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify app id")
+                .about("Specify project id")
                 .required(true)
                 .takes_value(true),
             Arg::new("version")
@@ -62,7 +62,7 @@ pub async fn exec_manifest(client: ApiClient, args: &clap::ArgMatches) -> Result
 
 pub fn build() -> Cmd {
     Cmd::new("build")
-        .about("Get build given namespace, app id and build version")
+        .about("Get build given namespace, project id and build version")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -71,7 +71,7 @@ pub fn build() -> Cmd {
                 .required(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify app id")
+                .about("Specify project id")
                 .takes_value(true)
                 .required(true),
             Arg::new("version")
@@ -98,7 +98,7 @@ pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()
 
 pub fn app() -> Cmd {
     Cmd::new("app")
-        .about("Get app binary given namespace, app id and build version")
+        .about("Get app binary given namespace, project id and build version")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -107,7 +107,7 @@ pub fn app() -> Cmd {
                 .required(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify app id")
+                .about("Specify project id")
                 .takes_value(true)
                 .required(true),
             Arg::new("version")
@@ -139,7 +139,7 @@ pub async fn exec_app(client: ApiClient, args: &clap::ArgMatches) -> Result<()> 
 
 pub fn build_log() -> Cmd {
     Cmd::new("log")
-        .about("Get build given namespace, app id and build version")
+        .about("Get build given namespace, project id and build version")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -148,7 +148,7 @@ pub fn build_log() -> Cmd {
                 .required(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify app id")
+                .about("Specify project id")
                 .takes_value(true)
                 .required(true),
             Arg::new("version")

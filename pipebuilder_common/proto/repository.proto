@@ -2,11 +2,11 @@ syntax = "proto3";
 package repository;
 
 message GetManifestRequest {
-    // app namespace
+    // project namespace
     string namespace = 1;
-    // app id
+    // project id
     string id = 2;
-    // app manifest version
+    // project manifest version
     uint64 version = 3;
 }
 
@@ -16,27 +16,27 @@ message GetManifestResponse {
 }
 
 message PutManifestRequest {
-    // app namespace
+    // project namespace
     string namespace = 1;
-    // app id
+    // project id
     string id = 2;
-    // manifest binaries
+    // project manifest binaries
     bytes buffer = 3;
 }
 
 message PutManifestResponse {
     // manifest id
     string id = 1;
-    // app manifest version
+    // project manifest version
     uint64 version = 2;
 }
 
 message GetAppRequest {
-    // app namespace
+    // project namespace
     string namespace = 1;
-    // app id
+    // project id
     string id = 2;
-    // app build version
+    // project build version
     uint64 version = 3;
 }
 
@@ -46,11 +46,11 @@ message GetAppResponse {
 }
 
 message PostAppRequest {
-    // app namespace
+    // project namespace
     string namespace = 1;
-    // app id
+    // project id
     string id = 2;
-    // app build version
+    // project build version
     uint64 version = 3;
     // app binaries
     bytes buffer = 4;

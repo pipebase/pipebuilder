@@ -11,7 +11,7 @@ pub fn cmd() -> Cmd {
 
 pub fn build() -> Cmd {
     Cmd::new("build")
-        .about("Cancel build given namespace, app id and build version")
+        .about("Cancel build given namespace, project id and build version")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -20,7 +20,7 @@ pub fn build() -> Cmd {
                 .required(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify app id")
+                .about("Specify project id")
                 .takes_value(true)
                 .required(true),
             Arg::new("version")

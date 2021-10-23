@@ -18,7 +18,7 @@ pub trait PrintHeader {
 #[derive(Serialize, Deserialize)]
 pub struct BuildRequest {
     pub namespace: String,
-    // app id
+    // project id
     pub id: String,
     pub manifest_version: u64,
     pub target_platform: String,
@@ -39,7 +39,7 @@ impl Display for BuildResponse {
 pub struct GetBuildRequest {
     // namespace
     pub namespace: String,
-    // app id
+    // project id
     pub id: String,
     // build version
     pub version: u64,
@@ -226,7 +226,7 @@ impl PrintHeader for VersionBuild {
 #[derive(Serialize, Deserialize)]
 pub struct ListBuildRequest {
     pub namespace: String,
-    // app id
+    // project id
     pub id: String,
 }
 

@@ -1,12 +1,12 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetManifestRequest {
-    /// app namespace
+    /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
-    /// app id
+    /// project id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
-    /// app manifest version
+    /// project manifest version
     #[prost(uint64, tag = "3")]
     pub version: u64,
 }
@@ -18,13 +18,13 @@ pub struct GetManifestResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PutManifestRequest {
-    /// app namespace
+    /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
-    /// app id
+    /// project id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
-    /// manifest binaries
+    /// project manifest binaries
     #[prost(bytes = "vec", tag = "3")]
     pub buffer: ::prost::alloc::vec::Vec<u8>,
 }
@@ -33,19 +33,19 @@ pub struct PutManifestResponse {
     /// manifest id
     #[prost(string, tag = "1")]
     pub id: ::prost::alloc::string::String,
-    /// app manifest version
+    /// project manifest version
     #[prost(uint64, tag = "2")]
     pub version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetAppRequest {
-    /// app namespace
+    /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
-    /// app id
+    /// project id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
-    /// app build version
+    /// project build version
     #[prost(uint64, tag = "3")]
     pub version: u64,
 }
@@ -57,13 +57,13 @@ pub struct GetAppResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PostAppRequest {
-    /// app namespace
+    /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
-    /// app id
+    /// project id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
-    /// app build version
+    /// project build version
     #[prost(uint64, tag = "3")]
     pub version: u64,
     /// app binaries

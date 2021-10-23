@@ -54,7 +54,7 @@ pub async fn exec_manifest_snapshot(client: ApiClient, args: &clap::ArgMatches) 
 
 pub fn build() -> Cmd {
     Cmd::new("build")
-        .about("List build history given namespace and app id")
+        .about("List build history given namespace and project id")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -63,7 +63,7 @@ pub fn build() -> Cmd {
                 .takes_value(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify app id")
+                .about("Specify project id")
                 .required(true)
                 .takes_value(true),
         ])

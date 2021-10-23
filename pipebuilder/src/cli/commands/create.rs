@@ -16,7 +16,7 @@ pub fn cmd() -> Cmd {
 
 pub fn manifest() -> Cmd {
     Cmd::new("manifest")
-        .about("Create manifest given namespace, app id and manifest file")
+        .about("Create manifest given namespace, project id and manifest file")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -25,7 +25,7 @@ pub fn manifest() -> Cmd {
                 .takes_value(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify app id")
+                .about("Specify project id")
                 .required(true)
                 .takes_value(true),
             Arg::new("file")
@@ -49,7 +49,7 @@ pub async fn exec_manifest(client: ApiClient, args: &clap::ArgMatches) -> Result
 
 pub fn build() -> Cmd {
     Cmd::new("build")
-        .about("Create build given namespace and app id")
+        .about("Create build given namespace and project id")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -58,7 +58,7 @@ pub fn build() -> Cmd {
                 .takes_value(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify app id")
+                .about("Specify project id")
                 .required(true)
                 .takes_value(true),
             Arg::new("version")

@@ -1,12 +1,12 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BuildRequest {
-    /// app namespace
+    /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
-    /// app id
+    /// project id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
-    /// manifest version
+    /// project manifest version
     #[prost(uint64, tag = "3")]
     pub manifest_version: u64,
     /// target platform
@@ -21,13 +21,13 @@ pub struct BuildResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CancelRequest {
-    /// app namespace
+    /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
-    /// app id
+    /// project id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
-    /// version: build version
+    /// project build version
     #[prost(uint64, tag = "3")]
     pub build_version: u64,
 }
@@ -37,13 +37,13 @@ pub struct CancelResponse {}
 pub struct ScanRequest {}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VersionBuildKey {
-    /// app namespace
+    /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
-    /// app id
+    /// project id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
-    /// app build version
+    /// project build version
     #[prost(uint64, tag = "3")]
     pub version: u64,
 }
@@ -54,13 +54,13 @@ pub struct ScanResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetLogRequest {
-    /// app namespace
+    /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
-    /// app id
+    /// project id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
-    /// app build version
+    /// project build version
     #[prost(uint64, tag = "3")]
     pub build_version: u64,
 }
