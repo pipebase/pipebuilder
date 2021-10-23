@@ -1,10 +1,11 @@
 use super::{
     constants::{
-        APP, BUILD, BUILD_LOG, BUILD_SNAPSHOT, CANCEL_BUILD, MANIFEST, MANIFEST_SNAPSHOT,
-        NODE_STATE, SCAN_BUILDER,
+        ACTIVATE_NODE, APP, BUILD, BUILD_LOG, BUILD_SNAPSHOT, CANCEL_BUILD, DEACTIVATE_NODE,
+        MANIFEST, MANIFEST_SNAPSHOT, NODE_STATE, SCAN_BUILDER,
     },
     models::{
-        BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
+        ActivateNodeRequest, ActivateNodeResponse, BuildRequest, BuildResponse, BuildSnapshot,
+        CancelBuildRequest, CancelBuildResponse, DeactivateNodeRequest, DeactivateNodeResponse,
         Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest, GetBuildLogResponse,
         GetBuildRequest, GetManifestRequest, GetManifestResponse, ListBuildRequest,
         ListBuildSnapshotRequest, ListManifestSnapshotRequest, ListNodeStateRequest,
@@ -208,6 +209,26 @@ impl ApiClient {
     pub async fn scan_builder(&self, request: &ScanBuilderRequest) -> Result<Vec<VersionBuildKey>> {
         let response = self.query(SCAN_BUILDER, request).await?;
         let response = Self::get_response_body::<Vec<VersionBuildKey>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn activate_node(
+        &self,
+        request: &ActivateNodeRequest,
+    ) -> Result<ActivateNodeResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(ACTIVATE_NODE, request).await?;
+        let response = Self::get_response_body::<ActivateNodeResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn deactivate_node(
+        &self,
+        request: &DeactivateNodeRequest,
+    ) -> Result<DeactivateNodeResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(DEACTIVATE_NODE, request).await?;
+        let response = Self::get_response_body::<DeactivateNodeResponse>(response).await?;
         Ok(response)
     }
 

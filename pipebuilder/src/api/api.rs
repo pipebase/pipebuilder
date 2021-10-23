@@ -29,7 +29,9 @@ pub mod filters {
             .or(v1_app_get(repository_client))
             .or(v1_build_log_get(register.clone(), lease_id))
             .or(v1_node_state_list(register.clone()))
-            .or(v1_builder_scan(register, lease_id))
+            .or(v1_builder_scan(register.clone(), lease_id))
+            .or(v1_node_activate(register.clone(), lease_id))
+            .or(v1_node_deactivate(register, lease_id))
     }
 
     pub fn v1_build(
@@ -160,6 +162,30 @@ pub mod filters {
             .and_then(handlers::scan_builder)
     }
 
+    pub fn v1_node_activate(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "node" / "activate")
+            .and(warp::post())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(json_request::<models::ActivateNodeRequest>())
+            .and_then(handlers::activate_node)
+    }
+
+    pub fn v1_node_deactivate(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "node" / "deactivate")
+            .and(warp::post())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(json_request::<models::DeactivateNodeRequest>())
+            .and_then(handlers::deactivate_node)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -205,7 +231,7 @@ mod handlers {
                 builder_client::BuilderClient, BuildRequest, CancelRequest, GetLogRequest,
                 ScanRequest,
             },
-            node::{node_client::NodeClient, StatusRequest},
+            node::{node_client::NodeClient, ActivateRequest, DeactivateRequest, StatusRequest},
             repository::{
                 repository_client::RepositoryClient, GetAppRequest, GetManifestRequest,
                 PutManifestRequest,
@@ -695,6 +721,108 @@ mod handlers {
         Ok(builds)
     }
 
+    pub async fn activate_node(
+        mut register: Register,
+        lease_id: i64,
+        request: models::ActivateNodeRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match validations::validate_activate_node_request(&request) {
+            Ok(()) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
+        let node_id = request.id.as_str();
+        let node_role = request.role;
+        let node_state = match get_internal_node_state(
+            &mut register,
+            lease_id,
+            node_role.clone(),
+            node_id,
+        )
+        .await
+        {
+            Ok(node_state) => node_state,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        // find node address
+        let address = match node_state {
+            Some(node_state) => node_state.external_address,
+            None => {
+                return Ok(http_not_found(Failure::new(format!(
+                    "node '({}, {})' not found",
+                    node_role.to_string(),
+                    node_id
+                ))))
+            }
+        };
+        let mut client = match node_client(address.as_str()).await {
+            Ok(node_client) => node_client,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match do_activate_node(&mut client).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    pub async fn deactivate_node(
+        mut register: Register,
+        lease_id: i64,
+        request: models::DeactivateNodeRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match validations::validate_deactivate_node_request(&request) {
+            Ok(()) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
+        let node_id = request.id.as_str();
+        let node_role = request.role;
+        let node_state = match get_internal_node_state(
+            &mut register,
+            lease_id,
+            node_role.clone(),
+            node_id,
+        )
+        .await
+        {
+            Ok(node_state) => node_state,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        // find node address
+        let address = match node_state {
+            Some(node_state) => node_state.external_address,
+            None => {
+                return Ok(http_not_found(Failure::new(format!(
+                    "node '({}, {})' not found",
+                    node_role.to_string(),
+                    node_id
+                ))))
+            }
+        };
+        let mut client = match node_client(address.as_str()).await {
+            Ok(node_client) => node_client,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match do_deactivate_node(&mut client).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_activate_node(
+        client: &mut NodeClient<Channel>,
+    ) -> pipebuilder_common::Result<models::ActivateNodeResponse> {
+        let response = client.activate(ActivateRequest {}).await?;
+        let response = response.into_inner();
+        Ok(response.into())
+    }
+
+    async fn do_deactivate_node(
+        client: &mut NodeClient<Channel>,
+    ) -> pipebuilder_common::Result<models::DeactivateNodeResponse> {
+        let response = client.deactivate(DeactivateRequest {}).await?;
+        let response = response.into_inner();
+        Ok(response.into())
+    }
+
     async fn get_internal_node_state(
         register: &mut Register,
         lease_id: i64,
@@ -776,6 +904,22 @@ mod validations {
             Some(role) => role,
             None => return Ok(()),
         };
+        match role {
+            NodeRole::Undefined => Err(invalid_api_request(String::from("undefined node role"))),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn validate_activate_node_request(request: &models::ActivateNodeRequest) -> Result<()> {
+        let role = &request.role;
+        match role {
+            NodeRole::Undefined => Err(invalid_api_request(String::from("undefined node role"))),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn validate_deactivate_node_request(request: &models::DeactivateNodeRequest) -> Result<()> {
+        let role = &request.role;
         match role {
             NodeRole::Undefined => Err(invalid_api_request(String::from("undefined node role"))),
             _ => Ok(()),

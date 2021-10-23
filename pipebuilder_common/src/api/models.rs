@@ -4,7 +4,7 @@ use crate::{
         DISPLAY_NAMESPACE_WIDTH, DISPLAY_NODE_ROLE_WIDTH, DISPLAY_NODE_STATUS_WIDTH,
         DISPLAY_TIMESTAMP_WIDTH, DISPLAY_VERSION_WIDTH,
     },
-    grpc::{build, repository},
+    grpc::{build, node, repository},
     BuildStatus, Error, NodeRole, NodeState as InternalNodeState, NodeStatus,
 };
 use chrono::{DateTime, Utc};
@@ -357,6 +357,24 @@ impl PrintHeader for VersionBuildKey {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ActivateNodeRequest {
+    pub role: NodeRole,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ActivateNodeResponse {}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeactivateNodeRequest {
+    pub role: NodeRole,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeactivateNodeResponse {}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Failure {
     pub error: String,
@@ -521,6 +539,18 @@ impl From<build::VersionBuildKey> for VersionBuildKey {
 impl From<ScanBuilderRequest> for build::ScanRequest {
     fn from(_: ScanBuilderRequest) -> Self {
         build::ScanRequest {}
+    }
+}
+
+impl From<node::ActivateResponse> for ActivateNodeResponse {
+    fn from(_: node::ActivateResponse) -> Self {
+        ActivateNodeResponse {}
+    }
+}
+
+impl From<node::DeactivateResponse> for DeactivateNodeResponse {
+    fn from(_: node::DeactivateResponse) -> Self {
+        DeactivateNodeResponse {}
     }
 }
 

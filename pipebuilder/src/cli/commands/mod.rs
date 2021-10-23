@@ -1,7 +1,9 @@
 use pipebuilder_common::{api::client::ApiClient, Result};
 
+pub(crate) mod activate;
 pub(crate) mod cancel;
 pub(crate) mod create;
+pub(crate) mod deactivate;
 pub(crate) mod get;
 pub(crate) mod list;
 pub(crate) mod scan;
@@ -10,7 +12,9 @@ pub type Cmd = clap::App<'static>;
 
 pub fn cmds() -> Vec<Cmd> {
     vec![
+        activate::cmd(),
         create::cmd(),
+        deactivate::cmd(),
         get::cmd(),
         list::cmd(),
         cancel::cmd(),
@@ -26,6 +30,8 @@ pub async fn exec(
     args: &clap::ArgMatches,
 ) -> Result<()> {
     match (action, resource) {
+        ("activate", "builder") => activate::exec_builder(client, args).await,
+        ("deactivate", "builder") => deactivate::exec_builder(client, args).await,
         ("get", "manifest") => get::exec_manifest(client, args).await,
         ("get", "build") => get::exec_build(client, args).await,
         ("get", "app") => get::exec_app(client, args).await,
