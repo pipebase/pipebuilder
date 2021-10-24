@@ -31,7 +31,9 @@ pub mod filters {
             .or(v1_node_state_list(register.clone()))
             .or(v1_builder_scan(register.clone(), lease_id))
             .or(v1_node_activate(register.clone(), lease_id))
-            .or(v1_node_deactivate(register, lease_id))
+            .or(v1_node_deactivate(register.clone(), lease_id))
+            .or(v1_app_metadata_list(register.clone()))
+            .or(v1_manifest_metadata_list(register))
     }
 
     pub fn v1_build(
@@ -186,6 +188,26 @@ pub mod filters {
             .and_then(handlers::deactivate_node)
     }
 
+    pub fn v1_app_metadata_list(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "app" / "metadata")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(warp::query::<models::ListAppMetadataRequest>())
+            .and_then(handlers::list_app_metadata)
+    }
+
+    pub fn v1_manifest_metadata_list(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "manifest" / "metadata")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(warp::query::<models::ListManifestMetadataRequest>())
+            .and_then(handlers::list_manifest_metadata)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -239,7 +261,8 @@ mod handlers {
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
         node_role_prefix, remove_resource_namespace, NodeRole, NodeState as InternalNodeState,
-        Register, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
+        Register, REGISTER_KEY_PREFIX_APP_METADATA, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
+        REGISTER_KEY_PREFIX_MANIFEST_METADATA, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
         REGISTER_KEY_PREFIX_NODE, REGISTER_KEY_PREFIX_VERSION_BUILD,
     };
     use serde::Serialize;
@@ -821,6 +844,94 @@ mod handlers {
         let response = client.deactivate(DeactivateRequest {}).await?;
         let response = response.into_inner();
         Ok(response.into())
+    }
+
+    pub async fn list_app_metadata(
+        mut register: Register,
+        request: models::ListAppMetadataRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_list_app_metadata(&mut register, request).await {
+            Ok(resp) => Ok(ok(&resp)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_list_app_metadata(
+        register: &mut Register,
+        request: models::ListAppMetadataRequest,
+    ) -> pipebuilder_common::Result<Vec<models::AppMetadata>> {
+        let namespace = request.namespace.as_str();
+        let id = request.id;
+        let metas = register.list_app_metadata(namespace, id).await?;
+        let metas = metas
+            .into_iter()
+            .map(|(key, meta)| {
+                let id_version = remove_resource_namespace(
+                    key.as_str(),
+                    REGISTER_KEY_PREFIX_APP_METADATA,
+                    namespace,
+                );
+                let id_version = id_version.split('/').collect::<Vec<&str>>();
+                let id = id_version.get(0).expect("id not found in key").to_string();
+                let version: u64 = id_version
+                    .get(1)
+                    .expect("version not found in key")
+                    .parse()
+                    .expect("cannot parse version as u64");
+                models::AppMetadata {
+                    id,
+                    version,
+                    pulls: meta.pulls,
+                    size: meta.size,
+                    created: meta.created,
+                }
+            })
+            .collect::<Vec<models::AppMetadata>>();
+        Ok(metas)
+    }
+
+    pub async fn list_manifest_metadata(
+        mut register: Register,
+        request: models::ListManifestMetadataRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_list_manifest_metadata(&mut register, request).await {
+            Ok(resp) => Ok(ok(&resp)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_list_manifest_metadata(
+        register: &mut Register,
+        request: models::ListManifestMetadataRequest,
+    ) -> pipebuilder_common::Result<Vec<models::ManifestMetadata>> {
+        let namespace = request.namespace.as_str();
+        let id = request.id;
+        let metas = register.list_manifest_metadata(namespace, id).await?;
+        let metas = metas
+            .into_iter()
+            .map(|(key, meta)| {
+                let id_version = remove_resource_namespace(
+                    key.as_str(),
+                    REGISTER_KEY_PREFIX_MANIFEST_METADATA,
+                    namespace,
+                );
+                let id_version = id_version.split('/').collect::<Vec<&str>>();
+                let id = id_version.get(0).expect("id not found in key").to_string();
+                let version: u64 = id_version
+                    .get(1)
+                    .expect("version not found in key")
+                    .parse()
+                    .expect("cannot parse version as u64");
+                models::ManifestMetadata {
+                    id,
+                    version,
+                    pulls: meta.pulls,
+                    size: meta.size,
+                    created: meta.created,
+                }
+            })
+            .collect::<Vec<models::ManifestMetadata>>();
+        Ok(metas)
     }
 
     async fn get_internal_node_state(

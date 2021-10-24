@@ -1,4 +1,5 @@
 pub mod api;
+mod app;
 mod bootstrap;
 mod build;
 mod config;
@@ -11,6 +12,7 @@ mod service;
 mod time;
 mod utils;
 
+pub use app::*;
 pub use bootstrap::*;
 pub use build::*;
 pub use config::*;

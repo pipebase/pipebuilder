@@ -1,16 +1,17 @@
 use super::{
     constants::{
-        ACTIVATE_NODE, APP, BUILD, BUILD_LOG, BUILD_SNAPSHOT, CANCEL_BUILD, DEACTIVATE_NODE,
-        MANIFEST, MANIFEST_SNAPSHOT, NODE_STATE, SCAN_BUILDER,
+        ACTIVATE_NODE, APP, APP_METADATA, BUILD, BUILD_LOG, BUILD_SNAPSHOT, CANCEL_BUILD,
+        DEACTIVATE_NODE, MANIFEST, MANIFEST_METADATA, MANIFEST_SNAPSHOT, NODE_STATE, SCAN_BUILDER,
     },
     models::{
-        ActivateNodeRequest, ActivateNodeResponse, BuildRequest, BuildResponse, BuildSnapshot,
-        CancelBuildRequest, CancelBuildResponse, DeactivateNodeRequest, DeactivateNodeResponse,
-        Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest, GetBuildLogResponse,
-        GetBuildRequest, GetManifestRequest, GetManifestResponse, ListBuildRequest,
-        ListBuildSnapshotRequest, ListManifestSnapshotRequest, ListNodeStateRequest,
-        ManifestSnapshot, NodeState, PutManifestRequest, PutManifestResponse, ScanBuilderRequest,
-        VersionBuild, VersionBuildKey,
+        ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildRequest, BuildResponse,
+        BuildSnapshot, CancelBuildRequest, CancelBuildResponse, DeactivateNodeRequest,
+        DeactivateNodeResponse, Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest,
+        GetBuildLogResponse, GetBuildRequest, GetManifestRequest, GetManifestResponse,
+        ListAppMetadataRequest, ListBuildRequest, ListBuildSnapshotRequest,
+        ListManifestMetadataRequest, ListManifestSnapshotRequest, ListNodeStateRequest,
+        ManifestMetadata, ManifestSnapshot, NodeState, PutManifestRequest, PutManifestResponse,
+        ScanBuilderRequest, VersionBuild, VersionBuildKey,
     },
 };
 use crate::{api_client_error, api_server_error, Result};
@@ -229,6 +230,24 @@ impl ApiClient {
         let request = Self::serialize_request(request)?;
         let response = self.post(DEACTIVATE_NODE, request).await?;
         let response = Self::get_response_body::<DeactivateNodeResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_app_metadata(
+        &self,
+        request: &ListAppMetadataRequest,
+    ) -> Result<Vec<AppMetadata>> {
+        let response = self.query(APP_METADATA, request).await?;
+        let response = Self::get_response_body::<Vec<AppMetadata>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_manifest_metadata(
+        &self,
+        request: &ListManifestMetadataRequest,
+    ) -> Result<Vec<ManifestMetadata>> {
+        let response = self.query(MANIFEST_METADATA, request).await?;
+        let response = Self::get_response_body::<Vec<ManifestMetadata>>(response).await?;
         Ok(response)
     }
 

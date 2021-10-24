@@ -53,20 +53,34 @@ impl Repository for RepositoryService {
         let version = request.version;
         info!("get manifest {}/{}/{}", namespace, id, version);
         let repository = self.manifest_repository.as_str();
-        match read_target_from_repo(
+        let buffer = match read_target_from_repo(
             repository,
             namespace.as_str(),
             id.as_str(),
             version,
             TARGET_MANIFEST,
         ) {
-            Ok(buffer) => Ok(Response::new(GetManifestResponse { buffer })),
+            Ok(buffer) => buffer,
             Err(err) => {
                 error!(
                     "read manifest {}/{}/{} fail, error '{}'",
                     namespace, id, version, err
                 );
-                Err(rpc_not_found("manifest not found"))
+                return Err(rpc_not_found("manifest not found"));
+            }
+        };
+        // update manifest metadata
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        let size = buffer.len();
+        match register
+            .update_manifest_metadata(lease_id, namespace.as_str(), id.as_str(), version, size)
+            .await
+        {
+            Ok(_) => Ok(Response::new(GetManifestResponse { buffer })),
+            Err(err) => {
+                error!("update manifest metadata fail, error '{}'", err);
+                Err(rpc_internal_error(err))
             }
         }
     }
@@ -104,10 +118,22 @@ impl Repository for RepositoryService {
             buffer,
             TARGET_MANIFEST,
         ) {
-            Ok(_) => Ok(Response::new(PutManifestResponse { id, version })),
+            Ok(_) => (),
             Err(err) => {
                 error!("write manifest fail, error '{}'", err);
                 return Err(rpc_internal_error(err));
+            }
+        };
+        // update manifest metadata
+        let size = buffer.len();
+        match register
+            .update_manifest_metadata(lease_id, namespace.as_str(), id.as_str(), version, size)
+            .await
+        {
+            Ok(_) => Ok(Response::new(PutManifestResponse { id, version })),
+            Err(err) => {
+                error!("update manifest metadata fail, error '{}'", err);
+                Err(rpc_internal_error(err))
             }
         }
     }
@@ -123,20 +149,34 @@ impl Repository for RepositoryService {
         let version = request.version;
         info!("get app {}/{}/{}", namespace, id, version);
         let repository = self.app_repository.as_str();
-        match read_target_from_repo(
+        let buffer = match read_target_from_repo(
             repository,
             namespace.as_str(),
             id.as_str(),
             version,
             TARGET_APP,
         ) {
-            Ok(buffer) => Ok(Response::new(GetAppResponse { buffer })),
+            Ok(buffer) => buffer,
             Err(err) => {
                 error!(
                     "read app {}/{}/{} fail, error '{}'",
                     namespace, id, version, err
                 );
-                Err(rpc_not_found("app not found"))
+                return Err(rpc_not_found("app not found"));
+            }
+        };
+        // update app metadata
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        let size = buffer.len();
+        match register
+            .update_app_metadata(lease_id, namespace.as_str(), id.as_str(), version, size)
+            .await
+        {
+            Ok(_) => Ok(Response::new(GetAppResponse { buffer })),
+            Err(err) => {
+                error!("update app metadata fail, error '{}'", err);
+                Err(rpc_internal_error(err))
             }
         }
     }
@@ -161,10 +201,24 @@ impl Repository for RepositoryService {
             buffer,
             TARGET_APP,
         ) {
-            Ok(_) => Ok(Response::new(PostAppResponse {})),
+            Ok(_) => (),
             Err(err) => {
                 error!("post app fail, error '{}'", err);
                 return Err(rpc_internal_error(err));
+            }
+        };
+        // update app metadata
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        let size = buffer.len();
+        match register
+            .update_app_metadata(lease_id, namespace.as_str(), id.as_str(), version, size)
+            .await
+        {
+            Ok(_) => Ok(Response::new(PostAppResponse {})),
+            Err(err) => {
+                error!("update app metadata fail, error '{}'", err);
+                Err(rpc_internal_error(err))
             }
         }
     }
@@ -202,4 +256,3 @@ fn write_target_into_repo(
 fn get_target_directory(repository: &str, namespace: &str, id: &str, version: u64) -> String {
     format!("{}/{}/{}/{}", repository, namespace, id, version)
 }
-

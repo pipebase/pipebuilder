@@ -2,8 +2,9 @@ use pipebuilder_common::{
     api::{
         client::ApiClient,
         models::{
-            GetManifestRequest, GetManifestResponse, ListManifestSnapshotRequest, ManifestSnapshot,
-            PutManifestRequest, PutManifestResponse,
+            GetManifestRequest, GetManifestResponse, ListManifestMetadataRequest,
+            ListManifestSnapshotRequest, ManifestMetadata, ManifestSnapshot, PutManifestRequest,
+            PutManifestResponse,
         },
     },
     Result,
@@ -44,6 +45,15 @@ pub(crate) async fn list_manifest_snapshot(
 ) -> Result<Vec<ManifestSnapshot>> {
     let request = ListManifestSnapshotRequest { namespace };
     client.list_manifest_snapshot(&request).await
+}
+
+pub(crate) async fn list_manifest_metadata(
+    client: &ApiClient,
+    namespace: String,
+    id: Option<String>,
+) -> Result<Vec<ManifestMetadata>> {
+    let request = ListManifestMetadataRequest { namespace, id };
+    client.list_manifest_metadata(&request).await
 }
 
 pub(crate) fn validate_manifest(client: &ApiClient, path: &str) -> Result<()> {

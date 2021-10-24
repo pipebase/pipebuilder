@@ -1,8 +1,9 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
     read_file, resource_id, resource_namespace, resource_namespace_id,
-    resource_namespace_id_version, BuildSnapshot, ManifestSnapshot, NodeState, Result,
-    VersionBuild, REGISTER_KEY_PREFIX_BUILDER, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
+    resource_namespace_id_version, AppMetadata, BuildSnapshot, ManifestMetadata, ManifestSnapshot,
+    NodeState, Result, VersionBuild, REGISTER_KEY_PREFIX_APP_METADATA, REGISTER_KEY_PREFIX_BUILDER,
+    REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, REGISTER_KEY_PREFIX_MANIFEST_METADATA,
     REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_VERSION_BUILD,
 };
 use etcd_client::{
@@ -484,6 +485,201 @@ impl Register {
         let prefix = resource_namespace(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace);
         let build_snapshots = self.list::<BuildSnapshot>(prefix.as_str()).await?;
         Ok(build_snapshots)
+    }
+
+    async fn do_get_app_metadata(
+        &mut self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> Result<Option<AppMetadata>> {
+        let key =
+            resource_namespace_id_version(REGISTER_KEY_PREFIX_APP_METADATA, namespace, id, version);
+        let metadata = self
+            .get_json_value::<String, AppMetadata>(key, None)
+            .await?;
+        Ok(metadata)
+    }
+
+    pub async fn get_app_metadata(
+        &mut self,
+        lease_id: i64,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> Result<Option<AppMetadata>> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_name =
+            resource_namespace_id_version(REGISTER_KEY_PREFIX_APP_METADATA, namespace, id, version);
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_get_app_metadata(namespace, id, version).await;
+        self.unlock(lock_name.as_str(), key).await?;
+        resp
+    }
+
+    async fn do_update_app_metadata(
+        &mut self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+        size: usize,
+    ) -> Result<(PutResponse, AppMetadata)> {
+        let new_metadata = match self.do_get_app_metadata(namespace, id, version).await? {
+            Some(mut metadata) => {
+                metadata.pulls += 1;
+                metadata
+            }
+            None => AppMetadata::new(size),
+        };
+        let key =
+            resource_namespace_id_version(REGISTER_KEY_PREFIX_APP_METADATA, namespace, id, version);
+        let value = serde_json::to_vec(&new_metadata)?;
+        let resp = self.put(key, value, None).await?;
+        Ok((resp, new_metadata))
+    }
+
+    pub async fn update_app_metadata(
+        &mut self,
+        lease_id: i64,
+        namespace: &str,
+        id: &str,
+        version: u64,
+        size: usize,
+    ) -> Result<(PutResponse, AppMetadata)> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_name =
+            resource_namespace_id_version(REGISTER_KEY_PREFIX_APP_METADATA, namespace, id, version);
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self
+            .do_update_app_metadata(namespace, id, version, size)
+            .await;
+        self.unlock(lock_name.as_str(), key).await?;
+        resp
+    }
+
+    pub async fn list_app_metadata(
+        &mut self,
+        namespace: &str,
+        id: Option<String>,
+    ) -> Result<Vec<(String, AppMetadata)>> {
+        let prefix = match id {
+            Some(id) => {
+                resource_namespace_id(REGISTER_KEY_PREFIX_APP_METADATA, namespace, id.as_str())
+            }
+            None => resource_namespace(REGISTER_KEY_PREFIX_APP_METADATA, namespace),
+        };
+        let resp = self.list::<AppMetadata>(prefix.as_str()).await?;
+        Ok(resp)
+    }
+
+    async fn do_get_manifest_metadata(
+        &mut self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> Result<Option<ManifestMetadata>> {
+        let key = resource_namespace_id_version(
+            REGISTER_KEY_PREFIX_MANIFEST_METADATA,
+            namespace,
+            id,
+            version,
+        );
+        let metadata = self
+            .get_json_value::<String, ManifestMetadata>(key, None)
+            .await?;
+        Ok(metadata)
+    }
+
+    pub async fn get_manifest_metadata(
+        &mut self,
+        lease_id: i64,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> Result<Option<ManifestMetadata>> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_name = resource_namespace_id_version(
+            REGISTER_KEY_PREFIX_MANIFEST_METADATA,
+            namespace,
+            id,
+            version,
+        );
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_get_manifest_metadata(namespace, id, version).await;
+        self.unlock(lock_name.as_str(), key).await?;
+        resp
+    }
+
+    async fn do_update_manifest_metadata(
+        &mut self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+        size: usize,
+    ) -> Result<(PutResponse, ManifestMetadata)> {
+        let new_metadata = match self
+            .do_get_manifest_metadata(namespace, id, version)
+            .await?
+        {
+            Some(mut metadata) => {
+                metadata.pulls += 1;
+                metadata
+            }
+            None => ManifestMetadata::new(size),
+        };
+        let key = resource_namespace_id_version(
+            REGISTER_KEY_PREFIX_MANIFEST_METADATA,
+            namespace,
+            id,
+            version,
+        );
+        let value = serde_json::to_vec(&new_metadata)?;
+        let resp = self.put(key, value, None).await?;
+        Ok((resp, new_metadata))
+    }
+
+    pub async fn update_manifest_metadata(
+        &mut self,
+        lease_id: i64,
+        namespace: &str,
+        id: &str,
+        version: u64,
+        size: usize,
+    ) -> Result<(PutResponse, ManifestMetadata)> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_name = resource_namespace_id_version(
+            REGISTER_KEY_PREFIX_MANIFEST_METADATA,
+            namespace,
+            id,
+            version,
+        );
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self
+            .do_update_manifest_metadata(namespace, id, version, size)
+            .await;
+        self.unlock(lock_name.as_str(), key).await?;
+        resp
+    }
+
+    pub async fn list_manifest_metadata(
+        &mut self,
+        namespace: &str,
+        id: Option<String>,
+    ) -> Result<Vec<(String, ManifestMetadata)>> {
+        let prefix = match id {
+            Some(id) => resource_namespace_id(
+                REGISTER_KEY_PREFIX_MANIFEST_METADATA,
+                namespace,
+                id.as_str(),
+            ),
+            None => resource_namespace(REGISTER_KEY_PREFIX_MANIFEST_METADATA, namespace),
+        };
+        let resp = self.list::<ManifestMetadata>(prefix.as_str()).await?;
+        Ok(resp)
     }
 
     fn deserialize_kvs<T>(kvs: &[KeyValue]) -> Result<Vec<(String, T)>>

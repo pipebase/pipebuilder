@@ -1,7 +1,7 @@
 use pipebuilder_common::{
     api::{
         client::ApiClient,
-        models::{GetAppRequest, GetAppResponse},
+        models::{AppMetadata, GetAppRequest, GetAppResponse, ListAppMetadataRequest},
     },
     Result,
 };
@@ -18,4 +18,13 @@ pub(crate) async fn get_app(
         build_version,
     };
     client.get_app(&request).await
+}
+
+pub(crate) async fn list_app_metadata(
+    client: &ApiClient,
+    namespace: String,
+    id: Option<String>,
+) -> Result<Vec<AppMetadata>> {
+    let request = ListAppMetadataRequest { namespace, id };
+    client.list_app_metadata(&request).await
 }

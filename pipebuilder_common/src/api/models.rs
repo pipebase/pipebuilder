@@ -1,8 +1,9 @@
 use crate::{
     api::constants::{
-        DISPLAY_ADDRESS_WIDTH, DISPLAY_BUILD_STATUS_WIDTH, DISPLAY_ID_WIDTH, DISPLAY_MESSAGE_WIDTH,
-        DISPLAY_NAMESPACE_WIDTH, DISPLAY_NODE_ROLE_WIDTH, DISPLAY_NODE_STATUS_WIDTH,
-        DISPLAY_TIMESTAMP_WIDTH, DISPLAY_VERSION_WIDTH,
+        DISPLAY_ADDRESS_WIDTH, DISPLAY_BUILD_STATUS_WIDTH, DISPLAY_COUNT_WIDTH, DISPLAY_ID_WIDTH,
+        DISPLAY_MESSAGE_WIDTH, DISPLAY_NAMESPACE_WIDTH, DISPLAY_NODE_ROLE_WIDTH,
+        DISPLAY_NODE_STATUS_WIDTH, DISPLAY_SIZE_WIDTH, DISPLAY_TIMESTAMP_WIDTH,
+        DISPLAY_VERSION_WIDTH,
     },
     grpc::{build, node, repository},
     BuildStatus, Error, NodeRole, NodeState as InternalNodeState, NodeStatus,
@@ -374,6 +375,114 @@ pub struct DeactivateNodeRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct DeactivateNodeResponse {}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListAppMetadataRequest {
+    pub namespace: String,
+    pub id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct AppMetadata {
+    // project id
+    pub id: String,
+    // build version
+    pub version: u64,
+    pub pulls: u64,
+    pub size: usize,
+    pub created: DateTime<Utc>,
+}
+
+impl Display for AppMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:<id_width$}{version:<version_width$}{pulls:<pulls_width$}{size:<size_width$}{created:<created_width$}",
+            id = self.id,
+            version = self.version,
+            pulls = self.pulls,
+            size = self.size,
+            created = self.created,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+            pulls_width = DISPLAY_COUNT_WIDTH,
+            size_width = DISPLAY_SIZE_WIDTH,
+            created_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for AppMetadata {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}",
+            col0 = "Id",
+            col1 = "Version",
+            col2 = "Pulls",
+            col3 = "Size",
+            col4 = "Created",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+            col2_width = DISPLAY_COUNT_WIDTH,
+            col3_width = DISPLAY_SIZE_WIDTH,
+            col4_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListManifestMetadataRequest {
+    pub namespace: String,
+    pub id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ManifestMetadata {
+    // project id
+    pub id: String,
+    // manifest version
+    pub version: u64,
+    pub pulls: u64,
+    pub size: usize,
+    pub created: DateTime<Utc>,
+}
+
+impl Display for ManifestMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:<id_width$}{version:<version_width$}{pulls:<pulls_width$}{size:<size_width$}{created:<created_width$}",
+            id = self.id,
+            version = self.version,
+            pulls = self.pulls,
+            size = self.size,
+            created = self.created,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+            pulls_width = DISPLAY_COUNT_WIDTH,
+            size_width = DISPLAY_SIZE_WIDTH,
+            created_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for ManifestMetadata {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}",
+            col0 = "Id",
+            col1 = "Version",
+            col2 = "Pulls",
+            col3 = "Size",
+            col4 = "Created",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+            col2_width = DISPLAY_COUNT_WIDTH,
+            col3_width = DISPLAY_SIZE_WIDTH,
+            col4_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Failure {
