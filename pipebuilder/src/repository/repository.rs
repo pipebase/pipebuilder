@@ -4,7 +4,7 @@ use pipebuilder_common::{
         repository_server::Repository, GetAppResponse, GetManifestResponse, PostAppResponse,
         PutManifestResponse,
     },
-    read_file, rpc_internal_error, rpc_not_found, write_file, Register,
+    read_file, rpc_internal_error, rpc_not_found, sub_path, write_file, Register,
 };
 use tonic::Response;
 use tracing::{error, info};
@@ -177,7 +177,8 @@ fn read_target_from_repo(
     version: u64,
     target_name: &str,
 ) -> pipebuilder_common::Result<Vec<u8>> {
-    let path = get_target_path(repository, namespace, id, version, target_name);
+    let directory = get_target_directory(repository, namespace, id, version);
+    let path = sub_path(directory.as_str(), target_name);
     let buffer = read_file(path)?;
     Ok(buffer)
 }
@@ -190,8 +191,8 @@ fn write_target_into_repo(
     buffer: &[u8],
     target_name: &str,
 ) -> pipebuilder_common::Result<()> {
-    let path = get_target_path(repository, namespace, id, version, target_name);
     let directory = get_target_directory(repository, namespace, id, version);
+    let path = sub_path(directory.as_str(), target_name);
     create_directory(directory)?;
     write_file(path, buffer)?;
     // TODO S3 backup
@@ -202,15 +203,3 @@ fn get_target_directory(repository: &str, namespace: &str, id: &str, version: u6
     format!("{}/{}/{}/{}", repository, namespace, id, version)
 }
 
-fn get_target_path(
-    repository: &str,
-    namespace: &str,
-    id: &str,
-    version: u64,
-    target_name: &str,
-) -> String {
-    format!(
-        "{}/{}/{}/{}/{}",
-        repository, namespace, id, version, target_name
-    )
-}
