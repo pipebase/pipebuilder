@@ -22,7 +22,7 @@ pub fn cmd() -> Cmd {
 }
 
 pub fn build_snapshot() -> Cmd {
-    Cmd::new("build-snapshot")
+    Cmd::new("build/snapshot")
         .about("List build snapshot given namespace")
         .args(vec![Arg::new("namespace")
             .short('n')
@@ -39,7 +39,7 @@ pub async fn exec_build_snapshot(client: ApiClient, args: &clap::ArgMatches) -> 
 }
 
 pub fn manifest_snapshot() -> Cmd {
-    Cmd::new("manifest-snapshot")
+    Cmd::new("manifest/snapshot")
         .about("List manifest snapshot given namespace")
         .args(vec![Arg::new("namespace")
             .short('n')
@@ -98,7 +98,7 @@ pub async fn exec_node(client: ApiClient, args: &clap::ArgMatches) -> Result<()>
 }
 
 pub fn app_metadata() -> Cmd {
-    Cmd::new("app-metadata")
+    Cmd::new("app/metadata")
         .about("List app metadata")
         .args(vec![
             Arg::new("namespace")
@@ -123,7 +123,7 @@ pub async fn exec_app_metadata(client: ApiClient, args: &clap::ArgMatches) -> Re
 }
 
 pub fn manifest_metadata() -> Cmd {
-    Cmd::new("manifest-metadata")
+    Cmd::new("manifest/metadata")
         .about("List manifest metadata")
         .args(vec![
             Arg::new("namespace")
