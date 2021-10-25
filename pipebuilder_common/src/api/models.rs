@@ -228,7 +228,7 @@ impl PrintHeader for VersionBuild {
 pub struct ListBuildRequest {
     pub namespace: String,
     // project id
-    pub id: String,
+    pub id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

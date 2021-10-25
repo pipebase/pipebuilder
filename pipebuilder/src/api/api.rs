@@ -496,9 +496,7 @@ mod handlers {
     ) -> pipebuilder_common::Result<Vec<models::VersionBuild>> {
         let namespace = request.namespace;
         let id = request.id;
-        let version_builds = register
-            .list_version_build(namespace.as_str(), id.as_str())
-            .await?;
+        let version_builds = register.list_version_build(namespace.as_str(), id).await?;
         let version_builds = version_builds
             .into_iter()
             .map(|(key, version_build)| {

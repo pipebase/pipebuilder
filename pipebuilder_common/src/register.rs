@@ -358,9 +358,14 @@ impl Register {
     pub async fn list_version_build(
         &mut self,
         namespace: &str,
-        id: &str,
+        id: Option<String>,
     ) -> Result<Vec<(String, VersionBuild)>> {
-        let prefix = resource_namespace_id(REGISTER_KEY_PREFIX_VERSION_BUILD, namespace, id);
+        let prefix = match id {
+            Some(id) => {
+                resource_namespace_id(REGISTER_KEY_PREFIX_VERSION_BUILD, namespace, id.as_str())
+            }
+            None => resource_namespace(REGISTER_KEY_PREFIX_VERSION_BUILD, namespace),
+        };
         let version_builds = self.list::<VersionBuild>(prefix.as_str()).await?;
         Ok(version_builds)
     }

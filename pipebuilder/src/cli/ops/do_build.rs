@@ -43,7 +43,7 @@ pub(crate) async fn get_build(
 pub(crate) async fn list_build(
     client: &ApiClient,
     namespace: String,
-    id: String,
+    id: Option<String>,
 ) -> Result<Vec<VersionBuild>> {
     let request = ListBuildRequest { namespace, id };
     client.list_build(&request).await

@@ -67,14 +67,13 @@ pub fn build() -> Cmd {
             Arg::new("id")
                 .short('i')
                 .about("Specify project id")
-                .required(true)
                 .takes_value(true),
         ])
 }
 
 pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let namespace = args.value_of("namespace").unwrap();
-    let id = args.value_of("id").unwrap();
+    let id = args.value_of("id").map(|id| id.to_owned());
     let response = list_build(&client, namespace.to_owned(), id.to_owned()).await?;
     print_records(response.as_slice());
     Ok(())
