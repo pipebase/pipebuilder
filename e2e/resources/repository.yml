@@ -8,5 +8,5 @@ base:
   register:
     endpoints: ["localhost:2379"]
 repository:
-  manifest: data/manifests
-  app: data/apps
+  manifest: e2e/data/manifests
+  app: e2e/data/apps

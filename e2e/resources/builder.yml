@@ -9,6 +9,6 @@ base:
     endpoints: ["localhost:2379"]
 builder:
   repository_endpoint: http://127.0.0.1:17000
-  workspace: data/builds/apps
-  restore_directory: data/builds/restores
-  log_directory: data/builds/logs
+  workspace: e2e/data/builds/apps
+  restore_directory: e2e/data/builds/restores
+  log_directory: e2e/data/builds/logs
