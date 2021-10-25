@@ -234,12 +234,21 @@ where
     Ok(None)
 }
 
-pub fn resource_namespace_id(resource: &str, namespace: &str, id: &str) -> String {
-    format!("{}/{}/{}", resource, namespace, id)
+// key prefix functions
+pub fn resource(resource: &str) -> String {
+    format!("/{}", resource)
 }
 
 pub fn resource_id(resource: &str, id: &str) -> String {
-    format!("{}/{}", resource, id)
+    format!("/{}/{}", resource, id)
+}
+
+pub fn resource_namespace(resource: &str, namespace: &str) -> String {
+    format!("/{}/{}", resource, namespace)
+}
+
+pub fn resource_namespace_id(resource: &str, namespace: &str, id: &str) -> String {
+    format!("/{}/{}/{}", resource, namespace, id)
 }
 
 pub fn resource_namespace_id_version(
@@ -248,18 +257,25 @@ pub fn resource_namespace_id_version(
     id: &str,
     version: u64,
 ) -> String {
-    format!("{}/{}/{}/{}", resource, namespace, id, version)
+    format!("/{}/{}/{}/{}", resource, namespace, id, version)
 }
 
-pub fn resource_namespace(resource: &str, namespace: &str) -> String {
-    format!("{}/{}", resource, namespace)
-}
-
-// remove /resource/namespace/ and return id/<suffix> given a key
+// remove '/resource/namespace/' and return id/<suffix> given a key
 pub fn remove_resource_namespace<'a>(key: &'a str, resource: &str, namespace: &str) -> &'a str {
-    let pattern = format!("{}/{}/", resource, namespace);
+    let pattern = format!("/{}/{}/", resource, namespace);
+    key.strip_prefix(pattern.as_str()).unwrap_or_else(|| {
+        panic!(
+            "key '{}' not start with '/{}/{}/'",
+            key, resource, namespace
+        )
+    })
+}
+
+// remove '/resource/' and return suffix
+pub fn remove_resource<'a>(key: &'a str, resource: &str) -> &'a str {
+    let pattern = format!("/{}/", resource);
     key.strip_prefix(pattern.as_str())
-        .unwrap_or_else(|| panic!("key '{}' not start with '/{}/{}'", key, resource, namespace))
+        .unwrap_or_else(|| panic!("key '{}' not start with '/{}/'", key, resource))
 }
 
 // rpc

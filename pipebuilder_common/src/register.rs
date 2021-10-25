@@ -1,10 +1,11 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
-    read_file, resource_id, resource_namespace, resource_namespace_id,
+    read_file, resource, resource_id, resource_namespace, resource_namespace_id,
     resource_namespace_id_version, AppMetadata, BuildSnapshot, ManifestMetadata, ManifestSnapshot,
-    NodeState, Result, VersionBuild, REGISTER_KEY_PREFIX_APP_METADATA, REGISTER_KEY_PREFIX_BUILDER,
-    REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, REGISTER_KEY_PREFIX_MANIFEST_METADATA,
-    REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_VERSION_BUILD,
+    Namespace, NodeState, Project, Result, VersionBuild, REGISTER_KEY_PREFIX_APP_METADATA,
+    REGISTER_KEY_PREFIX_BUILDER, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
+    REGISTER_KEY_PREFIX_MANIFEST_METADATA, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
+    REGISTER_KEY_PREFIX_NAMESPACE, REGISTER_KEY_PREFIX_PROJECT, REGISTER_KEY_PREFIX_VERSION_BUILD,
 };
 use etcd_client::{
     Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, KeyValue,
@@ -684,6 +685,110 @@ impl Register {
             None => resource_namespace(REGISTER_KEY_PREFIX_MANIFEST_METADATA, namespace),
         };
         let resp = self.list::<ManifestMetadata>(prefix.as_str()).await?;
+        Ok(resp)
+    }
+
+    async fn do_get_namespace(&mut self, id: &str) -> Result<Option<Namespace>> {
+        let key = resource_id(REGISTER_KEY_PREFIX_NAMESPACE, id);
+        let namespace = self.get_json_value::<String, Namespace>(key, None).await?;
+        Ok(namespace)
+    }
+
+    pub async fn get_namespace(&mut self, lease_id: i64, id: &str) -> Result<Option<Namespace>> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_name = resource_id(REGISTER_KEY_PREFIX_NAMESPACE, id);
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_get_namespace(id).await;
+        self.unlock(lock_name.as_str(), key).await?;
+        resp
+    }
+
+    async fn do_update_namespace(&mut self, id: &str) -> Result<(PutResponse, Namespace)> {
+        let namespace = match self.do_get_namespace(id).await? {
+            Some(namespace) => namespace,
+            None => Namespace::new(),
+        };
+        let key = resource_id(REGISTER_KEY_PREFIX_NAMESPACE, id);
+        let value = serde_json::to_vec(&namespace)?;
+        let resp = self.put(key, value, None).await?;
+        Ok((resp, namespace))
+    }
+
+    pub async fn update_namespace(
+        &mut self,
+        lease_id: i64,
+        id: &str,
+    ) -> Result<(PutResponse, Namespace)> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_name = resource_id(REGISTER_KEY_PREFIX_NAMESPACE, id);
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_update_namespace(id).await;
+        self.unlock(lock_name.as_str(), key).await?;
+        resp
+    }
+
+    pub async fn list_namespace(&mut self) -> Result<Vec<(String, Namespace)>> {
+        let prefix = resource(REGISTER_KEY_PREFIX_NAMESPACE);
+        let resp = self.list::<Namespace>(prefix.as_str()).await?;
+        Ok(resp)
+    }
+
+    async fn do_get_project(&mut self, namespace: &str, id: &str) -> Result<Option<Project>> {
+        let key = resource_namespace_id(REGISTER_KEY_PREFIX_PROJECT, namespace, id);
+        let project = self.get_json_value::<String, Project>(key, None).await?;
+        Ok(project)
+    }
+
+    pub async fn get_project(
+        &mut self,
+        lease_id: i64,
+        namespace: &str,
+        id: &str,
+    ) -> Result<Option<Project>> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_PROJECT, namespace, id);
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_get_project(namespace, id).await;
+        self.unlock(lock_name.as_str(), key).await?;
+        resp
+    }
+
+    async fn do_update_project(
+        &mut self,
+        namespace: &str,
+        id: &str,
+    ) -> Result<(PutResponse, Project)> {
+        let project = match self.do_get_project(namespace, id).await? {
+            Some(project) => project,
+            None => Project::new(),
+        };
+        let key = resource_namespace_id(REGISTER_KEY_PREFIX_PROJECT, namespace, id);
+        let value = serde_json::to_vec(&project)?;
+        let resp = self.put(key, value, None).await?;
+        Ok((resp, project))
+    }
+
+    pub async fn update_project(
+        &mut self,
+        lease_id: i64,
+        namespace: &str,
+        id: &str,
+    ) -> Result<(PutResponse, Project)> {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_PROJECT, namespace, id);
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_update_project(namespace, id).await;
+        self.unlock(lock_name.as_str(), key).await?;
+        resp
+    }
+
+    pub async fn list_project(&mut self, namespace: &str) -> Result<Vec<(String, Project)>> {
+        let prefix = resource_namespace(REGISTER_KEY_PREFIX_PROJECT, namespace);
+        let resp = self.list::<Project>(prefix.as_str()).await?;
         Ok(resp)
     }
 

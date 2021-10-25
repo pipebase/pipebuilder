@@ -33,7 +33,11 @@ pub mod filters {
             .or(v1_node_activate(register.clone(), lease_id))
             .or(v1_node_deactivate(register.clone(), lease_id))
             .or(v1_app_metadata_list(register.clone()))
-            .or(v1_manifest_metadata_list(register))
+            .or(v1_manifest_metadata_list(register.clone()))
+            .or(v1_namespace_put(register.clone(), lease_id))
+            .or(v1_project_put(register.clone(), lease_id))
+            .or(v1_namespace_list(register.clone()))
+            .or(v1_project_list(register))
     }
 
     pub fn v1_build(
@@ -208,6 +212,50 @@ pub mod filters {
             .and_then(handlers::list_manifest_metadata)
     }
 
+    pub fn v1_namespace_put(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "namespace")
+            .and(warp::post())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(json_request::<models::UpdateNamespaceRequest>())
+            .and_then(handlers::put_namespace)
+    }
+
+    pub fn v1_project_put(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "project")
+            .and(warp::post())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(json_request::<models::UpdateProjectRequest>())
+            .and_then(handlers::put_project)
+    }
+
+    pub fn v1_namespace_list(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "namespace")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(warp::query::<models::ListNamespaceRequest>())
+            .and_then(handlers::list_namespace)
+    }
+
+    pub fn v1_project_list(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "project")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(warp::query::<models::ListProjectRequest>())
+            .and_then(handlers::list_project)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -260,10 +308,11 @@ mod handlers {
             },
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
-        node_role_prefix, remove_resource_namespace, NodeRole, NodeState as InternalNodeState,
-        Register, REGISTER_KEY_PREFIX_APP_METADATA, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
-        REGISTER_KEY_PREFIX_MANIFEST_METADATA, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
-        REGISTER_KEY_PREFIX_NODE, REGISTER_KEY_PREFIX_VERSION_BUILD,
+        node_role_prefix, remove_resource, remove_resource_namespace, NodeRole,
+        NodeState as InternalNodeState, Register, REGISTER_KEY_PREFIX_APP_METADATA,
+        REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, REGISTER_KEY_PREFIX_MANIFEST_METADATA,
+        REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_NAMESPACE,
+        REGISTER_KEY_PREFIX_NODE, REGISTER_KEY_PREFIX_PROJECT, REGISTER_KEY_PREFIX_VERSION_BUILD,
     };
     use serde::Serialize;
     use std::convert::Infallible;
@@ -930,6 +979,114 @@ mod handlers {
             })
             .collect::<Vec<models::ManifestMetadata>>();
         Ok(metas)
+    }
+
+    async fn do_put_namespace(
+        register: &mut Register,
+        lease_id: i64,
+        request: models::UpdateNamespaceRequest,
+    ) -> pipebuilder_common::Result<models::Namespace> {
+        let id = request.id;
+        let (_, namespace) = register.update_namespace(lease_id, id.as_str()).await?;
+        let created = namespace.created;
+        Ok(models::Namespace { id, created })
+    }
+
+    pub async fn put_namespace(
+        mut register: Register,
+        lease_id: i64,
+        request: models::UpdateNamespaceRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_put_namespace(&mut register, lease_id, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_put_project(
+        register: &mut Register,
+        lease_id: i64,
+        request: models::UpdateProjectRequest,
+    ) -> pipebuilder_common::Result<models::Project> {
+        let namespace = request.namespace;
+        let id = request.id;
+        let (_, project) = register
+            .update_project(lease_id, namespace.as_str(), id.as_str())
+            .await?;
+        let created = project.created;
+        Ok(models::Project { id, created })
+    }
+
+    pub async fn put_project(
+        mut register: Register,
+        lease_id: i64,
+        request: models::UpdateProjectRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_put_project(&mut register, lease_id, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_list_namespace(
+        register: &mut Register,
+        _request: models::ListNamespaceRequest,
+    ) -> pipebuilder_common::Result<Vec<models::Namespace>> {
+        let namespaces = register.list_namespace().await?;
+        let namespaces = namespaces
+            .into_iter()
+            .map(|(key, namespace)| {
+                let id = remove_resource(key.as_str(), REGISTER_KEY_PREFIX_NAMESPACE);
+                models::Namespace {
+                    id: id.to_owned(),
+                    created: namespace.created,
+                }
+            })
+            .collect::<Vec<models::Namespace>>();
+        Ok(namespaces)
+    }
+
+    pub async fn list_namespace(
+        mut register: Register,
+        _request: models::ListNamespaceRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_list_namespace(&mut register, _request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_list_project(
+        register: &mut Register,
+        request: models::ListProjectRequest,
+    ) -> pipebuilder_common::Result<Vec<models::Project>> {
+        let namespace = request.namespace;
+        let projects = register.list_project(namespace.as_str()).await?;
+        let projects = projects
+            .into_iter()
+            .map(|(key, project)| {
+                let id = remove_resource_namespace(
+                    key.as_str(),
+                    REGISTER_KEY_PREFIX_PROJECT,
+                    namespace.as_str(),
+                );
+                models::Project {
+                    id: id.to_owned(),
+                    created: project.created,
+                }
+            })
+            .collect::<Vec<models::Project>>();
+        Ok(projects)
+    }
+
+    pub async fn list_project(
+        mut register: Register,
+        request: models::ListProjectRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_list_project(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
     }
 
     async fn get_internal_node_state(

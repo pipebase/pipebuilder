@@ -1,7 +1,8 @@
 use super::{
     constants::{
         ACTIVATE_NODE, APP, APP_METADATA, BUILD, BUILD_LOG, BUILD_SNAPSHOT, CANCEL_BUILD,
-        DEACTIVATE_NODE, MANIFEST, MANIFEST_METADATA, MANIFEST_SNAPSHOT, NODE_STATE, SCAN_BUILDER,
+        DEACTIVATE_NODE, MANIFEST, MANIFEST_METADATA, MANIFEST_SNAPSHOT, NAMESPACE, NODE_STATE,
+        PROJECT, SCAN_BUILDER,
     },
     models::{
         ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildRequest, BuildResponse,
@@ -9,9 +10,10 @@ use super::{
         DeactivateNodeResponse, Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest,
         GetBuildLogResponse, GetBuildRequest, GetManifestRequest, GetManifestResponse,
         ListAppMetadataRequest, ListBuildRequest, ListBuildSnapshotRequest,
-        ListManifestMetadataRequest, ListManifestSnapshotRequest, ListNodeStateRequest,
-        ManifestMetadata, ManifestSnapshot, NodeState, PutManifestRequest, PutManifestResponse,
-        ScanBuilderRequest, VersionBuild, VersionBuildKey,
+        ListManifestMetadataRequest, ListManifestSnapshotRequest, ListNamespaceRequest,
+        ListNodeStateRequest, ListProjectRequest, ManifestMetadata, ManifestSnapshot, Namespace,
+        NodeState, Project, PutManifestRequest, PutManifestResponse, ScanBuilderRequest,
+        UpdateNamespaceRequest, UpdateProjectRequest, VersionBuild, VersionBuildKey,
     },
 };
 use crate::{api_client_error, api_server_error, Result};
@@ -248,6 +250,32 @@ impl ApiClient {
     ) -> Result<Vec<ManifestMetadata>> {
         let response = self.query(MANIFEST_METADATA, request).await?;
         let response = Self::get_response_body::<Vec<ManifestMetadata>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn update_namespace(&self, request: &UpdateNamespaceRequest) -> Result<Namespace> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(NAMESPACE, request).await?;
+        let response = Self::get_response_body::<Namespace>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn update_project(&self, request: &UpdateProjectRequest) -> Result<Project> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(PROJECT, request).await?;
+        let response = Self::get_response_body::<Project>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_namespace(&self, request: &ListNamespaceRequest) -> Result<Vec<Namespace>> {
+        let response = self.query(NAMESPACE, request).await?;
+        let response = Self::get_response_body::<Vec<Namespace>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_project(&self, request: &ListProjectRequest) -> Result<Vec<Project>> {
+        let response = self.query(PROJECT, request).await?;
+        let response = Self::get_response_body::<Vec<Project>>(response).await?;
         Ok(response)
     }
 

@@ -484,6 +484,89 @@ impl PrintHeader for ManifestMetadata {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct UpdateNamespaceRequest {
+    // namespace id
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListNamespaceRequest {}
+
+#[derive(Serialize, Deserialize)]
+pub struct Namespace {
+    pub id: String,
+    pub created: DateTime<Utc>,
+}
+
+impl Display for Namespace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:<id_width$}{created:<created_width$}",
+            id = self.id,
+            created = self.created,
+            id_width = DISPLAY_ID_WIDTH,
+            created_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for Namespace {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}",
+            col0 = "Id",
+            col1 = "Created",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UpdateProjectRequest {
+    pub namespace: String,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListProjectRequest {
+    pub namespace: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Project {
+    // project id
+    pub id: String,
+    pub created: DateTime<Utc>,
+}
+
+impl Display for Project {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:<id_width$}{created:<created_width$}",
+            id = self.id,
+            created = self.created,
+            id_width = DISPLAY_ID_WIDTH,
+            created_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for Project {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}",
+            col0 = "Id",
+            col1 = "Created",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Failure {
     pub error: String,
