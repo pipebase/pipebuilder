@@ -8,9 +8,9 @@ use crate::{
     REGISTER_KEY_PREFIX_NAMESPACE, REGISTER_KEY_PREFIX_PROJECT, REGISTER_KEY_PREFIX_VERSION_BUILD,
 };
 use etcd_client::{
-    Certificate, Client, ConnectOptions, GetOptions, GetResponse, Identity, KeyValue,
-    LeaseGrantResponse, LockOptions, LockResponse, PutOptions, PutResponse, TlsOptions,
-    WatchOptions, WatchStream, Watcher,
+    Certificate, Client, ConnectOptions, DeleteOptions, DeleteResponse, GetOptions, GetResponse,
+    Identity, KeyValue, LeaseGrantResponse, LockOptions, LockResponse, PutOptions, PutResponse,
+    TlsOptions, WatchOptions, WatchStream, Watcher,
 };
 use serde::{de::DeserializeOwned, Deserialize};
 use tracing::info;
@@ -129,7 +129,7 @@ impl Register {
         Ok(Register { client })
     }
 
-    pub async fn put<K, V>(
+    async fn put<K, V>(
         &mut self,
         key: K,
         value: V,
@@ -143,7 +143,7 @@ impl Register {
         Ok(resp)
     }
 
-    pub async fn get<K>(&mut self, key: K, options: Option<GetOptions>) -> Result<GetResponse>
+    async fn get<K>(&mut self, key: K, options: Option<GetOptions>) -> Result<GetResponse>
     where
         K: Into<Vec<u8>>,
     {
@@ -151,14 +151,31 @@ impl Register {
         Ok(resp)
     }
 
-    // list with key prefix
-    async fn list<V>(&mut self, prefix: &str) -> Result<Vec<(String, V)>>
+    pub async fn delete<K>(
+        &mut self,
+        key: K,
+        options: Option<DeleteOptions>,
+    ) -> Result<DeleteResponse>
     where
-        V: DeserializeOwned,
+        K: Into<Vec<u8>>,
     {
+        let resp = self.client.delete(key, options).await?;
+        Ok(resp)
+    }
+
+    // list with key prefix
+    async fn list(&mut self, prefix: &str) -> Result<GetResponse> {
         let resp = self
             .get(prefix, Some(GetOptions::new().with_prefix()))
             .await?;
+        Ok(resp)
+    }
+
+    async fn list_kvs<V>(&mut self, prefix: &str) -> Result<Vec<(String, V)>>
+    where
+        V: DeserializeOwned,
+    {
+        let resp = self.list(prefix).await?;
         let kvs = Self::deserialize_kvs::<V>(resp.kvs())?;
         Ok(kvs)
     }
@@ -212,7 +229,7 @@ impl Register {
     }
 
     pub async fn list_node_state(&mut self, prefix: &str) -> Result<Vec<(String, NodeState)>> {
-        let node_states = self.list::<NodeState>(prefix).await?;
+        let node_states = self.list_kvs::<NodeState>(prefix).await?;
         Ok(node_states)
     }
 
@@ -367,7 +384,7 @@ impl Register {
             }
             None => resource_namespace(REGISTER_KEY_PREFIX_VERSION_BUILD, namespace),
         };
-        let version_builds = self.list::<VersionBuild>(prefix.as_str()).await?;
+        let version_builds = self.list_kvs::<VersionBuild>(prefix.as_str()).await?;
         Ok(version_builds)
     }
 
@@ -479,7 +496,7 @@ impl Register {
         namespace: &str,
     ) -> Result<Vec<(String, ManifestSnapshot)>> {
         let prefix = resource_namespace(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace);
-        let manifest_snapshots = self.list::<ManifestSnapshot>(prefix.as_str()).await?;
+        let manifest_snapshots = self.list_kvs::<ManifestSnapshot>(prefix.as_str()).await?;
         Ok(manifest_snapshots)
     }
 
@@ -489,7 +506,7 @@ impl Register {
         namespace: &str,
     ) -> Result<Vec<(String, BuildSnapshot)>> {
         let prefix = resource_namespace(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace);
-        let build_snapshots = self.list::<BuildSnapshot>(prefix.as_str()).await?;
+        let build_snapshots = self.list_kvs::<BuildSnapshot>(prefix.as_str()).await?;
         Ok(build_snapshots)
     }
 
@@ -576,7 +593,7 @@ impl Register {
             }
             None => resource_namespace(REGISTER_KEY_PREFIX_APP_METADATA, namespace),
         };
-        let resp = self.list::<AppMetadata>(prefix.as_str()).await?;
+        let resp = self.list_kvs::<AppMetadata>(prefix.as_str()).await?;
         Ok(resp)
     }
 
@@ -684,7 +701,7 @@ impl Register {
             ),
             None => resource_namespace(REGISTER_KEY_PREFIX_MANIFEST_METADATA, namespace),
         };
-        let resp = self.list::<ManifestMetadata>(prefix.as_str()).await?;
+        let resp = self.list_kvs::<ManifestMetadata>(prefix.as_str()).await?;
         Ok(resp)
     }
 
@@ -731,7 +748,7 @@ impl Register {
 
     pub async fn list_namespace(&mut self) -> Result<Vec<(String, Namespace)>> {
         let prefix = resource(REGISTER_KEY_PREFIX_NAMESPACE);
-        let resp = self.list::<Namespace>(prefix.as_str()).await?;
+        let resp = self.list_kvs::<Namespace>(prefix.as_str()).await?;
         Ok(resp)
     }
 
@@ -788,7 +805,7 @@ impl Register {
 
     pub async fn list_project(&mut self, namespace: &str) -> Result<Vec<(String, Project)>> {
         let prefix = resource_namespace(REGISTER_KEY_PREFIX_PROJECT, namespace);
-        let resp = self.list::<Project>(prefix.as_str()).await?;
+        let resp = self.list_kvs::<Project>(prefix.as_str()).await?;
         Ok(resp)
     }
 
