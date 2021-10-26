@@ -94,6 +94,10 @@ impl VersionBuild {
             message,
         }
     }
+
+    pub fn is_stopped(&self) -> bool {
+        matches!(self.status, BuildStatus::Cancel | BuildStatus::Fail | BuildStatus::Succeed)
+    }
 }
 
 // Latest build state per manifest id
