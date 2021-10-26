@@ -130,7 +130,7 @@ impl Repository for RepositoryService {
             .update_manifest_metadata(lease_id, namespace.as_str(), id.as_str(), version, size)
             .await
         {
-            Ok(_) => Ok(Response::new(PutManifestResponse { id, version })),
+            Ok(_) => Ok(Response::new(PutManifestResponse { version })),
             Err(err) => {
                 error!("update manifest metadata fail, error '{}'", err);
                 Err(rpc_internal_error(err))

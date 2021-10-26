@@ -25,9 +25,7 @@ message PutManifestRequest {
 }
 
 message PutManifestResponse {
-    // manifest id
-    string id = 1;
-    // project manifest version
+    // manifest version
     uint64 version = 2;
 }
 

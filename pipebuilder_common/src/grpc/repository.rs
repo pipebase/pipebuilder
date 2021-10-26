@@ -30,10 +30,7 @@ pub struct PutManifestRequest {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PutManifestResponse {
-    /// manifest id
-    #[prost(string, tag = "1")]
-    pub id: ::prost::alloc::string::String,
-    /// project manifest version
+    /// manifest version
     #[prost(uint64, tag = "2")]
     pub version: u64,
 }

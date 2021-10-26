@@ -55,20 +55,12 @@ pub struct PutManifestRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct PutManifestResponse {
-    pub id: String,
     pub version: u64,
 }
 
 impl Display for PutManifestResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{id:<id_width$}{version:<version_width$}",
-            id = self.id,
-            version = self.version,
-            id_width = DISPLAY_ID_WIDTH,
-            version_width = DISPLAY_VERSION_WIDTH,
-        )
+        writeln!(f, "manifest version: {}", self.version)
     }
 }
 
@@ -634,9 +626,8 @@ impl From<PutManifestRequest> for repository::PutManifestRequest {
 
 impl From<repository::PutManifestResponse> for PutManifestResponse {
     fn from(origin: repository::PutManifestResponse) -> Self {
-        let id = origin.id;
         let version = origin.version;
-        PutManifestResponse { id, version }
+        PutManifestResponse { version }
     }
 }
 
