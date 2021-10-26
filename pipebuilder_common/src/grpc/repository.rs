@@ -35,6 +35,20 @@ pub struct PutManifestResponse {
     pub version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteManifestRequest {
+    /// project namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// project id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
+    /// manifest version
+    #[prost(uint64, tag = "3")]
+    pub version: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteManifestResponse {}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetAppRequest {
     /// project namespace
     #[prost(string, tag = "1")]
@@ -69,6 +83,20 @@ pub struct PostAppRequest {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PostAppResponse {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteAppRequest {
+    /// project namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// project id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
+    /// app build version
+    #[prost(uint64, tag = "3")]
+    pub version: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteAppResponse {}
 #[doc = r" Generated client implementations."]
 pub mod repository_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -157,6 +185,21 @@ pub mod repository_client {
             let path = http::uri::PathAndQuery::from_static("/repository.Repository/PutManifest");
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn delete_manifest(
+            &mut self,
+            request: impl tonic::IntoRequest<super::DeleteManifestRequest>,
+        ) -> Result<tonic::Response<super::DeleteManifestResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path =
+                http::uri::PathAndQuery::from_static("/repository.Repository/DeleteManifest");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
         pub async fn get_app(
             &mut self,
             request: impl tonic::IntoRequest<super::GetAppRequest>,
@@ -185,6 +228,20 @@ pub mod repository_client {
             let path = http::uri::PathAndQuery::from_static("/repository.Repository/PostApp");
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn delete_app(
+            &mut self,
+            request: impl tonic::IntoRequest<super::DeleteAppRequest>,
+        ) -> Result<tonic::Response<super::DeleteAppResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/repository.Repository/DeleteApp");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
     }
 }
 #[doc = r" Generated server implementations."]
@@ -202,6 +259,10 @@ pub mod repository_server {
             &self,
             request: tonic::Request<super::PutManifestRequest>,
         ) -> Result<tonic::Response<super::PutManifestResponse>, tonic::Status>;
+        async fn delete_manifest(
+            &self,
+            request: tonic::Request<super::DeleteManifestRequest>,
+        ) -> Result<tonic::Response<super::DeleteManifestResponse>, tonic::Status>;
         async fn get_app(
             &self,
             request: tonic::Request<super::GetAppRequest>,
@@ -210,6 +271,10 @@ pub mod repository_server {
             &self,
             request: tonic::Request<super::PostAppRequest>,
         ) -> Result<tonic::Response<super::PostAppResponse>, tonic::Status>;
+        async fn delete_app(
+            &self,
+            request: tonic::Request<super::DeleteAppRequest>,
+        ) -> Result<tonic::Response<super::DeleteAppResponse>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct RepositoryServer<T: Repository> {
@@ -312,6 +377,39 @@ pub mod repository_server {
                     };
                     Box::pin(fut)
                 }
+                "/repository.Repository/DeleteManifest" => {
+                    #[allow(non_camel_case_types)]
+                    struct DeleteManifestSvc<T: Repository>(pub Arc<T>);
+                    impl<T: Repository> tonic::server::UnaryService<super::DeleteManifestRequest>
+                        for DeleteManifestSvc<T>
+                    {
+                        type Response = super::DeleteManifestResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::DeleteManifestRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).delete_manifest(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = DeleteManifestSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
                 "/repository.Repository/GetApp" => {
                     #[allow(non_camel_case_types)]
                     struct GetAppSvc<T: Repository>(pub Arc<T>);
@@ -364,6 +462,37 @@ pub mod repository_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = PostAppSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/repository.Repository/DeleteApp" => {
+                    #[allow(non_camel_case_types)]
+                    struct DeleteAppSvc<T: Repository>(pub Arc<T>);
+                    impl<T: Repository> tonic::server::UnaryService<super::DeleteAppRequest> for DeleteAppSvc<T> {
+                        type Response = super::DeleteAppResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::DeleteAppRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).delete_app(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = DeleteAppSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
                             accept_compression_encodings,

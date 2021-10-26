@@ -5,7 +5,7 @@ use pipebuilder_common::{api::client::ApiClient, Result};
 
 pub fn cmd() -> Cmd {
     Cmd::new("cancel")
-        .about("Cancel resources")
+        .about("Cancel resource")
         .subcommands(vec![build()])
 }
 

@@ -114,14 +114,11 @@ impl Builder for BuilderService {
         // cleanup local build workspace
         let app_directory = app_workspace(workspace, namespace.as_str(), id.as_str(), version);
         let app_path = sub_path(app_directory.as_str(), PATH_APP);
-        match remove_directory(app_path.as_str()).await {
-            Ok(_) => (),
-            Err(err) => {
-                return Err(tonic::Status::internal(format!(
-                    "clean app directory failed for '{}/{}/{}', error: '{}'",
-                    namespace, id, version, err
-                )))
-            }
+        if !remove_directory(app_path.as_str()).await {
+            error!(
+                "clean app directory failed for '{}/{}/{}'",
+                namespace, id, version
+            )
         };
         let mut register = self.register.clone();
         let lease_id = self.lease_id;

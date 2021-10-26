@@ -29,6 +29,17 @@ message PutManifestResponse {
     uint64 version = 2;
 }
 
+message DeleteManifestRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // manifest version
+    uint64 version = 3;
+}
+
+message DeleteManifestResponse {}
+
 message GetAppRequest {
     // project namespace
     string namespace = 1;
@@ -56,9 +67,22 @@ message PostAppRequest {
 
 message PostAppResponse {}
 
+message DeleteAppRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // app build version
+    uint64 version = 3;
+}
+
+message DeleteAppResponse {}
+
 service Repository {
     rpc GetManifest(GetManifestRequest) returns (GetManifestResponse) {}
     rpc PutManifest(PutManifestRequest) returns (PutManifestResponse) {}
+    rpc DeleteManifest(DeleteManifestRequest) returns (DeleteManifestResponse) {}
     rpc GetApp(GetAppRequest) returns (GetAppResponse) {}
     rpc PostApp(PostAppRequest) returns (PostAppResponse) {}
+    rpc DeleteApp(DeleteAppRequest) returns (DeleteAppResponse) {}
 }

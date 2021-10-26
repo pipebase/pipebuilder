@@ -1,8 +1,8 @@
 use crate::{
     grpc::node::{self, node_server::Node},
     Period, Register, DEFAULT_NODE_HEARTBEAT_PERIOD, ENV_PIPEBUILDER_EXTERNAL_ADDR,
-    ENV_PIPEBUILDER_NODE_ID, REGISTER_KEY_PREFIX_API, REGISTER_KEY_PREFIX_BUILDER,
-    REGISTER_KEY_PREFIX_REPOSITORY, REGISTER_KEY_PREFIX_SCHEDULER,
+    ENV_PIPEBUILDER_NODE_ID, RESOURCE_NODE_API, RESOURCE_NODE_BUILDER, RESOURCE_NODE_REPOSITORY,
+    RESOURCE_NODE_SCHEDULER,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -51,10 +51,10 @@ impl From<&str> for NodeRole {
 
 pub fn node_role_prefix(role: NodeRole) -> &'static str {
     match role {
-        NodeRole::Api => REGISTER_KEY_PREFIX_API,
-        NodeRole::Builder => REGISTER_KEY_PREFIX_BUILDER,
-        NodeRole::Manifest => REGISTER_KEY_PREFIX_REPOSITORY,
-        NodeRole::Scheduler => REGISTER_KEY_PREFIX_SCHEDULER,
+        NodeRole::Api => RESOURCE_NODE_API,
+        NodeRole::Builder => RESOURCE_NODE_BUILDER,
+        NodeRole::Manifest => RESOURCE_NODE_REPOSITORY,
+        NodeRole::Scheduler => RESOURCE_NODE_SCHEDULER,
         NodeRole::Undefined => unreachable!(),
     }
 }

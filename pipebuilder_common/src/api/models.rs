@@ -233,6 +233,36 @@ pub struct CancelBuildRequest {
 #[derive(Serialize, Deserialize)]
 pub struct CancelBuildResponse {}
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DeleteBuildRequest {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteBuildResponse {}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DeleteAppRequest {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteAppResponse {}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DeleteManifestRequest {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteManifestResponse {}
+
 #[derive(Serialize, Deserialize)]
 pub struct GetAppRequest {
     pub namespace: String,
@@ -734,6 +764,44 @@ impl From<node::ActivateResponse> for ActivateNodeResponse {
 impl From<node::DeactivateResponse> for DeactivateNodeResponse {
     fn from(_: node::DeactivateResponse) -> Self {
         DeactivateNodeResponse {}
+    }
+}
+
+impl From<DeleteManifestRequest> for repository::DeleteManifestRequest {
+    fn from(origin: DeleteManifestRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let version = origin.version;
+        repository::DeleteManifestRequest {
+            namespace,
+            id,
+            version,
+        }
+    }
+}
+
+impl From<repository::DeleteManifestResponse> for DeleteManifestResponse {
+    fn from(_: repository::DeleteManifestResponse) -> Self {
+        DeleteManifestResponse {}
+    }
+}
+
+impl From<DeleteAppRequest> for repository::DeleteAppRequest {
+    fn from(origin: DeleteAppRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let version = origin.version;
+        repository::DeleteAppRequest {
+            namespace,
+            id,
+            version,
+        }
+    }
+}
+
+impl From<repository::DeleteAppResponse> for DeleteAppResponse {
+    fn from(_: repository::DeleteAppResponse) -> Self {
+        DeleteAppResponse {}
     }
 }
 

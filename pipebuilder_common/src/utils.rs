@@ -15,7 +15,7 @@ use std::{
     io::{BufReader, BufWriter, Read, Write},
     path::Path,
 };
-use tokio::process::Command;
+use tokio::{fs::remove_dir_all, process::Command};
 use tonic::transport::Channel;
 use tracing::info;
 
@@ -96,11 +96,8 @@ pub fn sub_path(parent_directory: &str, path: &str) -> String {
 }
 
 // remove directory and return success flag
-pub async fn remove_directory(path: &str) -> Result<bool> {
-    let mut cmd = Command::new("rm");
-    cmd.arg("-r").arg(path);
-    let (code, _) = cmd_status_output(cmd).await?;
-    Ok(code == 0)
+pub async fn remove_directory(path: &str) -> bool {
+    remove_dir_all(path).await.is_ok()
 }
 
 // copy directory and return success flag
@@ -235,7 +232,7 @@ where
 }
 
 // key prefix functions
-pub fn resource(resource: &str) -> String {
+pub fn root_resource(resource: &str) -> String {
     format!("/{}", resource)
 }
 
@@ -262,7 +259,7 @@ pub fn resource_namespace_id_version(
 
 // remove '/resource/namespace/' and return id/<suffix> given a key
 pub fn remove_resource_namespace<'a>(key: &'a str, resource: &str, namespace: &str) -> &'a str {
-    let pattern = format!("/{}/{}/", resource, namespace);
+    let pattern = format!("{}/", resource_namespace(resource, namespace));
     key.strip_prefix(pattern.as_str()).unwrap_or_else(|| {
         panic!(
             "key '{}' not start with '/{}/{}/'",
@@ -273,7 +270,7 @@ pub fn remove_resource_namespace<'a>(key: &'a str, resource: &str, namespace: &s
 
 // remove '/resource/' and return suffix
 pub fn remove_resource<'a>(key: &'a str, resource: &str) -> &'a str {
-    let pattern = format!("/{}/", resource);
+    let pattern = format!("{}/", root_resource(resource));
     key.strip_prefix(pattern.as_str())
         .unwrap_or_else(|| panic!("key '{}' not start with '/{}/'", key, resource))
 }

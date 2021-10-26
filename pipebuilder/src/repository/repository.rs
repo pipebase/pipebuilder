@@ -1,11 +1,12 @@
 use pipebuilder_common::{
     create_directory,
     grpc::repository::{
-        repository_server::Repository, GetAppResponse, GetManifestResponse, PostAppResponse,
-        PutManifestResponse,
+        repository_server::Repository, DeleteAppResponse, DeleteManifestResponse, GetAppResponse,
+        GetManifestResponse, PostAppResponse, PutManifestResponse,
     },
     read_file, rpc_internal_error, rpc_not_found, sub_path, write_file, Register,
 };
+use std::fs::remove_dir_all;
 use tonic::Response;
 use tracing::{error, info};
 
@@ -138,6 +139,46 @@ impl Repository for RepositoryService {
         }
     }
 
+    async fn delete_manifest(
+        &self,
+        request: tonic::Request<pipebuilder_common::grpc::repository::DeleteManifestRequest>,
+    ) -> Result<
+        tonic::Response<pipebuilder_common::grpc::repository::DeleteManifestResponse>,
+        tonic::Status,
+    > {
+        let request = request.into_inner();
+        let namespace = request.namespace;
+        let id = request.id;
+        let version = request.version;
+        info!("delete manifest '{}/{}/{}'", namespace, id, version);
+        let repository = self.manifest_repository.as_str();
+        match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
+            Ok(_) => (),
+            Err(err) => {
+                error!(
+                    "delete manifest '{}/{}/{}' fail, error: '{:#?}'",
+                    namespace, id, version, err
+                );
+                // return error ?
+            }
+        };
+        let mut register = self.register.clone();
+        match register
+            .delete_manifest_meta(namespace.as_str(), id.as_str(), version)
+            .await
+        {
+            Ok(_) => (),
+            Err(err) => {
+                error!(
+                    "delete manifest metadata '{}/{}/{}' fail, error: '{:#?}'",
+                    namespace, id, version, err
+                )
+                // return error ?
+            }
+        }
+        Ok(Response::new(DeleteManifestResponse {}))
+    }
+
     async fn get_app(
         &self,
         request: tonic::Request<pipebuilder_common::grpc::repository::GetAppRequest>,
@@ -147,7 +188,7 @@ impl Repository for RepositoryService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        info!("get app {}/{}/{}", namespace, id, version);
+        info!("get app '{}/{}/{}'", namespace, id, version);
         let repository = self.app_repository.as_str();
         let buffer = match read_target_from_repo(
             repository,
@@ -159,7 +200,7 @@ impl Repository for RepositoryService {
             Ok(buffer) => buffer,
             Err(err) => {
                 error!(
-                    "read app {}/{}/{} fail, error '{}'",
+                    "read app '{}/{}/{}' fail, error '{}'",
                     namespace, id, version, err
                 );
                 return Err(rpc_not_found("app not found"));
@@ -190,7 +231,7 @@ impl Repository for RepositoryService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        info!("post app {}/{}/{}", namespace, id, version);
+        info!("post app '{}/{}/{}'", namespace, id, version);
         let buffer = request.buffer.as_slice();
         let repository = self.app_repository.as_str();
         match write_target_into_repo(
@@ -222,6 +263,46 @@ impl Repository for RepositoryService {
             }
         }
     }
+
+    async fn delete_app(
+        &self,
+        request: tonic::Request<pipebuilder_common::grpc::repository::DeleteAppRequest>,
+    ) -> Result<
+        tonic::Response<pipebuilder_common::grpc::repository::DeleteAppResponse>,
+        tonic::Status,
+    > {
+        let request = request.into_inner();
+        let namespace = request.namespace;
+        let id = request.id;
+        let version = request.version;
+        info!("delete app '{}/{}/{}'", namespace, id, version);
+        let repository = self.app_repository.as_str();
+        match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
+            Ok(_) => (),
+            Err(err) => {
+                error!(
+                    "delete app '{}/{}/{}' fail, error: '{:#?}'",
+                    namespace, id, version, err
+                );
+                // return error ?
+            }
+        };
+        let mut register = self.register.clone();
+        match register
+            .delete_app_meta(namespace.as_str(), id.as_str(), version)
+            .await
+        {
+            Ok(_) => (),
+            Err(err) => {
+                error!(
+                    "delete app metadata '{}/{}/{}' fail, error: '{:#?}'",
+                    namespace, id, version, err
+                )
+                // return error ?
+            }
+        }
+        Ok(Response::new(DeleteAppResponse {}))
+    }
 }
 
 fn read_target_from_repo(
@@ -250,6 +331,17 @@ fn write_target_into_repo(
     create_directory(directory)?;
     write_file(path, buffer)?;
     // TODO S3 backup
+    Ok(())
+}
+
+fn delete_target_from_repo(
+    repository: &str,
+    namespace: &str,
+    id: &str,
+    version: u64,
+) -> pipebuilder_common::Result<()> {
+    let directory = get_target_directory(repository, namespace, id, version);
+    remove_dir_all(directory)?;
     Ok(())
 }
 

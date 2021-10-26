@@ -96,7 +96,10 @@ impl VersionBuild {
     }
 
     pub fn is_stopped(&self) -> bool {
-        matches!(self.status, BuildStatus::Cancel | BuildStatus::Fail | BuildStatus::Succeed)
+        matches!(
+            self.status,
+            BuildStatus::Cancel | BuildStatus::Fail | BuildStatus::Succeed
+        )
     }
 }
 
@@ -420,7 +423,7 @@ impl Build {
             app_restore_directory(restore_directory, namespace, id, target_platform);
         let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
         // cleanup previous app build cache if any
-        let _ = remove_directory(app_restore_path.as_str()).await?;
+        let _ = remove_directory(app_restore_path.as_str()).await;
         create_directory(app_restore_directory.as_str())?;
         if !move_directory(app_path.as_str(), app_restore_directory.as_str()).await? {
             error!(

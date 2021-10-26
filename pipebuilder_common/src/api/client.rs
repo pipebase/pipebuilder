@@ -7,13 +7,14 @@ use super::{
     models::{
         ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildRequest, BuildResponse,
         BuildSnapshot, CancelBuildRequest, CancelBuildResponse, DeactivateNodeRequest,
-        DeactivateNodeResponse, Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest,
-        GetBuildLogResponse, GetBuildRequest, GetManifestRequest, GetManifestResponse,
-        ListAppMetadataRequest, ListBuildRequest, ListBuildSnapshotRequest,
-        ListManifestMetadataRequest, ListManifestSnapshotRequest, ListNamespaceRequest,
-        ListNodeStateRequest, ListProjectRequest, ManifestMetadata, ManifestSnapshot, Namespace,
-        NodeState, Project, PutManifestRequest, PutManifestResponse, ScanBuilderRequest,
-        UpdateNamespaceRequest, UpdateProjectRequest, VersionBuild, VersionBuildKey,
+        DeactivateNodeResponse, DeleteAppRequest, DeleteBuildRequest, DeleteManifestRequest,
+        Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest, GetBuildLogResponse,
+        GetBuildRequest, GetManifestRequest, GetManifestResponse, ListAppMetadataRequest,
+        ListBuildRequest, ListBuildSnapshotRequest, ListManifestMetadataRequest,
+        ListManifestSnapshotRequest, ListNamespaceRequest, ListNodeStateRequest,
+        ListProjectRequest, ManifestMetadata, ManifestSnapshot, Namespace, NodeState, Project,
+        PutManifestRequest, PutManifestResponse, ScanBuilderRequest, UpdateNamespaceRequest,
+        UpdateProjectRequest, VersionBuild, VersionBuildKey,
     },
 };
 use crate::{api_client_error, api_server_error, Result};
@@ -131,6 +132,28 @@ impl ApiClient {
             None => req,
         };
         let resp = req.send().await?;
+        Ok(resp)
+    }
+
+    pub async fn delete<B>(&self, path: &str, body: B) -> Result<Response>
+    where
+        B: Into<Body>,
+    {
+        let req = self
+            .client
+            .delete(self.get_url(path))
+            .headers(self.headers.to_owned());
+        let req = match self.basic_auth {
+            Some(ref basic_auth) => {
+                req.basic_auth(&basic_auth.username, basic_auth.password.as_ref())
+            }
+            None => req,
+        };
+        let req = match self.bearer_auth_token {
+            Some(ref token) => req.bearer_auth(token),
+            None => req,
+        };
+        let resp = req.body(body).send().await?;
         Ok(resp)
     }
 
@@ -277,6 +300,24 @@ impl ApiClient {
         let response = self.query(PROJECT, request).await?;
         let response = Self::get_response_body::<Vec<Project>>(response).await?;
         Ok(response)
+    }
+
+    pub async fn delete_build(&self, request: &DeleteBuildRequest) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(BUILD, request).await?;
+        Ok(())
+    }
+
+    pub async fn delete_app(&self, request: &DeleteAppRequest) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(APP, request).await?;
+        Ok(())
+    }
+
+    pub async fn delete_manfiest(&self, request: &DeleteManifestRequest) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(MANIFEST, request).await?;
+        Ok(())
     }
 
     fn serialize_request<T>(request: &T) -> Result<Vec<u8>>

@@ -1,11 +1,10 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
-    read_file, resource, resource_id, resource_namespace, resource_namespace_id,
-    resource_namespace_id_version, AppMetadata, BuildSnapshot, ManifestMetadata, ManifestSnapshot,
-    Namespace, NodeState, Project, Result, VersionBuild, REGISTER_KEY_PREFIX_APP_METADATA,
-    REGISTER_KEY_PREFIX_BUILDER, REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
-    REGISTER_KEY_PREFIX_MANIFEST_METADATA, REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
-    REGISTER_KEY_PREFIX_NAMESPACE, REGISTER_KEY_PREFIX_PROJECT, REGISTER_KEY_PREFIX_VERSION_BUILD,
+    read_file, resource_id, resource_namespace, resource_namespace_id,
+    resource_namespace_id_version, root_resource, AppMetadata, BuildSnapshot, ManifestMetadata,
+    ManifestSnapshot, Namespace, NodeState, Project, Result, VersionBuild, RESOURCE_APP_METADATA,
+    RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
+    RESOURCE_NAMESPACE, RESOURCE_NODE_BUILDER, RESOURCE_PROJECT, RESOURCE_VERSION_BUILD,
 };
 use etcd_client::{
     Certificate, Client, ConnectOptions, DeleteOptions, DeleteResponse, GetOptions, GetResponse,
@@ -273,7 +272,7 @@ impl Register {
     }
 
     pub async fn watch_builders(&mut self) -> Result<(Watcher, WatchStream)> {
-        self.watch_prefix(REGISTER_KEY_PREFIX_BUILDER).await
+        self.watch_prefix(RESOURCE_NODE_BUILDER).await
     }
 
     pub async fn lock(&mut self, name: &str, options: Option<LockOptions>) -> Result<LockResponse> {
@@ -301,7 +300,7 @@ impl Register {
             }
             None => BuildSnapshot::default(),
         };
-        let key = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, id);
+        let key = resource_namespace_id(RESOURCE_BUILD_SNAPSHOT, namespace, id);
         let value = serde_json::to_vec(&new_snapshot)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, new_snapshot))
@@ -312,7 +311,7 @@ impl Register {
         namespace: &str,
         id: &str,
     ) -> Result<Option<BuildSnapshot>> {
-        let key = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, id);
+        let key = resource_namespace_id(RESOURCE_BUILD_SNAPSHOT, namespace, id);
         let snapshot = self
             .get_json_value::<String, BuildSnapshot>(key, None)
             .await?;
@@ -326,7 +325,7 @@ impl Register {
         lease_id: i64,
     ) -> Result<(PutResponse, BuildSnapshot)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace, id);
+        let lock_name = resource_namespace_id(RESOURCE_BUILD_SNAPSHOT, namespace, id);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_incr_build_snapshot(namespace, id).await;
@@ -340,12 +339,7 @@ impl Register {
         id: &str,
         version: u64,
     ) -> Result<Option<VersionBuild>> {
-        let key = resource_namespace_id_version(
-            REGISTER_KEY_PREFIX_VERSION_BUILD,
-            namespace,
-            id,
-            version,
-        );
+        let key = resource_namespace_id_version(RESOURCE_VERSION_BUILD, namespace, id, version);
         let state = self
             .get_json_value::<String, VersionBuild>(key, None)
             .await?;
@@ -360,12 +354,8 @@ impl Register {
         version: u64,
     ) -> Result<Option<VersionBuild>> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_namespace_id_version(
-            REGISTER_KEY_PREFIX_VERSION_BUILD,
-            namespace,
-            id,
-            version,
-        );
+        let lock_name =
+            resource_namespace_id_version(RESOURCE_VERSION_BUILD, namespace, id, version);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_get_version_build(namespace, id, version).await?;
@@ -379,10 +369,8 @@ impl Register {
         id: Option<String>,
     ) -> Result<Vec<(String, VersionBuild)>> {
         let prefix = match id {
-            Some(id) => {
-                resource_namespace_id(REGISTER_KEY_PREFIX_VERSION_BUILD, namespace, id.as_str())
-            }
-            None => resource_namespace(REGISTER_KEY_PREFIX_VERSION_BUILD, namespace),
+            Some(id) => resource_namespace_id(RESOURCE_VERSION_BUILD, namespace, id.as_str()),
+            None => resource_namespace(RESOURCE_VERSION_BUILD, namespace),
         };
         let version_builds = self.list_kvs::<VersionBuild>(prefix.as_str()).await?;
         Ok(version_builds)
@@ -395,12 +383,7 @@ impl Register {
         version: u64,
         state: VersionBuild,
     ) -> Result<(PutResponse, VersionBuild)> {
-        let key = resource_namespace_id_version(
-            REGISTER_KEY_PREFIX_VERSION_BUILD,
-            namespace,
-            id,
-            version,
-        );
+        let key = resource_namespace_id_version(RESOURCE_VERSION_BUILD, namespace, id, version);
         let value = serde_json::to_vec(&state)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, state))
@@ -415,12 +398,8 @@ impl Register {
         state: VersionBuild,
     ) -> Result<(PutResponse, VersionBuild)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_namespace_id_version(
-            REGISTER_KEY_PREFIX_VERSION_BUILD,
-            namespace,
-            id,
-            version,
-        );
+        let lock_name =
+            resource_namespace_id_version(RESOURCE_VERSION_BUILD, namespace, id, version);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self
@@ -442,7 +421,7 @@ impl Register {
             }
             None => ManifestSnapshot::new(),
         };
-        let key = resource_namespace_id(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace, id);
+        let key = resource_namespace_id(RESOURCE_MANIFEST_SNAPSHOT, namespace, id);
         let value = serde_json::to_vec(&new_snapshot)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, new_snapshot))
@@ -455,7 +434,7 @@ impl Register {
         id: &str,
     ) -> Result<(PutResponse, ManifestSnapshot)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace, id);
+        let lock_name = resource_namespace_id(RESOURCE_MANIFEST_SNAPSHOT, namespace, id);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_incr_manifest_snapshot(namespace, id).await;
@@ -468,7 +447,7 @@ impl Register {
         namespace: &str,
         id: &str,
     ) -> Result<Option<ManifestSnapshot>> {
-        let key = resource_namespace_id(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace, id);
+        let key = resource_namespace_id(RESOURCE_MANIFEST_SNAPSHOT, namespace, id);
         let snapshot = self
             .get_json_value::<String, ManifestSnapshot>(key, None)
             .await?;
@@ -482,7 +461,7 @@ impl Register {
         id: &str,
     ) -> Result<Option<ManifestSnapshot>> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace, id);
+        let lock_name = resource_namespace_id(RESOURCE_MANIFEST_SNAPSHOT, namespace, id);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_get_manifest_snapshot(namespace, id).await;
@@ -495,7 +474,7 @@ impl Register {
         &mut self,
         namespace: &str,
     ) -> Result<Vec<(String, ManifestSnapshot)>> {
-        let prefix = resource_namespace(REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, namespace);
+        let prefix = resource_namespace(RESOURCE_MANIFEST_SNAPSHOT, namespace);
         let manifest_snapshots = self.list_kvs::<ManifestSnapshot>(prefix.as_str()).await?;
         Ok(manifest_snapshots)
     }
@@ -505,7 +484,7 @@ impl Register {
         &mut self,
         namespace: &str,
     ) -> Result<Vec<(String, BuildSnapshot)>> {
-        let prefix = resource_namespace(REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, namespace);
+        let prefix = resource_namespace(RESOURCE_BUILD_SNAPSHOT, namespace);
         let build_snapshots = self.list_kvs::<BuildSnapshot>(prefix.as_str()).await?;
         Ok(build_snapshots)
     }
@@ -516,8 +495,7 @@ impl Register {
         id: &str,
         version: u64,
     ) -> Result<Option<AppMetadata>> {
-        let key =
-            resource_namespace_id_version(REGISTER_KEY_PREFIX_APP_METADATA, namespace, id, version);
+        let key = resource_namespace_id_version(RESOURCE_APP_METADATA, namespace, id, version);
         let metadata = self
             .get_json_value::<String, AppMetadata>(key, None)
             .await?;
@@ -533,7 +511,7 @@ impl Register {
     ) -> Result<Option<AppMetadata>> {
         let lock_options = LockOptions::new().with_lease(lease_id);
         let lock_name =
-            resource_namespace_id_version(REGISTER_KEY_PREFIX_APP_METADATA, namespace, id, version);
+            resource_namespace_id_version(RESOURCE_APP_METADATA, namespace, id, version);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_get_app_metadata(namespace, id, version).await;
@@ -555,8 +533,7 @@ impl Register {
             }
             None => AppMetadata::new(size),
         };
-        let key =
-            resource_namespace_id_version(REGISTER_KEY_PREFIX_APP_METADATA, namespace, id, version);
+        let key = resource_namespace_id_version(RESOURCE_APP_METADATA, namespace, id, version);
         let value = serde_json::to_vec(&new_metadata)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, new_metadata))
@@ -572,7 +549,7 @@ impl Register {
     ) -> Result<(PutResponse, AppMetadata)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
         let lock_name =
-            resource_namespace_id_version(REGISTER_KEY_PREFIX_APP_METADATA, namespace, id, version);
+            resource_namespace_id_version(RESOURCE_APP_METADATA, namespace, id, version);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self
@@ -588,10 +565,8 @@ impl Register {
         id: Option<String>,
     ) -> Result<Vec<(String, AppMetadata)>> {
         let prefix = match id {
-            Some(id) => {
-                resource_namespace_id(REGISTER_KEY_PREFIX_APP_METADATA, namespace, id.as_str())
-            }
-            None => resource_namespace(REGISTER_KEY_PREFIX_APP_METADATA, namespace),
+            Some(id) => resource_namespace_id(RESOURCE_APP_METADATA, namespace, id.as_str()),
+            None => resource_namespace(RESOURCE_APP_METADATA, namespace),
         };
         let resp = self.list_kvs::<AppMetadata>(prefix.as_str()).await?;
         Ok(resp)
@@ -603,12 +578,7 @@ impl Register {
         id: &str,
         version: u64,
     ) -> Result<Option<ManifestMetadata>> {
-        let key = resource_namespace_id_version(
-            REGISTER_KEY_PREFIX_MANIFEST_METADATA,
-            namespace,
-            id,
-            version,
-        );
+        let key = resource_namespace_id_version(RESOURCE_MANIFEST_METADATA, namespace, id, version);
         let metadata = self
             .get_json_value::<String, ManifestMetadata>(key, None)
             .await?;
@@ -623,12 +593,8 @@ impl Register {
         version: u64,
     ) -> Result<Option<ManifestMetadata>> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_namespace_id_version(
-            REGISTER_KEY_PREFIX_MANIFEST_METADATA,
-            namespace,
-            id,
-            version,
-        );
+        let lock_name =
+            resource_namespace_id_version(RESOURCE_MANIFEST_METADATA, namespace, id, version);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_get_manifest_metadata(namespace, id, version).await;
@@ -653,12 +619,7 @@ impl Register {
             }
             None => ManifestMetadata::new(size),
         };
-        let key = resource_namespace_id_version(
-            REGISTER_KEY_PREFIX_MANIFEST_METADATA,
-            namespace,
-            id,
-            version,
-        );
+        let key = resource_namespace_id_version(RESOURCE_MANIFEST_METADATA, namespace, id, version);
         let value = serde_json::to_vec(&new_metadata)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, new_metadata))
@@ -673,12 +634,8 @@ impl Register {
         size: usize,
     ) -> Result<(PutResponse, ManifestMetadata)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_namespace_id_version(
-            REGISTER_KEY_PREFIX_MANIFEST_METADATA,
-            namespace,
-            id,
-            version,
-        );
+        let lock_name =
+            resource_namespace_id_version(RESOURCE_MANIFEST_METADATA, namespace, id, version);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self
@@ -694,26 +651,22 @@ impl Register {
         id: Option<String>,
     ) -> Result<Vec<(String, ManifestMetadata)>> {
         let prefix = match id {
-            Some(id) => resource_namespace_id(
-                REGISTER_KEY_PREFIX_MANIFEST_METADATA,
-                namespace,
-                id.as_str(),
-            ),
-            None => resource_namespace(REGISTER_KEY_PREFIX_MANIFEST_METADATA, namespace),
+            Some(id) => resource_namespace_id(RESOURCE_MANIFEST_METADATA, namespace, id.as_str()),
+            None => resource_namespace(RESOURCE_MANIFEST_METADATA, namespace),
         };
         let resp = self.list_kvs::<ManifestMetadata>(prefix.as_str()).await?;
         Ok(resp)
     }
 
     async fn do_get_namespace(&mut self, id: &str) -> Result<Option<Namespace>> {
-        let key = resource_id(REGISTER_KEY_PREFIX_NAMESPACE, id);
+        let key = resource_id(RESOURCE_NAMESPACE, id);
         let namespace = self.get_json_value::<String, Namespace>(key, None).await?;
         Ok(namespace)
     }
 
     pub async fn get_namespace(&mut self, lease_id: i64, id: &str) -> Result<Option<Namespace>> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_id(REGISTER_KEY_PREFIX_NAMESPACE, id);
+        let lock_name = resource_id(RESOURCE_NAMESPACE, id);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_get_namespace(id).await;
@@ -726,7 +679,7 @@ impl Register {
             Some(namespace) => namespace,
             None => Namespace::new(),
         };
-        let key = resource_id(REGISTER_KEY_PREFIX_NAMESPACE, id);
+        let key = resource_id(RESOURCE_NAMESPACE, id);
         let value = serde_json::to_vec(&namespace)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, namespace))
@@ -738,7 +691,7 @@ impl Register {
         id: &str,
     ) -> Result<(PutResponse, Namespace)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_id(REGISTER_KEY_PREFIX_NAMESPACE, id);
+        let lock_name = resource_id(RESOURCE_NAMESPACE, id);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_update_namespace(id).await;
@@ -747,13 +700,13 @@ impl Register {
     }
 
     pub async fn list_namespace(&mut self) -> Result<Vec<(String, Namespace)>> {
-        let prefix = resource(REGISTER_KEY_PREFIX_NAMESPACE);
+        let prefix = root_resource(RESOURCE_NAMESPACE);
         let resp = self.list_kvs::<Namespace>(prefix.as_str()).await?;
         Ok(resp)
     }
 
     async fn do_get_project(&mut self, namespace: &str, id: &str) -> Result<Option<Project>> {
-        let key = resource_namespace_id(REGISTER_KEY_PREFIX_PROJECT, namespace, id);
+        let key = resource_namespace_id(RESOURCE_PROJECT, namespace, id);
         let project = self.get_json_value::<String, Project>(key, None).await?;
         Ok(project)
     }
@@ -765,7 +718,7 @@ impl Register {
         id: &str,
     ) -> Result<Option<Project>> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_PROJECT, namespace, id);
+        let lock_name = resource_namespace_id(RESOURCE_PROJECT, namespace, id);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_get_project(namespace, id).await;
@@ -782,7 +735,7 @@ impl Register {
             Some(project) => project,
             None => Project::new(),
         };
-        let key = resource_namespace_id(REGISTER_KEY_PREFIX_PROJECT, namespace, id);
+        let key = resource_namespace_id(RESOURCE_PROJECT, namespace, id);
         let value = serde_json::to_vec(&project)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, project))
@@ -795,7 +748,7 @@ impl Register {
         id: &str,
     ) -> Result<(PutResponse, Project)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = resource_namespace_id(REGISTER_KEY_PREFIX_PROJECT, namespace, id);
+        let lock_name = resource_namespace_id(RESOURCE_PROJECT, namespace, id);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self.do_update_project(namespace, id).await;
@@ -804,9 +757,49 @@ impl Register {
     }
 
     pub async fn list_project(&mut self, namespace: &str) -> Result<Vec<(String, Project)>> {
-        let prefix = resource_namespace(REGISTER_KEY_PREFIX_PROJECT, namespace);
+        let prefix = resource_namespace(RESOURCE_PROJECT, namespace);
         let resp = self.list_kvs::<Project>(prefix.as_str()).await?;
         Ok(resp)
+    }
+
+    pub async fn delete_version_build(
+        &mut self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> Result<()> {
+        let key = resource_namespace_id_version(RESOURCE_VERSION_BUILD, namespace, id, version);
+        let _ = self.delete(key, None).await?;
+        Ok(())
+    }
+
+    pub async fn delete_build_snapshot(&mut self, namespace: &str, id: &str) -> Result<()> {
+        let key = resource_namespace_id(RESOURCE_BUILD_SNAPSHOT, namespace, id);
+        let _ = self.delete(key, None).await?;
+        Ok(())
+    }
+
+    pub async fn delete_app_meta(&mut self, namespace: &str, id: &str, version: u64) -> Result<()> {
+        let key = resource_namespace_id_version(RESOURCE_APP_METADATA, namespace, id, version);
+        let _ = self.delete(key, None).await?;
+        Ok(())
+    }
+
+    pub async fn delete_manifest_meta(
+        &mut self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> Result<()> {
+        let key = resource_namespace_id_version(RESOURCE_MANIFEST_METADATA, namespace, id, version);
+        let _ = self.delete(key, None).await?;
+        Ok(())
+    }
+
+    pub async fn delete_manifest_snapshot(&mut self, namespace: &str, id: &str) -> Result<()> {
+        let key = resource_namespace_id(RESOURCE_MANIFEST_SNAPSHOT, namespace, id);
+        let _ = self.delete(key, None).await?;
+        Ok(())
     }
 
     fn deserialize_kvs<T>(kvs: &[KeyValue]) -> Result<Vec<(String, T)>>

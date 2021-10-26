@@ -4,6 +4,7 @@ pub(crate) mod activate;
 pub(crate) mod cancel;
 pub(crate) mod create;
 pub(crate) mod deactivate;
+pub(crate) mod delete;
 pub(crate) mod get;
 pub(crate) mod list;
 pub(crate) mod scan;
@@ -15,6 +16,7 @@ pub fn cmds() -> Vec<Cmd> {
         activate::cmd(),
         create::cmd(),
         deactivate::cmd(),
+        delete::cmd(),
         get::cmd(),
         list::cmd(),
         cancel::cmd(),
@@ -50,6 +52,9 @@ pub async fn exec(
         ("list", "project") => list::exec_project(client, args).await,
         ("cancel", "build") => cancel::exec_build(client, args).await,
         ("scan", "builder") => scan::exec_builder(client, args).await,
+        ("delete", "app") => delete::exec_app(client, args).await,
+        ("delete", "build") => delete::exec_build(client, args).await,
+        ("delete", "manifest") => delete::exec_manifest(client, args).await,
         _ => unreachable!("unknown cmd ({}, {})", action, resource),
     }
 }

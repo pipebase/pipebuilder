@@ -26,7 +26,7 @@ pub mod filters {
             .or(v1_build_get(register.clone(), lease_id))
             .or(v1_build_list(register.clone()))
             .or(v1_build_cancel(register.clone(), lease_id))
-            .or(v1_app_get(repository_client))
+            .or(v1_app_get(repository_client.clone()))
             .or(v1_build_log_get(register.clone(), lease_id))
             .or(v1_node_state_list(register.clone()))
             .or(v1_builder_scan(register.clone(), lease_id))
@@ -37,7 +37,10 @@ pub mod filters {
             .or(v1_namespace_put(register.clone(), lease_id))
             .or(v1_project_put(register.clone(), lease_id))
             .or(v1_namespace_list(register.clone()))
-            .or(v1_project_list(register))
+            .or(v1_project_list(register.clone()))
+            .or(v1_build_delete(register, lease_id))
+            .or(v1_app_delete(repository_client.clone()))
+            .or(v1_manifest_delete(repository_client))
     }
 
     pub fn v1_build(
@@ -256,6 +259,38 @@ pub mod filters {
             .and_then(handlers::list_project)
     }
 
+    pub fn v1_build_delete(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "build")
+            .and(warp::delete())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(json_request::<models::DeleteBuildRequest>())
+            .and_then(handlers::delete_build)
+    }
+
+    pub fn v1_app_delete(
+        repository_client: RepositoryClient<Channel>,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "app")
+            .and(warp::delete())
+            .and(with_repository_client(repository_client))
+            .and(json_request::<models::DeleteAppRequest>())
+            .and_then(handlers::delete_app)
+    }
+
+    pub fn v1_manifest_delete(
+        repository_client: RepositoryClient<Channel>,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "manifest")
+            .and(warp::delete())
+            .and(with_repository_client(repository_client))
+            .and(json_request::<models::DeleteManifestRequest>())
+            .and_then(handlers::delete_manifest)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -303,16 +338,15 @@ mod handlers {
             },
             node::{node_client::NodeClient, ActivateRequest, DeactivateRequest, StatusRequest},
             repository::{
-                repository_client::RepositoryClient, GetAppRequest, GetManifestRequest,
-                PutManifestRequest,
+                repository_client::RepositoryClient, DeleteAppRequest, DeleteManifestRequest,
+                GetAppRequest, GetManifestRequest, PutManifestRequest,
             },
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
         node_role_prefix, remove_resource, remove_resource_namespace, NodeRole,
-        NodeState as InternalNodeState, Register, REGISTER_KEY_PREFIX_APP_METADATA,
-        REGISTER_KEY_PREFIX_BUILD_SNAPSHOT, REGISTER_KEY_PREFIX_MANIFEST_METADATA,
-        REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT, REGISTER_KEY_PREFIX_NAMESPACE,
-        REGISTER_KEY_PREFIX_NODE, REGISTER_KEY_PREFIX_PROJECT, REGISTER_KEY_PREFIX_VERSION_BUILD,
+        NodeState as InternalNodeState, Register, RESOURCE_APP_METADATA, RESOURCE_BUILD_SNAPSHOT,
+        RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT, RESOURCE_NAMESPACE, RESOURCE_NODE,
+        RESOURCE_PROJECT, RESOURCE_VERSION_BUILD,
     };
     use serde::Serialize;
     use std::convert::Infallible;
@@ -449,7 +483,7 @@ mod handlers {
             .map(|(key, manifest_snapshot)| models::ManifestSnapshot {
                 id: remove_resource_namespace(
                     key.as_str(),
-                    REGISTER_KEY_PREFIX_MANIFEST_SNAPSHOT,
+                    RESOURCE_MANIFEST_SNAPSHOT,
                     namespace.as_str(),
                 )
                 .to_owned(),
@@ -480,7 +514,7 @@ mod handlers {
             .map(|(key, build_snapshot)| models::BuildSnapshot {
                 id: remove_resource_namespace(
                     key.as_str(),
-                    REGISTER_KEY_PREFIX_BUILD_SNAPSHOT,
+                    RESOURCE_BUILD_SNAPSHOT,
                     namespace.as_str(),
                 )
                 .to_owned(),
@@ -551,7 +585,7 @@ mod handlers {
             .map(|(key, version_build)| {
                 let id_version = remove_resource_namespace(
                     key.as_str(),
-                    REGISTER_KEY_PREFIX_VERSION_BUILD,
+                    RESOURCE_VERSION_BUILD,
                     namespace.as_str(),
                 );
                 let id_version = id_version.split('/').collect::<Vec<&str>>();
@@ -634,6 +668,55 @@ mod handlers {
         Ok(resp.into_inner().into())
     }
 
+    pub async fn delete_build(
+        mut register: Register,
+        lease_id: i64,
+        request: models::DeleteBuildRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        let namespace = request.namespace.as_str();
+        let id = request.id.as_str();
+        let version = request.version;
+        let version_build = match register
+            .get_version_build(lease_id, namespace, id, version)
+            .await
+        {
+            Ok(version_build) => version_build,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        let version_build = match version_build {
+            Some(version_build) => version_build,
+            None => {
+                return Ok(http_bad_request(Failure::new(format!(
+                    "build {}/{}/{} not found",
+                    namespace, id, version
+                ))))
+            }
+        };
+        if !version_build.is_stopped() {
+            return Ok(http_bad_request(Failure::new(format!(
+                "build {}/{}/{} is running, cancel required before delete",
+                namespace, id, version
+            ))));
+        }
+        match do_delete_build(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_delete_build(
+        register: &mut Register,
+        request: models::DeleteBuildRequest,
+    ) -> pipebuilder_common::Result<models::DeleteBuildResponse> {
+        let namespace = request.namespace;
+        let id = request.id;
+        let version = request.version;
+        register
+            .delete_version_build(namespace.as_str(), id.as_str(), version)
+            .await?;
+        Ok(models::DeleteBuildResponse {})
+    }
+
     pub async fn get_app(
         mut client: RepositoryClient<Channel>,
         request: models::GetAppRequest,
@@ -650,6 +733,44 @@ mod handlers {
     ) -> pipebuilder_common::Result<models::GetAppResponse> {
         let request: GetAppRequest = request.into();
         let response = client.get_app(request).await?;
+        Ok(response.into_inner().into())
+    }
+
+    pub async fn delete_app(
+        mut client: RepositoryClient<Channel>,
+        request: models::DeleteAppRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_delete_app(&mut client, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_delete_app(
+        client: &mut RepositoryClient<Channel>,
+        request: models::DeleteAppRequest,
+    ) -> pipebuilder_common::Result<models::DeleteAppResponse> {
+        let request: DeleteAppRequest = request.into();
+        let response = client.delete_app(request).await?;
+        Ok(response.into_inner().into())
+    }
+
+    pub async fn delete_manifest(
+        mut client: RepositoryClient<Channel>,
+        request: models::DeleteManifestRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_delete_manifest(&mut client, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_delete_manifest(
+        client: &mut RepositoryClient<Channel>,
+        request: models::DeleteManifestRequest,
+    ) -> pipebuilder_common::Result<models::DeleteManifestResponse> {
+        let request: DeleteManifestRequest = request.into();
+        let response = client.delete_manifest(request).await?;
         Ok(response.into_inner().into())
     }
 
@@ -733,7 +854,7 @@ mod handlers {
         let role = request.role;
         let prefix = match role {
             Some(role) => node_role_prefix(role),
-            None => REGISTER_KEY_PREFIX_NODE,
+            None => RESOURCE_NODE,
         };
         let node_states = register.list_node_state(prefix).await?;
         let node_states = node_states
@@ -913,11 +1034,8 @@ mod handlers {
         let metas = metas
             .into_iter()
             .map(|(key, meta)| {
-                let id_version = remove_resource_namespace(
-                    key.as_str(),
-                    REGISTER_KEY_PREFIX_APP_METADATA,
-                    namespace,
-                );
+                let id_version =
+                    remove_resource_namespace(key.as_str(), RESOURCE_APP_METADATA, namespace);
                 let id_version = id_version.split('/').collect::<Vec<&str>>();
                 let id = id_version.get(0).expect("id not found in key").to_string();
                 let version: u64 = id_version
@@ -957,11 +1075,8 @@ mod handlers {
         let metas = metas
             .into_iter()
             .map(|(key, meta)| {
-                let id_version = remove_resource_namespace(
-                    key.as_str(),
-                    REGISTER_KEY_PREFIX_MANIFEST_METADATA,
-                    namespace,
-                );
+                let id_version =
+                    remove_resource_namespace(key.as_str(), RESOURCE_MANIFEST_METADATA, namespace);
                 let id_version = id_version.split('/').collect::<Vec<&str>>();
                 let id = id_version.get(0).expect("id not found in key").to_string();
                 let version: u64 = id_version
@@ -1036,7 +1151,7 @@ mod handlers {
         let namespaces = namespaces
             .into_iter()
             .map(|(key, namespace)| {
-                let id = remove_resource(key.as_str(), REGISTER_KEY_PREFIX_NAMESPACE);
+                let id = remove_resource(key.as_str(), RESOURCE_NAMESPACE);
                 models::Namespace {
                     id: id.to_owned(),
                     created: namespace.created,
@@ -1065,11 +1180,8 @@ mod handlers {
         let projects = projects
             .into_iter()
             .map(|(key, project)| {
-                let id = remove_resource_namespace(
-                    key.as_str(),
-                    REGISTER_KEY_PREFIX_PROJECT,
-                    namespace.as_str(),
-                );
+                let id =
+                    remove_resource_namespace(key.as_str(), RESOURCE_PROJECT, namespace.as_str());
                 models::Project {
                     id: id.to_owned(),
                     created: project.created,

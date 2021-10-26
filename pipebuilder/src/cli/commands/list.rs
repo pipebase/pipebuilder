@@ -13,7 +13,7 @@ use pipebuilder_common::{api::client::ApiClient, NodeRole, Result};
 use clap::Arg;
 
 pub fn cmd() -> Cmd {
-    Cmd::new("list").about("List resources").subcommands(vec![
+    Cmd::new("list").about("List resource").subcommands(vec![
         app_metadata(),
         build_snapshot(),
         manifest_metadata(),

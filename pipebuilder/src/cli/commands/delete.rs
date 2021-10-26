@@ -1,25 +1,18 @@
 use super::Cmd;
-use crate::ops::{
-    do_app::get_app,
-    do_build::{get_build, get_build_log},
-    do_manifest::get_manifest,
-    print::{print_records, print_utf8},
-};
-use pipebuilder_common::{api::client::ApiClient, write_file, Result};
+use crate::ops::{do_app::delete_app, do_build::delete_build, do_manifest::delete_manifest};
+use pipebuilder_common::{api::client::ApiClient, Result};
 
 use clap::Arg;
 
-pub(crate) const DEFAULT_APP_DOWNLOAD_PATH: &str = "./app";
-
 pub fn cmd() -> Cmd {
-    Cmd::new("get")
-        .about("Get resource")
-        .subcommands(vec![manifest(), build(), app(), build_log()])
+    Cmd::new("delete")
+        .about("Delete resource")
+        .subcommands(vec![manifest(), build(), app()])
 }
 
 pub fn manifest() -> Cmd {
     Cmd::new("manifest")
-        .about("Get manifest given namespace, project id and manifest version")
+        .about("Delete manifest given namespace, project id and manifest version")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -47,19 +40,18 @@ pub async fn exec_manifest(client: ApiClient, args: &clap::ArgMatches) -> Result
         .unwrap()
         .parse()
         .expect("invalid manifest version");
-    let response = get_manifest(
+    delete_manifest(
         &client,
         namespace.to_owned(),
         id.to_owned(),
         manifest_version,
     )
-    .await?;
-    print_utf8(response.buffer)
+    .await
 }
 
 pub fn build() -> Cmd {
     Cmd::new("build")
-        .about("Get build given namespace, project id and build version")
+        .about("Delete build given namespace, project id and build version")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -87,15 +79,12 @@ pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()
         .unwrap()
         .parse()
         .expect("invalid build version");
-    let response = get_build(&client, namespace.to_owned(), id.to_owned(), build_version).await?;
-    let responses = vec![response];
-    print_records(responses.as_slice());
-    Ok(())
+    delete_build(&client, namespace.to_owned(), id.to_owned(), build_version).await
 }
 
 pub fn app() -> Cmd {
     Cmd::new("app")
-        .about("Get app binary given namespace, project id and build version")
+        .about("Delete app binary given namespace, project id and build version")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -127,44 +116,5 @@ pub async fn exec_app(client: ApiClient, args: &clap::ArgMatches) -> Result<()> 
         .unwrap()
         .parse()
         .expect("invalid build version");
-    let path = args.value_of("").unwrap_or(DEFAULT_APP_DOWNLOAD_PATH);
-    let response = get_app(&client, namespace.to_owned(), id.to_owned(), build_version).await?;
-    let buffer = response.buffer;
-    write_file(path, buffer.as_slice())?;
-    Ok(())
-}
-
-pub fn build_log() -> Cmd {
-    Cmd::new("log")
-        .about("Get build given namespace, project id and build version")
-        .args(vec![
-            Arg::new("namespace")
-                .short('n')
-                .about("Specify namespace")
-                .takes_value(true)
-                .required(true),
-            Arg::new("id")
-                .short('i')
-                .about("Specify project id")
-                .takes_value(true)
-                .required(true),
-            Arg::new("version")
-                .short('v')
-                .about("Specify app build version")
-                .takes_value(true)
-                .required(true),
-        ])
-}
-
-pub async fn exec_build_log(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
-    let namespace = args.value_of("namespace").unwrap();
-    let id = args.value_of("id").unwrap();
-    let build_version = args
-        .value_of("version")
-        .unwrap()
-        .parse()
-        .expect("invalid build version");
-    let response =
-        get_build_log(&client, namespace.to_owned(), id.to_owned(), build_version).await?;
-    print_utf8(response.buffer)
+    delete_app(&client, namespace.to_owned(), id.to_owned(), build_version).await
 }
