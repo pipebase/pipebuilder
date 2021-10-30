@@ -168,7 +168,7 @@ impl Build {
     }
 
     // read app build log
-    pub fn read_log(
+    pub async fn read_log(
         log_directory: &str,
         namespace: &str,
         id: &str,
@@ -176,7 +176,7 @@ impl Build {
     ) -> Result<Vec<u8>> {
         let app_log_directory = app_build_log_directory(log_directory, namespace, id, version);
         let app_log_path = sub_path(app_log_directory.as_str(), PATH_APP_BUILD_LOG);
-        read_file(app_log_path.as_str())
+        read_file(app_log_path.as_str()).await
     }
 
     pub fn new(
@@ -310,7 +310,7 @@ impl Build {
         let namespace = self.namespace.as_str();
         // try restore app build workspace
         let app_workspace = app_workspace(workspace, namespace, id, build_version);
-        create_directory(app_workspace.as_str())?;
+        create_directory(app_workspace.as_str()).await?;
         let target_platform = self.target_platform.as_str();
         let app_restore_directory =
             app_restore_directory(restore_directory, namespace, id, target_platform);
@@ -318,7 +318,7 @@ impl Build {
         if !copy_directory(app_restore_path.as_str(), app_workspace.as_str()).await? {
             // cargo init
             let app_path = sub_path(app_workspace.as_str(), PATH_APP);
-            create_directory(app_path.as_str())?;
+            create_directory(app_path.as_str()).await?;
             cargo_init(app_path.as_str()).await?;
         }
         Ok(Some(BuildStatus::Generate))
@@ -335,18 +335,18 @@ impl Build {
         let namespace = self.namespace.as_str();
         let app_workspace = app_workspace(workspace, namespace, id, build_version);
         let toml_path = sub_path(app_workspace.as_str(), PATH_APP_TOML_MANIFEST);
-        let mut toml_manifest: TomlManifest = parse_toml(toml_path.as_str())?;
+        let mut toml_manifest: TomlManifest = parse_toml(toml_path.as_str()).await?;
         toml_manifest.init();
         let app = self.app.as_ref().expect("app not initialized");
         let additionals = app.get_dependencies().clone();
         for additional in additionals {
             toml_manifest.add_dependency(additional.get_name(), additional.into());
         }
-        write_toml(&toml_manifest, toml_path.as_str())?;
+        write_toml(&toml_manifest, toml_path.as_str()).await?;
         // generate src/main.rs
         let generated_code = self.app.as_ref().expect("app not initialized").generate();
         let main_path = sub_path(app_workspace.as_str(), PATH_APP_MAIN);
-        write_file(main_path.as_str(), generated_code.as_bytes())?;
+        write_file(main_path.as_str(), generated_code.as_bytes()).await?;
         // fmt code
         cargo_fmt(toml_path.as_str()).await?;
         Ok(Some(BuildStatus::Build))
@@ -369,7 +369,7 @@ impl Build {
         let target_path = sub_path(app_workspace.as_str(), PATH_APP_TARGET);
         // prepare log directory
         let log_directory = app_build_log_directory(log_directory, namespace, id, build_version);
-        create_directory(log_directory.as_str())?;
+        create_directory(log_directory.as_str()).await?;
         let log_path = sub_path(log_directory.as_str(), PATH_APP_BUILD_LOG);
         cargo_build(
             toml_path.as_str(),
@@ -400,7 +400,7 @@ impl Build {
             target_path.as_str(),
             target_platform_release_binary.as_str(),
         );
-        let buffer = read_file(release_path.as_str())?;
+        let buffer = read_file(release_path.as_str()).await?;
         let request = self.build_post_app_request(buffer);
         let _ = self.repository_client.post_app(request).await?.into_inner();
         Ok(Some(BuildStatus::Store))
@@ -424,7 +424,7 @@ impl Build {
         let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
         // cleanup previous app build cache if any
         let _ = remove_directory(app_restore_path.as_str()).await;
-        create_directory(app_restore_directory.as_str())?;
+        create_directory(app_restore_directory.as_str()).await?;
         if !move_directory(app_path.as_str(), app_restore_directory.as_str()).await? {
             error!(
                 "store app from '{}' to '{}' failed",

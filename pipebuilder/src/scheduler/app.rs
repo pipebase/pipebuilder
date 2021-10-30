@@ -22,8 +22,8 @@ use crate::config::SchedulerConfig;
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     info!("read configuration ...");
-    let file = open_file(std::env::var(ENV_PIPEBUILDER_CONFIG_FILE)?)?;
-    let config = parse_config::<Config>(file)?;
+    let file = open_file(std::env::var(ENV_PIPEBUILDER_CONFIG_FILE)?).await?;
+    let config = parse_config::<Config>(file).await?;
     let (register, node_svc, health_svc, _) = bootstrap(config.base).await?;
     let node_id = node_svc.get_id();
     let internal_address = node_svc.get_internal_address();

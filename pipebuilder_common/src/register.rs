@@ -35,9 +35,9 @@ pub struct IdentityConfig {
 }
 
 impl IdentityConfig {
-    fn into_identity(self) -> Result<Identity> {
-        let cert = read_file(self.cert)?;
-        let key = read_file(self.key)?;
+    async fn into_identity(self) -> Result<Identity> {
+        let cert = read_file(self.cert).await?;
+        let key = read_file(self.key).await?;
         Ok(Identity::from_pem(cert, key))
     }
 }
@@ -52,7 +52,7 @@ pub struct TlsConfig {
 }
 
 impl TlsConfig {
-    pub fn into_tls_options(self) -> Result<TlsOptions> {
+    pub async fn into_tls_options(self) -> Result<TlsOptions> {
         let tls = TlsOptions::new();
         let tls = match self.domain {
             Some(domain) => tls.domain_name(domain),
@@ -60,14 +60,14 @@ impl TlsConfig {
         };
         let tls = match self.ca_cert {
             Some(ca_cert) => {
-                let pem = read_file(ca_cert)?;
+                let pem = read_file(ca_cert).await?;
                 tls.ca_certificate(Certificate::from_pem(pem))
             }
             None => tls,
         };
         let tls = match self.identity {
             Some(identity) => {
-                let identity = identity.into_identity()?;
+                let identity = identity.into_identity().await?;
                 tls.identity(identity)
             }
             None => tls,
@@ -84,7 +84,7 @@ pub struct ConnectConfig {
 }
 
 impl ConnectConfig {
-    fn into_connect_opts(self) -> Result<ConnectOptions> {
+    async fn into_connect_opts(self) -> Result<ConnectOptions> {
         let opts = ConnectOptions::new();
         let opts = match self.user {
             Some(user) => opts.with_user(user.name, user.password),
@@ -98,7 +98,7 @@ impl ConnectConfig {
             None => opts,
         };
         let opts = match self.tls {
-            Some(tls) => opts.with_tls(tls.into_tls_options()?),
+            Some(tls) => opts.with_tls(tls.into_tls_options().await?),
             None => opts,
         };
         Ok(opts)
@@ -121,7 +121,7 @@ pub struct Register {
 impl Register {
     pub async fn new(config: RegisterConfig) -> Result<Register> {
         let connect_opts: Option<ConnectOptions> = match config.connect {
-            Some(connect) => Some(connect.into_connect_opts()?),
+            Some(connect) => Some(connect.into_connect_opts().await?),
             None => None,
         };
         let client = Client::connect(config.endpoints, connect_opts).await?;
@@ -163,20 +163,59 @@ impl Register {
     }
 
     // list with key prefix
-    async fn list(&mut self, prefix: &str) -> Result<GetResponse> {
+    async fn list<K>(&mut self, prefix: K) -> Result<GetResponse>
+    where
+        K: Into<Vec<u8>>,
+    {
         let resp = self
             .get(prefix, Some(GetOptions::new().with_prefix()))
             .await?;
         Ok(resp)
     }
 
-    async fn list_kvs<V>(&mut self, prefix: &str) -> Result<Vec<(String, V)>>
+    async fn list_kvs<K, V>(&mut self, prefix: K) -> Result<Vec<(String, V)>>
     where
+        K: Into<Vec<u8>>,
         V: DeserializeOwned,
     {
         let resp = self.list(prefix).await?;
         let kvs = Self::deserialize_kvs::<V>(resp.kvs())?;
         Ok(kvs)
+    }
+
+    pub async fn list_keys<K>(&mut self, prefix: K) -> Result<Vec<String>>
+    where
+        K: Into<Vec<u8>>,
+    {
+        let resp = self
+            .get(
+                prefix,
+                Some(GetOptions::new().with_prefix().with_keys_only()),
+            )
+            .await?;
+        let mut keys = vec![];
+        for kv in resp.kvs() {
+            keys.push(kv.key_str()?.to_owned());
+        }
+        Ok(keys)
+    }
+
+    pub async fn count<K>(&mut self, key: K) -> Result<usize>
+    where
+        K: Into<Vec<u8>>,
+    {
+        let options = GetOptions::new().with_count_only();
+        let resp = self.get(key, Some(options)).await?;
+        Ok(resp.count() as usize)
+    }
+
+    pub async fn count_prefix<K>(&mut self, prefix: K) -> Result<usize>
+    where
+        K: Into<Vec<u8>>,
+    {
+        let options = GetOptions::new().with_prefix().with_count_only();
+        let resp = self.get(prefix, Some(options)).await?;
+        Ok(resp.count() as usize)
     }
 
     pub async fn get_json_value<K, V>(
@@ -228,7 +267,7 @@ impl Register {
     }
 
     pub async fn list_node_state(&mut self, prefix: &str) -> Result<Vec<(String, NodeState)>> {
-        let node_states = self.list_kvs::<NodeState>(prefix).await?;
+        let node_states = self.list_kvs::<&str, NodeState>(prefix).await?;
         Ok(node_states)
     }
 
@@ -372,7 +411,7 @@ impl Register {
             Some(id) => resource_namespace_id(RESOURCE_VERSION_BUILD, namespace, id.as_str()),
             None => resource_namespace(RESOURCE_VERSION_BUILD, namespace),
         };
-        let version_builds = self.list_kvs::<VersionBuild>(prefix.as_str()).await?;
+        let version_builds = self.list_kvs::<&str, VersionBuild>(prefix.as_str()).await?;
         Ok(version_builds)
     }
 
@@ -475,7 +514,9 @@ impl Register {
         namespace: &str,
     ) -> Result<Vec<(String, ManifestSnapshot)>> {
         let prefix = resource_namespace(RESOURCE_MANIFEST_SNAPSHOT, namespace);
-        let manifest_snapshots = self.list_kvs::<ManifestSnapshot>(prefix.as_str()).await?;
+        let manifest_snapshots = self
+            .list_kvs::<&str, ManifestSnapshot>(prefix.as_str())
+            .await?;
         Ok(manifest_snapshots)
     }
 
@@ -485,7 +526,9 @@ impl Register {
         namespace: &str,
     ) -> Result<Vec<(String, BuildSnapshot)>> {
         let prefix = resource_namespace(RESOURCE_BUILD_SNAPSHOT, namespace);
-        let build_snapshots = self.list_kvs::<BuildSnapshot>(prefix.as_str()).await?;
+        let build_snapshots = self
+            .list_kvs::<&str, BuildSnapshot>(prefix.as_str())
+            .await?;
         Ok(build_snapshots)
     }
 
@@ -568,7 +611,7 @@ impl Register {
             Some(id) => resource_namespace_id(RESOURCE_APP_METADATA, namespace, id.as_str()),
             None => resource_namespace(RESOURCE_APP_METADATA, namespace),
         };
-        let resp = self.list_kvs::<AppMetadata>(prefix.as_str()).await?;
+        let resp = self.list_kvs::<&str, AppMetadata>(prefix.as_str()).await?;
         Ok(resp)
     }
 
@@ -654,7 +697,9 @@ impl Register {
             Some(id) => resource_namespace_id(RESOURCE_MANIFEST_METADATA, namespace, id.as_str()),
             None => resource_namespace(RESOURCE_MANIFEST_METADATA, namespace),
         };
-        let resp = self.list_kvs::<ManifestMetadata>(prefix.as_str()).await?;
+        let resp = self
+            .list_kvs::<&str, ManifestMetadata>(prefix.as_str())
+            .await?;
         Ok(resp)
     }
 
@@ -701,7 +746,7 @@ impl Register {
 
     pub async fn list_namespace(&mut self) -> Result<Vec<(String, Namespace)>> {
         let prefix = root_resource(RESOURCE_NAMESPACE);
-        let resp = self.list_kvs::<Namespace>(prefix.as_str()).await?;
+        let resp = self.list_kvs::<&str, Namespace>(prefix.as_str()).await?;
         Ok(resp)
     }
 
@@ -758,7 +803,7 @@ impl Register {
 
     pub async fn list_project(&mut self, namespace: &str) -> Result<Vec<(String, Project)>> {
         let prefix = resource_namespace(RESOURCE_PROJECT, namespace);
-        let resp = self.list_kvs::<Project>(prefix.as_str()).await?;
+        let resp = self.list_kvs::<&str, Project>(prefix.as_str()).await?;
         Ok(resp)
     }
 

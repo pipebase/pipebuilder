@@ -168,7 +168,7 @@ impl Builder for BuilderService {
         let version = request.build_version;
         info!("get build log for '{}/{}/{}'", namespace, id, version);
         let log_directory = self.context.log_directory.as_str();
-        match Build::read_log(log_directory, namespace.as_str(), id.as_str(), version) {
+        match Build::read_log(log_directory, namespace.as_str(), id.as_str(), version).await {
             Ok(buffer) => Ok(Response::new(GetLogResponse { buffer })),
             Err(err) => Err(tonic::Status::not_found(format!(
                 "build log for '{}/{}/{}' not found, error: '{}'",

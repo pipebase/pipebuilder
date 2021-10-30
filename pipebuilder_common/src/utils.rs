@@ -10,57 +10,69 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     ffi::OsString,
-    fs::{self, File},
     hash::{Hash, Hasher},
-    io::{BufReader, BufWriter, Read, Write},
     path::Path,
 };
-use tokio::{fs::remove_dir_all, process::Command};
+use tokio::{
+    fs::{self, File},
+    io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
+    process::Command,
+};
 use tonic::transport::Channel;
 use tracing::info;
 
 // filesystem ops
-pub fn open_file<P>(path: P) -> Result<File>
+pub async fn open_file<P>(path: P) -> Result<File>
 where
     P: AsRef<std::path::Path>,
 {
-    let file = std::fs::File::open(path)?;
+    let file = fs::File::open(path).await?;
     Ok(file)
 }
 
-pub fn read_file<P>(path: P) -> Result<Vec<u8>>
+pub async fn create_file<P>(path: P) -> Result<File>
 where
     P: AsRef<std::path::Path>,
 {
-    let file = std::fs::File::open(path)?;
+    let file = fs::File::create(path).await?;
+    Ok(file)
+}
+
+pub async fn read_file<P>(path: P) -> Result<Vec<u8>>
+where
+    P: AsRef<std::path::Path>,
+{
+    let file = open_file(path).await?;
     let mut rdr = BufReader::new(file);
     let mut buffer: Vec<u8> = Vec::new();
-    rdr.read_to_end(&mut buffer)?;
+    rdr.read_to_end(&mut buffer).await?;
     Ok(buffer)
 }
 
-pub fn write_file<P>(path: P, buffer: &[u8]) -> Result<()>
+pub async fn write_file<P>(path: P, buffer: &[u8]) -> Result<()>
 where
     P: AsRef<std::path::Path>,
 {
-    let mut wrt = BufWriter::new(fs::File::create(path)?);
-    wrt.write_all(buffer)?;
-    wrt.flush()?;
+    let file = create_file(path).await?;
+    let mut wrt = BufWriter::new(file);
+    wrt.write_all(buffer).await?;
+    wrt.flush().await?;
     Ok(())
 }
 
-pub fn create_directory<P>(path: P) -> Result<()>
+pub async fn create_directory<P>(path: P) -> Result<()>
 where
     P: AsRef<std::path::Path>,
 {
-    fs::create_dir_all(path)?;
+    fs::create_dir_all(path).await?;
     Ok(())
 }
 
-pub fn parse_config<C>(file: File) -> Result<C>
+pub async fn parse_config<C>(file: File) -> Result<C>
 where
     C: DeserializeOwned,
 {
+    let file = file.into_std().await;
     let config = serde_yaml::from_reader::<std::fs::File, C>(file)?;
     Ok(config)
 }
@@ -97,7 +109,7 @@ pub fn sub_path(parent_directory: &str, path: &str) -> String {
 
 // remove directory and return success flag
 pub async fn remove_directory(path: &str) -> bool {
-    remove_dir_all(path).await.is_ok()
+    fs::remove_dir_all(path).await.is_ok()
 }
 
 // copy directory and return success flag
@@ -181,7 +193,7 @@ pub async fn cargo_build(
     target_directory: &str,
     log_path: &str,
 ) -> Result<()> {
-    let log_file = fs::File::create(log_path)?;
+    let log_file = fs::File::create(log_path).await?.into_std().await;
     let mut cmd = Command::new(cargo_binary());
     cmd.arg("build")
         .arg("--manifest-path")
@@ -195,10 +207,7 @@ pub async fn cargo_build(
     let code = cmd_status(cmd).await?;
     match code == 0 {
         true => Ok(()),
-        false => {
-            Err(cargo_error("build", code, String::from("check build log")))
-            // Err(cargo_error("build", code, message))
-        }
+        false => Err(cargo_error("build", code, String::from("check build log"))),
     }
 }
 
@@ -378,22 +387,22 @@ impl TomlManifest {
     }
 }
 
-pub fn parse_toml<M, P>(toml_path: P) -> Result<M>
+pub async fn parse_toml<M, P>(toml_path: P) -> Result<M>
 where
     M: DeserializeOwned,
     P: AsRef<Path>,
 {
-    let toml_string = fs::read_to_string(toml_path)?;
+    let toml_string = fs::read_to_string(toml_path).await?;
     let toml_manifest = toml::from_str::<M>(toml_string.as_str())?;
     Ok(toml_manifest)
 }
 
-pub fn write_toml<M, P>(object: &M, path: P) -> Result<()>
+pub async fn write_toml<M, P>(object: &M, path: P) -> Result<()>
 where
     M: Serialize,
     P: AsRef<Path>,
 {
     let toml_string = toml::to_string(object)?;
-    fs::write(path, toml_string)?;
+    fs::write(path, toml_string).await?;
     Ok(())
 }

@@ -60,7 +60,9 @@ impl Repository for RepositoryService {
             id.as_str(),
             version,
             TARGET_MANIFEST,
-        ) {
+        )
+        .await
+        {
             Ok(buffer) => buffer,
             Err(err) => {
                 error!(
@@ -118,7 +120,9 @@ impl Repository for RepositoryService {
             version,
             buffer,
             TARGET_MANIFEST,
-        ) {
+        )
+        .await
+        {
             Ok(_) => (),
             Err(err) => {
                 error!("write manifest fail, error '{}'", err);
@@ -196,7 +200,9 @@ impl Repository for RepositoryService {
             id.as_str(),
             version,
             TARGET_APP,
-        ) {
+        )
+        .await
+        {
             Ok(buffer) => buffer,
             Err(err) => {
                 error!(
@@ -241,7 +247,9 @@ impl Repository for RepositoryService {
             version,
             buffer,
             TARGET_APP,
-        ) {
+        )
+        .await
+        {
             Ok(_) => (),
             Err(err) => {
                 error!("post app fail, error '{}'", err);
@@ -305,7 +313,7 @@ impl Repository for RepositoryService {
     }
 }
 
-fn read_target_from_repo(
+async fn read_target_from_repo(
     repository: &str,
     namespace: &str,
     id: &str,
@@ -314,11 +322,11 @@ fn read_target_from_repo(
 ) -> pipebuilder_common::Result<Vec<u8>> {
     let directory = get_target_directory(repository, namespace, id, version);
     let path = sub_path(directory.as_str(), target_name);
-    let buffer = read_file(path)?;
+    let buffer = read_file(path).await?;
     Ok(buffer)
 }
 
-fn write_target_into_repo(
+async fn write_target_into_repo(
     repository: &str,
     namespace: &str,
     id: &str,
@@ -328,8 +336,8 @@ fn write_target_into_repo(
 ) -> pipebuilder_common::Result<()> {
     let directory = get_target_directory(repository, namespace, id, version);
     let path = sub_path(directory.as_str(), target_name);
-    create_directory(directory)?;
-    write_file(path, buffer)?;
+    create_directory(directory).await?;
+    write_file(path, buffer).await?;
     // TODO S3 backup
     Ok(())
 }

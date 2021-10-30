@@ -130,7 +130,7 @@ pub async fn exec_app(client: ApiClient, args: &clap::ArgMatches) -> Result<()> 
     let path = args.value_of("").unwrap_or(DEFAULT_APP_DOWNLOAD_PATH);
     let response = get_app(&client, namespace.to_owned(), id.to_owned(), build_version).await?;
     let buffer = response.buffer;
-    write_file(path, buffer.as_slice())?;
+    write_file(path, buffer.as_slice()).await?;
     Ok(())
 }
 
