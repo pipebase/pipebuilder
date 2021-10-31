@@ -1267,13 +1267,8 @@ mod validations {
     use pipebuilder_common::{api::models, invalid_api_request, Build, NodeRole, Result};
 
     pub fn validate_build_request(request: &models::BuildRequest) -> Result<()> {
-        if !Build::is_target_platform_support(request.target_platform.as_str()) {
-            return Err(invalid_api_request(format!(
-                "target platform '{}' not support",
-                request.target_platform
-            )));
-        }
-        Ok(())
+        let target_platform = request.target_platform.as_str();
+        validate_target_platform(target_platform)
     }
 
     pub fn validate_list_node_state_request(request: &models::ListNodeStateRequest) -> Result<()> {
@@ -1282,25 +1277,33 @@ mod validations {
             Some(role) => role,
             None => return Ok(()),
         };
-        match role {
-            NodeRole::Undefined => Err(invalid_api_request(String::from("undefined node role"))),
-            _ => Ok(()),
-        }
+        validate_role(role)
     }
 
     pub fn validate_activate_node_request(request: &models::ActivateNodeRequest) -> Result<()> {
         let role = &request.role;
+        validate_role(role)
+    }
+
+    pub fn validate_deactivate_node_request(request: &models::DeactivateNodeRequest) -> Result<()> {
+        let role = &request.role;
+        validate_role(role)
+    }
+
+    fn validate_role(role: &NodeRole) -> Result<()> {
         match role {
             NodeRole::Undefined => Err(invalid_api_request(String::from("undefined node role"))),
             _ => Ok(()),
         }
     }
 
-    pub fn validate_deactivate_node_request(request: &models::DeactivateNodeRequest) -> Result<()> {
-        let role = &request.role;
-        match role {
-            NodeRole::Undefined => Err(invalid_api_request(String::from("undefined node role"))),
-            _ => Ok(()),
+    fn validate_target_platform(target_platform: &str) -> Result<()> {
+        if !Build::is_target_platform_support(target_platform) {
+            return Err(invalid_api_request(format!(
+                "target platform '{}' not support",
+                target_platform
+            )));
         }
+        Ok(())
     }
 }
