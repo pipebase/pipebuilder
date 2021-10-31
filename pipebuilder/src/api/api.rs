@@ -19,14 +19,14 @@ pub mod filters {
         lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_build(scheduler_client, register.clone())
-            .or(v1_manifest_put(repository_client.clone()))
-            .or(v1_manifest_get(repository_client.clone()))
+            .or(v1_manifest_put(repository_client.clone(), register.clone()))
+            .or(v1_manifest_get(repository_client.clone(), register.clone()))
             .or(v1_manifest_snapshot_list(register.clone()))
             .or(v1_build_snapshot_list(register.clone()))
             .or(v1_build_get(register.clone(), lease_id))
             .or(v1_build_list(register.clone()))
             .or(v1_build_cancel(register.clone(), lease_id))
-            .or(v1_app_get(repository_client.clone()))
+            .or(v1_app_get(repository_client.clone(), register.clone()))
             .or(v1_build_log_get(register.clone(), lease_id))
             .or(v1_node_state_list(register.clone()))
             .or(v1_builder_scan(register.clone(), lease_id))
@@ -38,9 +38,9 @@ pub mod filters {
             .or(v1_project_put(register.clone(), lease_id))
             .or(v1_namespace_list(register.clone()))
             .or(v1_project_list(register.clone()))
-            .or(v1_build_delete(register, lease_id))
-            .or(v1_app_delete(repository_client.clone()))
-            .or(v1_manifest_delete(repository_client))
+            .or(v1_build_delete(register.clone(), lease_id))
+            .or(v1_app_delete(repository_client.clone(), register.clone()))
+            .or(v1_manifest_delete(repository_client, register))
     }
 
     pub fn v1_build(
@@ -57,20 +57,24 @@ pub mod filters {
 
     pub fn v1_manifest_put(
         repository_client: RepositoryClient<Channel>,
+        register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "manifest")
             .and(warp::post())
             .and(with_repository_client(repository_client))
+            .and(with_register(register))
             .and(json_request::<models::PutManifestRequest>())
             .and_then(handlers::put_manifest)
     }
 
     pub fn v1_manifest_get(
         repository_client: RepositoryClient<Channel>,
+        register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "manifest")
             .and(warp::get())
             .and(with_repository_client(repository_client))
+            .and(with_register(register))
             .and(warp::query::<models::GetManifestRequest>())
             .and_then(handlers::get_manifest)
     }
@@ -131,10 +135,12 @@ pub mod filters {
 
     pub fn v1_app_get(
         repository_client: RepositoryClient<Channel>,
+        register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "app")
             .and(warp::get())
             .and(with_repository_client(repository_client))
+            .and(with_register(register))
             .and(warp::query::<models::GetAppRequest>())
             .and_then(handlers::get_app)
     }
@@ -275,20 +281,24 @@ pub mod filters {
 
     pub fn v1_app_delete(
         repository_client: RepositoryClient<Channel>,
+        register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "app")
             .and(warp::delete())
             .and(with_repository_client(repository_client))
+            .and(with_register(register))
             .and(json_request::<models::DeleteAppRequest>())
             .and_then(handlers::delete_app)
     }
 
     pub fn v1_manifest_delete(
         repository_client: RepositoryClient<Channel>,
+        register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "manifest")
             .and(warp::delete())
             .and(with_repository_client(repository_client))
+            .and(with_register(register))
             .and(json_request::<models::DeleteManifestRequest>())
             .and_then(handlers::delete_manifest)
     }
@@ -429,8 +439,14 @@ mod handlers {
 
     pub async fn put_manifest(
         mut client: RepositoryClient<Channel>,
+        mut register: Register,
         request: models::PutManifestRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_put_manifest_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_put_manifest(&mut client, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
@@ -448,8 +464,14 @@ mod handlers {
 
     pub async fn get_manifest(
         mut client: RepositoryClient<Channel>,
+        mut register: Register,
         request: models::GetManifestRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_get_manifest_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_get_manifest(&mut client, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_not_found(err.into())),
@@ -469,6 +491,11 @@ mod handlers {
         mut register: Register,
         request: models::ListManifestSnapshotRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_list_manifest_snapshot_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_list_manifest_snapshot(&mut register, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
@@ -500,6 +527,11 @@ mod handlers {
         mut register: Register,
         request: models::ListBuildSnapshotRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_list_build_snapshot_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_list_build_snapshot(&mut register, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
@@ -532,6 +564,11 @@ mod handlers {
         lease_id: i64,
         request: models::GetBuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_get_build_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         let response = match do_get_build(&mut register, lease_id, request).await {
             Ok(response) => response,
             Err(err) => return Ok(http_internal_error(err.into())),
@@ -570,6 +607,11 @@ mod handlers {
         mut register: Register,
         request: models::ListBuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_list_build_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_list_build(&mut register, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
@@ -617,6 +659,11 @@ mod handlers {
         lease_id: i64,
         request: models::CancelBuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_cancel_build_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         let request_clone = request.clone();
         // query version build for builder address
         let namespace = request.namespace;
@@ -676,6 +723,11 @@ mod handlers {
         lease_id: i64,
         request: models::DeleteBuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_delete_build_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         let namespace = request.namespace.as_str();
         let id = request.id.as_str();
         let version = request.version;
@@ -722,8 +774,14 @@ mod handlers {
 
     pub async fn get_app(
         mut client: RepositoryClient<Channel>,
+        mut register: Register,
         request: models::GetAppRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_get_app_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_get_app(&mut client, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_not_found(err.into())),
@@ -741,8 +799,14 @@ mod handlers {
 
     pub async fn delete_app(
         mut client: RepositoryClient<Channel>,
+        mut register: Register,
         request: models::DeleteAppRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_delete_app_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_delete_app(&mut client, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
@@ -760,8 +824,14 @@ mod handlers {
 
     pub async fn delete_manifest(
         mut client: RepositoryClient<Channel>,
+        mut register: Register,
         request: models::DeleteManifestRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_delete_manifest_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_delete_manifest(&mut client, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
@@ -782,6 +852,11 @@ mod handlers {
         lease_id: i64,
         request: models::GetBuildLogRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_get_build_log_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         let request_clone = request.clone();
         let namespace = request.namespace;
         let id = request.id;
@@ -872,6 +947,7 @@ mod handlers {
         lease_id: i64,
         request: models::ScanBuilderRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
         let builder_id = request.id.as_str();
         let node_state =
             match get_internal_node_state(&mut register, lease_id, &NodeRole::Builder, builder_id)
@@ -1009,6 +1085,11 @@ mod handlers {
         mut register: Register,
         request: models::ListAppMetadataRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_list_app_metadata_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_list_app_metadata(&mut register, request).await {
             Ok(resp) => Ok(ok(&resp)),
             Err(err) => Ok(http_internal_error(err.into())),
@@ -1050,6 +1131,11 @@ mod handlers {
         mut register: Register,
         request: models::ListManifestMetadataRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_list_manifest_metadata_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_list_manifest_metadata(&mut register, request).await {
             Ok(resp) => Ok(ok(&resp)),
             Err(err) => Ok(http_internal_error(err.into())),
@@ -1128,6 +1214,11 @@ mod handlers {
         lease_id: i64,
         request: models::UpdateProjectRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_put_project_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_put_project(&mut register, lease_id, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
@@ -1186,6 +1277,11 @@ mod handlers {
         mut register: Register,
         request: models::ListProjectRequest,
     ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_list_project_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
         match do_list_project(&mut register, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
@@ -1268,6 +1364,167 @@ mod validations {
         validate_namespace(register, namespace).await?;
         let id = request.id.as_str();
         validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_get_build_request(
+        register: &mut Register,
+        request: &models::GetBuildRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_get_build_log_request(
+        register: &mut Register,
+        request: &models::GetBuildLogRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_cancel_build_request(
+        register: &mut Register,
+        request: &models::CancelBuildRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_delete_build_request(
+        register: &mut Register,
+        request: &models::DeleteBuildRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_list_build_request(
+        register: &mut Register,
+        request: &models::ListBuildRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = match request.id.as_ref() {
+            Some(id) => id,
+            None => return Ok(()),
+        };
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_list_build_snapshot_request(
+        register: &mut Register,
+        request: &models::ListBuildSnapshotRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await
+    }
+
+    pub async fn validate_put_manifest_request(
+        register: &mut Register,
+        request: &models::PutManifestRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_get_manifest_request(
+        register: &mut Register,
+        request: &models::GetManifestRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_delete_manifest_request(
+        register: &mut Register,
+        request: &models::DeleteManifestRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_list_manifest_snapshot_request(
+        register: &mut Register,
+        request: &models::ListManifestSnapshotRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await
+    }
+
+    pub async fn validate_list_manifest_metadata_request(
+        register: &mut Register,
+        request: &models::ListManifestMetadataRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = match request.id.as_ref() {
+            Some(id) => id,
+            None => return Ok(()),
+        };
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_list_app_metadata_request(
+        register: &mut Register,
+        request: &models::ListAppMetadataRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = match request.id.as_ref() {
+            Some(id) => id,
+            None => return Ok(()),
+        };
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_get_app_request(
+        register: &mut Register,
+        request: &models::GetAppRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_delete_app_request(
+        register: &mut Register,
+        request: &models::DeleteAppRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await
+    }
+
+    pub async fn validate_list_project_request(
+        register: &mut Register,
+        request: &models::ListProjectRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await
+    }
+
+    pub async fn validate_put_project_request(
+        register: &mut Register,
+        request: &models::UpdateProjectRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await
     }
 
     pub fn validate_list_node_state_request(request: &models::ListNodeStateRequest) -> Result<()> {
