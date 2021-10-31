@@ -49,7 +49,7 @@ impl From<&str> for NodeRole {
     }
 }
 
-pub fn node_role_prefix(role: NodeRole) -> &'static str {
+pub fn node_role_prefix(role: &NodeRole) -> &'static str {
     match role {
         NodeRole::Api => RESOURCE_NODE_API,
         NodeRole::Builder => RESOURCE_NODE_BUILDER,
@@ -195,7 +195,7 @@ impl NodeService {
                     timestamp,
                 };
                 match register
-                    .put_node_state(node_role_prefix(role.clone()), &state, lease_id)
+                    .put_node_state(node_role_prefix(&role), &state, lease_id)
                     .await
                 {
                     Ok(_) => continue,

@@ -1,6 +1,9 @@
 use crate::{
     errors::{cargo_error, Result},
     grpc::{build::builder_client::BuilderClient, node::node_client::NodeClient},
+    node_role_prefix, NodeRole, RESOURCE_APP_METADATA, RESOURCE_BUILD_SNAPSHOT,
+    RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT, RESOURCE_NAMESPACE, RESOURCE_PROJECT,
+    RESOURCE_VERSION_BUILD,
 };
 use etcd_client::{Event, EventType};
 use fnv::FnvHasher;
@@ -264,6 +267,75 @@ pub fn resource_namespace_id_version(
     version: u64,
 ) -> String {
     format!("/{}/{}/{}/{}", resource, namespace, id, version)
+}
+
+pub fn namespace_key(id: &str) -> String {
+    resource_id(RESOURCE_NAMESPACE, id)
+}
+
+pub fn node_key(role: &NodeRole, id: &str) -> String {
+    let role_prefix = node_role_prefix(role);
+    resource_id(role_prefix, id)
+}
+
+pub fn app_metadata_namespace(namespace: &str) -> String {
+    resource_namespace(RESOURCE_APP_METADATA, namespace)
+}
+
+pub fn app_metadata_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
+    resource_namespace_id_version(RESOURCE_APP_METADATA, namespace, id, version)
+}
+
+pub fn build_snapshot_namespace(namespace: &str) -> String {
+    resource_namespace(RESOURCE_BUILD_SNAPSHOT, namespace)
+}
+
+pub fn manifest_metadata_namespace(namespace: &str) -> String {
+    resource_namespace(RESOURCE_MANIFEST_METADATA, namespace)
+}
+
+pub fn manifest_metadata_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
+    resource_namespace_id_version(RESOURCE_MANIFEST_METADATA, namespace, id, version)
+}
+
+pub fn manifest_snapshot_namespace(namespace: &str) -> String {
+    resource_namespace(RESOURCE_MANIFEST_SNAPSHOT, namespace)
+}
+
+pub fn project_namespace(namespace: &str) -> String {
+    resource_namespace(RESOURCE_PROJECT, namespace)
+}
+
+pub fn version_build_namespace(namespace: &str) -> String {
+    resource_namespace(RESOURCE_VERSION_BUILD, namespace)
+}
+
+pub fn app_metadata_namespace_id(namespace: &str, id: &str) -> String {
+    resource_namespace_id(RESOURCE_APP_METADATA, namespace, id)
+}
+
+pub fn build_snapshot_namespace_id(namespace: &str, id: &str) -> String {
+    resource_namespace_id(RESOURCE_BUILD_SNAPSHOT, namespace, id)
+}
+
+pub fn manifest_metadata_namespace_id(namespace: &str, id: &str) -> String {
+    resource_namespace_id(RESOURCE_MANIFEST_METADATA, namespace, id)
+}
+
+pub fn manifest_snapshot_namespace_id(namespace: &str, id: &str) -> String {
+    resource_namespace_id(RESOURCE_MANIFEST_SNAPSHOT, namespace, id)
+}
+
+pub fn project_namespace_id(namespace: &str, id: &str) -> String {
+    resource_namespace_id(RESOURCE_PROJECT, namespace, id)
+}
+
+pub fn version_build_namespace_id(namespace: &str, id: &str) -> String {
+    resource_namespace_id(RESOURCE_VERSION_BUILD, namespace, id)
+}
+
+pub fn version_build_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
+    resource_namespace_id_version(RESOURCE_VERSION_BUILD, namespace, id, version)
 }
 
 // remove '/resource/namespace/' and return id/<suffix> given a key

@@ -18,7 +18,7 @@ pub mod filters {
         register: Register,
         lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        v1_build(scheduler_client)
+        v1_build(scheduler_client, register.clone())
             .or(v1_manifest_put(repository_client.clone()))
             .or(v1_manifest_get(repository_client.clone()))
             .or(v1_manifest_snapshot_list(register.clone()))
@@ -45,10 +45,12 @@ pub mod filters {
 
     pub fn v1_build(
         scheduler_client: SchedulerClient<Channel>,
+        register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("api" / "v1" / "build")
             .and(warp::post())
             .and(with_scheduler_client(scheduler_client))
+            .and(with_register(register))
             .and(json_request::<models::BuildRequest>())
             .and_then(handlers::build)
     }
@@ -356,10 +358,11 @@ mod handlers {
 
     pub async fn build(
         mut client: SchedulerClient<Channel>,
+        mut register: Register,
         request: models::BuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         // validate build request
-        match validations::validate_build_request(&request) {
+        match validations::validate_build_request(&mut register, &request).await {
             Ok(_) => (),
             Err(err) => return Ok(http_bad_request(err.into())),
         };
@@ -853,7 +856,7 @@ mod handlers {
     ) -> pipebuilder_common::Result<Vec<models::NodeState>> {
         let role = request.role;
         let prefix = match role {
-            Some(role) => node_role_prefix(role),
+            Some(role) => node_role_prefix(&role),
             None => RESOURCE_NODE,
         };
         let node_states = register.list_node_state(prefix).await?;
@@ -871,7 +874,7 @@ mod handlers {
     ) -> Result<impl warp::Reply, Infallible> {
         let builder_id = request.id.as_str();
         let node_state =
-            match get_internal_node_state(&mut register, lease_id, NodeRole::Builder, builder_id)
+            match get_internal_node_state(&mut register, lease_id, &NodeRole::Builder, builder_id)
                 .await
             {
                 Ok(node_state) => node_state,
@@ -923,17 +926,11 @@ mod handlers {
         };
         let node_id = request.id.as_str();
         let node_role = request.role;
-        let node_state = match get_internal_node_state(
-            &mut register,
-            lease_id,
-            node_role.clone(),
-            node_id,
-        )
-        .await
-        {
-            Ok(node_state) => node_state,
-            Err(err) => return Ok(http_internal_error(err.into())),
-        };
+        let node_state =
+            match get_internal_node_state(&mut register, lease_id, &node_role, node_id).await {
+                Ok(node_state) => node_state,
+                Err(err) => return Ok(http_internal_error(err.into())),
+            };
         // find node address
         let address = match node_state {
             Some(node_state) => node_state.external_address,
@@ -966,17 +963,11 @@ mod handlers {
         };
         let node_id = request.id.as_str();
         let node_role = request.role;
-        let node_state = match get_internal_node_state(
-            &mut register,
-            lease_id,
-            node_role.clone(),
-            node_id,
-        )
-        .await
-        {
-            Ok(node_state) => node_state,
-            Err(err) => return Ok(http_internal_error(err.into())),
-        };
+        let node_state =
+            match get_internal_node_state(&mut register, lease_id, &node_role, node_id).await {
+                Ok(node_state) => node_state,
+                Err(err) => return Ok(http_internal_error(err.into())),
+            };
         // find node address
         let address = match node_state {
             Some(node_state) => node_state.external_address,
@@ -1204,12 +1195,10 @@ mod handlers {
     async fn get_internal_node_state(
         register: &mut Register,
         lease_id: i64,
-        role: NodeRole,
+        role: &NodeRole,
         id: &str,
     ) -> pipebuilder_common::Result<Option<InternalNodeState>> {
-        register
-            .get_node_state(lease_id, node_role_prefix(role), id)
-            .await
+        register.get_node_state(lease_id, role, id).await
     }
 
     async fn schedule(
@@ -1264,11 +1253,21 @@ mod handlers {
 
 mod validations {
 
-    use pipebuilder_common::{api::models, invalid_api_request, Build, NodeRole, Result};
+    use pipebuilder_common::{
+        api::models, invalid_api_request, namespace_key, project_namespace_id, Build, NodeRole,
+        Register, Result,
+    };
 
-    pub fn validate_build_request(request: &models::BuildRequest) -> Result<()> {
+    pub async fn validate_build_request(
+        register: &mut Register,
+        request: &models::BuildRequest,
+    ) -> Result<()> {
         let target_platform = request.target_platform.as_str();
-        validate_target_platform(target_platform)
+        validate_target_platform(target_platform)?;
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await
     }
 
     pub fn validate_list_node_state_request(request: &models::ListNodeStateRequest) -> Result<()> {
@@ -1305,5 +1304,29 @@ mod validations {
             )));
         }
         Ok(())
+    }
+
+    async fn validate_namespace(register: &mut Register, namespace: &str) -> Result<()> {
+        let key = namespace_key(namespace);
+        let is_exist = register.is_exist(key).await?;
+        match is_exist {
+            true => Ok(()),
+            false => Err(invalid_api_request(format!(
+                "invalid namespace {}",
+                namespace
+            ))),
+        }
+    }
+
+    async fn validate_project(register: &mut Register, namespace: &str, id: &str) -> Result<()> {
+        let key = project_namespace_id(namespace, id);
+        let is_exist = register.is_exist(key).await?;
+        match is_exist {
+            true => Ok(()),
+            false => Err(invalid_api_request(format!(
+                "invalid project {}/{}",
+                namespace, id
+            ))),
+        }
     }
 }
