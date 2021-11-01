@@ -18,29 +18,75 @@ pub mod filters {
         register: Register,
         lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        app(repository_client.clone(), register.clone())
+            .or(build(scheduler_client, register.clone(), lease_id))
+            .or(manifest(repository_client, register.clone()))
+            .or(namespace(register.clone(), lease_id))
+            .or(node(register.clone(), lease_id))
+            .or(project(register, lease_id))
+    }
+
+    // build api
+    pub fn build(
+        scheduler_client: SchedulerClient<Channel>,
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_build(scheduler_client, register.clone())
-            .or(v1_manifest_put(repository_client.clone(), register.clone()))
-            .or(v1_manifest_get(repository_client.clone(), register.clone()))
-            .or(v1_manifest_snapshot_list(register.clone()))
             .or(v1_build_snapshot_list(register.clone()))
             .or(v1_build_get(register.clone(), lease_id))
             .or(v1_build_list(register.clone()))
             .or(v1_build_cancel(register.clone(), lease_id))
-            .or(v1_app_get(repository_client.clone(), register.clone()))
             .or(v1_build_log_get(register.clone(), lease_id))
-            .or(v1_node_state_list(register.clone()))
-            .or(v1_builder_scan(register.clone(), lease_id))
-            .or(v1_node_activate(register.clone(), lease_id))
-            .or(v1_node_deactivate(register.clone(), lease_id))
-            .or(v1_app_metadata_list(register.clone()))
-            .or(v1_manifest_metadata_list(register.clone()))
-            .or(v1_namespace_put(register.clone(), lease_id))
-            .or(v1_project_put(register.clone(), lease_id))
-            .or(v1_namespace_list(register.clone()))
-            .or(v1_project_list(register.clone()))
             .or(v1_build_delete(register.clone(), lease_id))
-            .or(v1_app_delete(repository_client.clone(), register.clone()))
+            .or(v1_builder_scan(register, lease_id))
+    }
+
+    // manifest api
+    pub fn manifest(
+        repository_client: RepositoryClient<Channel>,
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        v1_manifest_put(repository_client.clone(), register.clone())
+            .or(v1_manifest_get(repository_client.clone(), register.clone()))
+            .or(v1_manifest_snapshot_list(register.clone()))
+            .or(v1_manifest_metadata_list(register.clone()))
             .or(v1_manifest_delete(repository_client, register))
+    }
+
+    // app api
+    pub fn app(
+        repository_client: RepositoryClient<Channel>,
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        v1_app_get(repository_client.clone(), register.clone())
+            .or(v1_app_metadata_list(register.clone()))
+            .or(v1_app_delete(repository_client, register))
+    }
+
+    // namespace api
+    pub fn namespace(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        v1_namespace_put(register.clone(), lease_id).or(v1_namespace_list(register))
+    }
+
+    // namespace api
+    pub fn project(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        v1_project_put(register.clone(), lease_id).or(v1_project_list(register))
+    }
+
+    pub fn node(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        v1_node_state_list(register.clone())
+            .or(v1_node_activate(register.clone(), lease_id))
+            .or(v1_node_deactivate(register, lease_id))
     }
 
     pub fn v1_build(
@@ -1569,7 +1615,7 @@ mod validations {
         match is_exist {
             true => Ok(()),
             false => Err(invalid_api_request(format!(
-                "invalid namespace {}",
+                "invalid namespace '{}'",
                 namespace
             ))),
         }
@@ -1581,7 +1627,7 @@ mod validations {
         match is_exist {
             true => Ok(()),
             false => Err(invalid_api_request(format!(
-                "invalid project {}/{}",
+                "invalid project '{}/{}'",
                 namespace, id
             ))),
         }
