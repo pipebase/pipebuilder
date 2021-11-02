@@ -1,7 +1,7 @@
 use super::Cmd;
 use crate::ops::{
     do_app::list_app_metadata,
-    do_build::{list_build, list_build_snapshot},
+    do_build::{list_build_metadata, list_build_snapshot},
     do_manifest::{list_manifest_metadata, list_manifest_snapshot},
     do_namespace::list_namespace,
     do_node::list_node_state,
@@ -18,7 +18,7 @@ pub fn cmd() -> Cmd {
         build_snapshot(),
         manifest_metadata(),
         manifest_snapshot(),
-        build(),
+        build_metadata(),
         node(),
         namespace(),
         project(),
@@ -59,8 +59,8 @@ pub async fn exec_manifest_snapshot(client: ApiClient, args: &clap::ArgMatches) 
     Ok(())
 }
 
-pub fn build() -> Cmd {
-    Cmd::new("build")
+pub fn build_metadata() -> Cmd {
+    Cmd::new("build/metadata")
         .about("List build history given namespace and project id")
         .args(vec![
             Arg::new("namespace")
@@ -75,10 +75,10 @@ pub fn build() -> Cmd {
         ])
 }
 
-pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+pub async fn exec_build_metadata(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let namespace = args.value_of("namespace").unwrap();
     let id = args.value_of("id").map(|id| id.to_owned());
-    let response = list_build(&client, namespace.to_owned(), id.to_owned()).await?;
+    let response = list_build_metadata(&client, namespace.to_owned(), id.to_owned()).await?;
     print_records(response.as_slice());
     Ok(())
 }

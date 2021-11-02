@@ -1,20 +1,20 @@
 use super::{
     constants::{
-        ACTIVATE_NODE, APP, APP_METADATA, BUILD, BUILD_LOG, BUILD_SNAPSHOT, CANCEL_BUILD,
-        DEACTIVATE_NODE, MANIFEST, MANIFEST_METADATA, MANIFEST_SNAPSHOT, NAMESPACE, NODE_STATE,
-        PROJECT, SCAN_BUILDER,
+        ACTIVATE_NODE, APP, APP_METADATA, BUILD, BUILD_LOG, BUILD_METADATA, BUILD_SNAPSHOT,
+        CANCEL_BUILD, DEACTIVATE_NODE, MANIFEST, MANIFEST_METADATA, MANIFEST_SNAPSHOT, NAMESPACE,
+        NODE_STATE, PROJECT, SCAN_BUILDER,
     },
     models::{
-        ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildRequest, BuildResponse,
-        BuildSnapshot, CancelBuildRequest, CancelBuildResponse, DeactivateNodeRequest,
-        DeactivateNodeResponse, DeleteAppRequest, DeleteBuildRequest, DeleteManifestRequest,
-        Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest, GetBuildLogResponse,
-        GetBuildRequest, GetManifestRequest, GetManifestResponse, ListAppMetadataRequest,
-        ListBuildRequest, ListBuildSnapshotRequest, ListManifestMetadataRequest,
-        ListManifestSnapshotRequest, ListNamespaceRequest, ListNodeStateRequest,
-        ListProjectRequest, ManifestMetadata, ManifestSnapshot, Namespace, NodeState, Project,
-        PutManifestRequest, PutManifestResponse, ScanBuilderRequest, UpdateNamespaceRequest,
-        UpdateProjectRequest, VersionBuild, VersionBuildKey,
+        ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildMetadata, BuildMetadataKey,
+        BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
+        DeactivateNodeRequest, DeactivateNodeResponse, DeleteAppRequest, DeleteBuildRequest,
+        DeleteBuildSnapshotRequest, DeleteManifestRequest, DeleteManifestSnapshotRequest, Failure,
+        GetAppRequest, GetAppResponse, GetBuildLogRequest, GetBuildLogResponse, GetBuildRequest,
+        GetManifestRequest, GetManifestResponse, ListAppMetadataRequest, ListBuildRequest,
+        ListBuildSnapshotRequest, ListManifestMetadataRequest, ListManifestSnapshotRequest,
+        ListNamespaceRequest, ListNodeStateRequest, ListProjectRequest, ManifestMetadata,
+        ManifestSnapshot, Namespace, NodeState, Project, PutManifestRequest, PutManifestResponse,
+        ScanBuilderRequest, UpdateNamespaceRequest, UpdateProjectRequest,
     },
 };
 use crate::{api_client_error, api_server_error, Result};
@@ -164,15 +164,18 @@ impl ApiClient {
         Ok(response)
     }
 
-    pub async fn get_build(&self, request: &GetBuildRequest) -> Result<VersionBuild> {
-        let response = self.query(BUILD, request).await?;
-        let response = Self::get_response_body::<VersionBuild>(response).await?;
+    pub async fn get_build_metadata(&self, request: &GetBuildRequest) -> Result<BuildMetadata> {
+        let response = self.query(BUILD_METADATA, request).await?;
+        let response = Self::get_response_body::<BuildMetadata>(response).await?;
         Ok(response)
     }
 
-    pub async fn list_build(&self, request: &ListBuildRequest) -> Result<Vec<VersionBuild>> {
-        let response = self.query(BUILD, request).await?;
-        let response = Self::get_response_body::<Vec<VersionBuild>>(response).await?;
+    pub async fn list_build_metadata(
+        &self,
+        request: &ListBuildRequest,
+    ) -> Result<Vec<BuildMetadata>> {
+        let response = self.query(BUILD_METADATA, request).await?;
+        let response = Self::get_response_body::<Vec<BuildMetadata>>(response).await?;
         Ok(response)
     }
 
@@ -232,9 +235,12 @@ impl ApiClient {
         Ok(response)
     }
 
-    pub async fn scan_builder(&self, request: &ScanBuilderRequest) -> Result<Vec<VersionBuildKey>> {
+    pub async fn scan_builder(
+        &self,
+        request: &ScanBuilderRequest,
+    ) -> Result<Vec<BuildMetadataKey>> {
         let response = self.query(SCAN_BUILDER, request).await?;
-        let response = Self::get_response_body::<Vec<VersionBuildKey>>(response).await?;
+        let response = Self::get_response_body::<Vec<BuildMetadataKey>>(response).await?;
         Ok(response)
     }
 
@@ -317,6 +323,21 @@ impl ApiClient {
     pub async fn delete_manfiest(&self, request: &DeleteManifestRequest) -> Result<()> {
         let request = Self::serialize_request(request)?;
         let _ = self.delete(MANIFEST, request).await?;
+        Ok(())
+    }
+
+    pub async fn delete_manifest_snapshot(
+        &self,
+        request: &DeleteManifestSnapshotRequest,
+    ) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(MANIFEST_SNAPSHOT, request).await?;
+        Ok(())
+    }
+
+    pub async fn delete_build_snapshot(&self, request: &DeleteBuildSnapshotRequest) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(BUILD_SNAPSHOT, request).await?;
         Ok(())
     }
 

@@ -1,7 +1,7 @@
 use pipebuilder_common::{
     api::{
         client::ApiClient,
-        models::{ScanBuilderRequest, VersionBuildKey},
+        models::{BuildMetadataKey, ScanBuilderRequest},
     },
     Result,
 };
@@ -9,7 +9,7 @@ use pipebuilder_common::{
 pub(crate) async fn scan_builder(
     client: &ApiClient,
     builder_id: &str,
-) -> Result<Vec<VersionBuildKey>> {
+) -> Result<Vec<BuildMetadataKey>> {
     let request = ScanBuilderRequest {
         id: builder_id.to_owned(),
     };

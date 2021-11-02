@@ -35,8 +35,8 @@ pub mod filters {
         v1_build_post(scheduler_client, register.clone())
             .or(v1_build_snapshot_list(register.clone()))
             .or(v1_build_snapshot_delete(register.clone()))
-            .or(v1_build_get(register.clone(), lease_id))
-            .or(v1_build_list(register.clone()))
+            .or(v1_build_metadata_get(register.clone(), lease_id))
+            .or(v1_build_metadata_list(register.clone()))
             .or(v1_build_cancel(register.clone(), lease_id))
             .or(v1_build_log_get(register.clone(), lease_id))
             .or(v1_build_delete(register.clone(), lease_id))
@@ -172,26 +172,26 @@ pub mod filters {
             .and_then(handlers::delete_build_snapshot)
     }
 
-    pub fn v1_build_get(
+    pub fn v1_build_metadata_get(
         register: Register,
         lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "build")
+        warp::path!("api" / "v1" / "build" / "metadata")
             .and(warp::get())
             .and(with_register(register))
             .and(with_lease_id(lease_id))
             .and(warp::query::<models::GetBuildRequest>())
-            .and_then(handlers::get_build)
+            .and_then(handlers::get_build_metadata)
     }
 
-    pub fn v1_build_list(
+    pub fn v1_build_metadata_list(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "build")
+        warp::path!("api" / "v1" / "build" / "metadata")
             .and(warp::get())
             .and(with_register(register))
             .and(warp::query::<models::ListBuildRequest>())
-            .and_then(handlers::list_build)
+            .and_then(handlers::list_build_metadata)
     }
 
     pub fn v1_build_cancel(
@@ -369,7 +369,7 @@ pub mod filters {
             .and(with_register(register))
             .and(with_lease_id(lease_id))
             .and(json_request::<models::DeleteBuildRequest>())
-            .and_then(handlers::delete_build)
+            .and_then(handlers::delete_build_metadata)
     }
 
     pub fn v1_app_delete(
@@ -449,9 +449,9 @@ mod handlers {
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
         node_role_prefix, remove_resource, remove_resource_namespace, NodeRole,
-        NodeState as InternalNodeState, Register, RESOURCE_APP_METADATA, RESOURCE_BUILD_SNAPSHOT,
-        RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT, RESOURCE_NAMESPACE, RESOURCE_NODE,
-        RESOURCE_PROJECT, RESOURCE_VERSION_BUILD,
+        NodeState as InternalNodeState, Register, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA,
+        RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
+        RESOURCE_NAMESPACE, RESOURCE_NODE, RESOURCE_PROJECT,
     };
     use serde::Serialize;
     use std::convert::Infallible;
@@ -705,7 +705,7 @@ mod handlers {
         Ok(models::DeleteBuildSnapshotResponse {})
     }
 
-    pub async fn get_build(
+    pub async fn get_build_metadata(
         mut register: Register,
         lease_id: i64,
         request: models::GetBuildRequest,
@@ -715,7 +715,7 @@ mod handlers {
             Ok(_) => (),
             Err(err) => return Ok(http_bad_request(err.into())),
         };
-        let response = match do_get_build(&mut register, lease_id, request).await {
+        let response = match do_get_build_metadata(&mut register, lease_id, request).await {
             Ok(response) => response,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
@@ -727,18 +727,18 @@ mod handlers {
         }
     }
 
-    async fn do_get_build(
+    async fn do_get_build_metadata(
         register: &mut Register,
         lease_id: i64,
         request: models::GetBuildRequest,
-    ) -> pipebuilder_common::Result<Option<models::VersionBuild>> {
+    ) -> pipebuilder_common::Result<Option<models::BuildMetadata>> {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
         let version_build = register
-            .get_version_build(lease_id, namespace.as_str(), id.as_str(), version)
+            .get_build_metadata(lease_id, namespace.as_str(), id.as_str(), version)
             .await?;
-        Ok(version_build.map(|b| models::VersionBuild {
+        Ok(version_build.map(|b| models::BuildMetadata {
             id,
             version,
             status: b.status,
@@ -749,7 +749,7 @@ mod handlers {
         }))
     }
 
-    pub async fn list_build(
+    pub async fn list_build_metadata(
         mut register: Register,
         request: models::ListBuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
@@ -758,25 +758,25 @@ mod handlers {
             Ok(_) => (),
             Err(err) => return Ok(http_bad_request(err.into())),
         };
-        match do_list_build(&mut register, request).await {
+        match do_list_build_metadata(&mut register, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
     }
 
-    async fn do_list_build(
+    async fn do_list_build_metadata(
         register: &mut Register,
         request: models::ListBuildRequest,
-    ) -> pipebuilder_common::Result<Vec<models::VersionBuild>> {
+    ) -> pipebuilder_common::Result<Vec<models::BuildMetadata>> {
         let namespace = request.namespace;
         let id = request.id;
-        let version_builds = register.list_version_build(namespace.as_str(), id).await?;
-        let version_builds = version_builds
+        let build_metadatas = register.list_build_metadata(namespace.as_str(), id).await?;
+        let build_metadatas = build_metadatas
             .into_iter()
             .map(|(key, version_build)| {
                 let id_version = remove_resource_namespace(
                     key.as_str(),
-                    RESOURCE_VERSION_BUILD,
+                    RESOURCE_BUILD_METADATA,
                     namespace.as_str(),
                 );
                 let id_version = id_version.split('/').collect::<Vec<&str>>();
@@ -786,7 +786,7 @@ mod handlers {
                     .expect("version not found in key")
                     .parse()
                     .expect("cannot parse version as u64");
-                models::VersionBuild {
+                models::BuildMetadata {
                     id,
                     version,
                     status: version_build.status,
@@ -796,8 +796,8 @@ mod handlers {
                     message: version_build.message,
                 }
             })
-            .collect::<Vec<models::VersionBuild>>();
-        Ok(version_builds)
+            .collect::<Vec<models::BuildMetadata>>();
+        Ok(build_metadatas)
     }
 
     pub async fn cancel_build(
@@ -815,7 +815,7 @@ mod handlers {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        let version_build = match do_get_build(
+        let build_metadata = match do_get_build_metadata(
             &mut register,
             lease_id,
             models::GetBuildRequest {
@@ -826,21 +826,21 @@ mod handlers {
         )
         .await
         {
-            Ok(version_build) => version_build,
+            Ok(build_metadata) => build_metadata,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
-        let version_build = match version_build {
-            Some(version_build) => version_build,
+        let build_metadata = match build_metadata {
+            Some(build_metadata) => build_metadata,
             None => {
                 return Ok(http_not_found(Failure::new(format!(
-                    "version build {}/{}/{} not found",
+                    "build metadata {}/{}/{} not found",
                     namespace, id, version
                 ))))
             }
         };
         // cancel local build at builder
-        let builder_id = version_build.builder_id;
-        let builder_address = version_build.builder_address;
+        let builder_id = build_metadata.builder_id;
+        let builder_address = build_metadata.builder_address;
         info!(
             "cancel build at builder ({}, {})",
             builder_id, builder_address
@@ -864,7 +864,7 @@ mod handlers {
         Ok(resp.into_inner().into())
     }
 
-    pub async fn delete_build(
+    pub async fn delete_build_metadata(
         mut register: Register,
         lease_id: i64,
         request: models::DeleteBuildRequest,
@@ -877,15 +877,15 @@ mod handlers {
         let namespace = request.namespace.as_str();
         let id = request.id.as_str();
         let version = request.version;
-        let version_build = match register
-            .get_version_build(lease_id, namespace, id, version)
+        let build_metadata = match register
+            .get_build_metadata(lease_id, namespace, id, version)
             .await
         {
-            Ok(version_build) => version_build,
+            Ok(build_metadata) => build_metadata,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
-        let version_build = match version_build {
-            Some(version_build) => version_build,
+        let build_metadata = match build_metadata {
+            Some(build_metadata) => build_metadata,
             None => {
                 return Ok(http_bad_request(Failure::new(format!(
                     "build {}/{}/{} not found",
@@ -893,7 +893,7 @@ mod handlers {
                 ))))
             }
         };
-        if !version_build.is_stopped() {
+        if !build_metadata.is_stopped() {
             return Ok(http_bad_request(Failure::new(format!(
                 "build {}/{}/{} is running, cancel required before delete",
                 namespace, id, version
@@ -913,7 +913,7 @@ mod handlers {
         let id = request.id;
         let version = request.version;
         register
-            .delete_version_build(namespace.as_str(), id.as_str(), version)
+            .delete_build_metadata(namespace.as_str(), id.as_str(), version)
             .await?;
         Ok(models::DeleteBuildResponse {})
     }
@@ -1007,7 +1007,7 @@ mod handlers {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        let version_build = match do_get_build(
+        let build_metadata = match do_get_build_metadata(
             &mut register,
             lease_id,
             models::GetBuildRequest {
@@ -1018,21 +1018,21 @@ mod handlers {
         )
         .await
         {
-            Ok(version_build) => version_build,
+            Ok(build_metadata) => build_metadata,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
-        let version_build = match version_build {
-            Some(version_build) => version_build,
+        let build_metadata = match build_metadata {
+            Some(build_metadata) => build_metadata,
             None => {
                 return Ok(http_not_found(Failure::new(format!(
-                    "version build {}/{}/{} not found",
+                    "build metadata {}/{}/{} not found",
                     namespace, id, version
                 ))))
             }
         };
         // get local build log at builder
-        let builder_id = version_build.builder_id;
-        let builder_address = version_build.builder_address;
+        let builder_id = build_metadata.builder_id;
+        let builder_address = build_metadata.builder_address;
         info!(
             "get build log at builder ({}, {})",
             builder_id, builder_address
@@ -1125,7 +1125,7 @@ mod handlers {
     async fn do_scan_builder(
         client: &mut BuilderClient<Channel>,
         request: models::ScanBuilderRequest,
-    ) -> pipebuilder_common::Result<Vec<models::VersionBuildKey>> {
+    ) -> pipebuilder_common::Result<Vec<models::BuildMetadataKey>> {
         let request: ScanRequest = request.into();
         let response = client.scan(request).await?;
         let response = response.into_inner();
@@ -1133,7 +1133,7 @@ mod handlers {
         let builds = builds
             .into_iter()
             .map(|b| b.into())
-            .collect::<Vec<models::VersionBuildKey>>();
+            .collect::<Vec<models::BuildMetadataKey>>();
         Ok(builds)
     }
 

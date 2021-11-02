@@ -4,12 +4,12 @@ use pipebuilder_common::{
     app_workspace,
     grpc::{
         build::{
-            builder_server::Builder, BuildResponse, CancelResponse, GetLogResponse, ScanResponse,
-            VersionBuildKey,
+            builder_server::Builder, BuildMetadataKey, BuildResponse, CancelResponse,
+            GetLogResponse, ScanResponse,
         },
         repository::repository_client::RepositoryClient,
     },
-    remove_directory, sub_path, Build, BuildStatus, LocalBuildContext, Register, VersionBuild,
+    remove_directory, sub_path, Build, BuildMetadata, BuildStatus, LocalBuildContext, Register,
     PATH_APP,
 };
 use std::sync::Arc;
@@ -122,7 +122,7 @@ impl Builder for BuilderService {
         };
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
-        match cancel_version_build(
+        match cancel_build(
             &mut register,
             lease_id,
             namespace.as_str(),
@@ -148,12 +148,12 @@ impl Builder for BuilderService {
         let builds = builds_ref
             .keys()
             .into_iter()
-            .map(|(namespace, id, build_version)| VersionBuildKey {
+            .map(|(namespace, id, build_version)| BuildMetadataKey {
                 namespace: namespace.to_owned(),
                 id: id.to_owned(),
                 version: build_version.to_owned(),
             })
-            .collect::<Vec<VersionBuildKey>>();
+            .collect::<Vec<BuildMetadataKey>>();
         Ok(Response::new(ScanResponse { builds }))
     }
 
@@ -251,7 +251,7 @@ async fn update(
     let (namespace, id, _, build_version) = build.get_build_meta();
     let (builder_id, builder_address) = build.get_builder_meta();
     let now = Utc::now();
-    let version_build = VersionBuild::new(
+    let version_build = BuildMetadata::new(
         status,
         now,
         builder_id.to_owned(),
@@ -259,7 +259,7 @@ async fn update(
         message,
     );
     register
-        .put_version_build(
+        .put_build_metadata(
             lease_id,
             namespace.as_str(),
             id.as_str(),
@@ -293,7 +293,7 @@ fn cancel_local_build(
     }
 }
 
-async fn cancel_version_build(
+async fn cancel_build(
     register: &mut Register,
     lease_id: i64,
     namespace: &str,
@@ -301,7 +301,7 @@ async fn cancel_version_build(
     version: u64,
 ) -> pipebuilder_common::Result<()> {
     let mut version_build = match register
-        .get_version_build(lease_id, namespace, id, version)
+        .get_build_metadata(lease_id, namespace, id, version)
         .await?
     {
         Some(version_build) => version_build,
@@ -315,7 +315,7 @@ async fn cancel_version_build(
     };
     version_build.status = BuildStatus::Cancel;
     register
-        .put_version_build(lease_id, namespace, id, version, version_build)
+        .put_build_metadata(lease_id, namespace, id, version, version_build)
         .await?;
     Ok(())
 }

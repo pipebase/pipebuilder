@@ -30,7 +30,7 @@ message CancelResponse {}
 
 message ScanRequest {}
 
-message VersionBuildKey {
+message BuildMetadataKey {
     // project namespace
     string namespace = 1;
     // project id
@@ -40,7 +40,7 @@ message VersionBuildKey {
 }
 
 message ScanResponse {
-    repeated VersionBuildKey builds = 1;
+    repeated BuildMetadataKey builds = 1;
 }
 
 message GetLogRequest {

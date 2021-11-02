@@ -1,7 +1,7 @@
 use super::Cmd;
 use crate::ops::{
     do_app::get_app,
-    do_build::{get_build, get_build_log},
+    do_build::{get_build_log, get_build_metadata},
     do_manifest::get_manifest,
     print::{print_records, print_utf8},
 };
@@ -12,9 +12,12 @@ use clap::Arg;
 pub(crate) const DEFAULT_APP_DOWNLOAD_PATH: &str = "./app";
 
 pub fn cmd() -> Cmd {
-    Cmd::new("get")
-        .about("Get resource")
-        .subcommands(vec![manifest(), build(), app(), build_log()])
+    Cmd::new("get").about("Get resource").subcommands(vec![
+        manifest(),
+        build_metadata(),
+        app(),
+        build_log(),
+    ])
 }
 
 pub fn manifest() -> Cmd {
@@ -57,9 +60,9 @@ pub async fn exec_manifest(client: ApiClient, args: &clap::ArgMatches) -> Result
     print_utf8(response.buffer)
 }
 
-pub fn build() -> Cmd {
-    Cmd::new("build")
-        .about("Get build given namespace, project id and build version")
+pub fn build_metadata() -> Cmd {
+    Cmd::new("build/metadata")
+        .about("Get build metadata given namespace, project id and build version")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -79,7 +82,7 @@ pub fn build() -> Cmd {
         ])
 }
 
-pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+pub async fn exec_build_metadata(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let namespace = args.value_of("namespace").unwrap();
     let id = args.value_of("id").unwrap();
     let build_version = args
@@ -87,7 +90,8 @@ pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()
         .unwrap()
         .parse()
         .expect("invalid build version");
-    let response = get_build(&client, namespace.to_owned(), id.to_owned(), build_version).await?;
+    let response =
+        get_build_metadata(&client, namespace.to_owned(), id.to_owned(), build_version).await?;
     let responses = vec![response];
     print_records(responses.as_slice());
     Ok(())

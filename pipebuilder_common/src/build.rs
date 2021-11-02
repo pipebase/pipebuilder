@@ -65,7 +65,7 @@ impl ToString for BuildStatus {
 
 // Build state per (build_id, version), persist in registry
 #[derive(Deserialize, Serialize)]
-pub struct VersionBuild {
+pub struct BuildMetadata {
     // build status
     pub status: BuildStatus,
     // timestamp
@@ -78,7 +78,7 @@ pub struct VersionBuild {
     pub message: Option<String>,
 }
 
-impl VersionBuild {
+impl BuildMetadata {
     pub fn new(
         status: BuildStatus,
         timestamp: DateTime<Utc>,
@@ -86,7 +86,7 @@ impl VersionBuild {
         builder_address: String,
         message: Option<String>,
     ) -> Self {
-        VersionBuild {
+        BuildMetadata {
             status,
             timestamp,
             builder_id,

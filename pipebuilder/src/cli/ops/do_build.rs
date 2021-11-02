@@ -2,9 +2,9 @@ use pipebuilder_common::{
     api::{
         client::ApiClient,
         models::{
-            BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
-            DeleteBuildRequest, GetBuildLogRequest, GetBuildLogResponse, GetBuildRequest,
-            ListBuildRequest, ListBuildSnapshotRequest, VersionBuild,
+            BuildMetadata, BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest,
+            CancelBuildResponse, DeleteBuildRequest, GetBuildLogRequest, GetBuildLogResponse,
+            GetBuildRequest, ListBuildRequest, ListBuildSnapshotRequest,
         },
     },
     Result,
@@ -26,27 +26,27 @@ pub(crate) async fn build(
     client.build(&request).await
 }
 
-pub(crate) async fn get_build(
+pub(crate) async fn get_build_metadata(
     client: &ApiClient,
     namespace: String,
     id: String,
     version: u64,
-) -> Result<VersionBuild> {
+) -> Result<BuildMetadata> {
     let request = GetBuildRequest {
         namespace,
         id,
         version,
     };
-    client.get_build(&request).await
+    client.get_build_metadata(&request).await
 }
 
-pub(crate) async fn list_build(
+pub(crate) async fn list_build_metadata(
     client: &ApiClient,
     namespace: String,
     id: Option<String>,
-) -> Result<Vec<VersionBuild>> {
+) -> Result<Vec<BuildMetadata>> {
     let request = ListBuildRequest { namespace, id };
-    client.list_build(&request).await
+    client.list_build_metadata(&request).await
 }
 
 pub(crate) async fn list_build_snapshot(

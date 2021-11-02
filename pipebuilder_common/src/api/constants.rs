@@ -1,6 +1,7 @@
 pub(crate) const APP: &str = "/api/v1/app";
 pub(crate) const APP_METADATA: &str = "/api/v1/app/metadata";
 pub(crate) const BUILD: &str = "/api/v1/build";
+pub(crate) const BUILD_METADATA: &str = "/api/v1/build/metadata";
 pub(crate) const BUILD_SNAPSHOT: &str = "/api/v1/build/snapshot";
 pub(crate) const BUILD_LOG: &str = "/api/v1/build/log";
 pub(crate) const CANCEL_BUILD: &str = "/api/v1/build/cancel";

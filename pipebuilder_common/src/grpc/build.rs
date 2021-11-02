@@ -36,7 +36,7 @@ pub struct CancelResponse {}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ScanRequest {}
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct VersionBuildKey {
+pub struct BuildMetadataKey {
     /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
@@ -50,7 +50,7 @@ pub struct VersionBuildKey {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ScanResponse {
     #[prost(message, repeated, tag = "1")]
-    pub builds: ::prost::alloc::vec::Vec<VersionBuildKey>,
+    pub builds: ::prost::alloc::vec::Vec<BuildMetadataKey>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetLogRequest {

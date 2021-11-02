@@ -1,13 +1,13 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
     app_metadata_namespace, app_metadata_namespace_id, app_metadata_namespace_id_version,
-    build_snapshot_namespace, build_snapshot_namespace_id, manifest_metadata_namespace,
-    manifest_metadata_namespace_id, manifest_metadata_namespace_id_version,
-    manifest_snapshot_namespace, manifest_snapshot_namespace_id, namespace_key, node_key,
-    project_namespace, project_namespace_id, read_file, root_resource, version_build_namespace,
-    version_build_namespace_id, version_build_namespace_id_version, AppMetadata, BuildSnapshot,
-    ManifestMetadata, ManifestSnapshot, Namespace, NodeRole, NodeState, Project, Result,
-    VersionBuild, RESOURCE_NAMESPACE, RESOURCE_NODE_BUILDER,
+    build_metadata_namespace_id, build_metadata_namespace_id_version, build_snapshot_namespace,
+    build_snapshot_namespace_id, manifest_metadata_namespace, manifest_metadata_namespace_id,
+    manifest_metadata_namespace_id_version, manifest_snapshot_namespace,
+    manifest_snapshot_namespace_id, namespace_key, node_key, project_namespace,
+    project_namespace_id, read_file, root_resource, version_build_namespace, AppMetadata,
+    BuildMetadata, BuildSnapshot, ManifestMetadata, ManifestSnapshot, Namespace, NodeRole,
+    NodeState, Project, Result, RESOURCE_NAMESPACE, RESOURCE_NODE_BUILDER,
 };
 use etcd_client::{
     Certificate, Client, ConnectOptions, DeleteOptions, DeleteResponse, GetOptions, GetResponse,
@@ -387,75 +387,77 @@ impl Register {
         resp
     }
 
-    pub async fn do_get_version_build(
+    pub async fn do_get_build_metadata(
         &mut self,
         namespace: &str,
         id: &str,
         version: u64,
-    ) -> Result<Option<VersionBuild>> {
-        let key = version_build_namespace_id_version(namespace, id, version);
+    ) -> Result<Option<BuildMetadata>> {
+        let key = build_metadata_namespace_id_version(namespace, id, version);
         let state = self
-            .get_json_value::<String, VersionBuild>(key, None)
+            .get_json_value::<String, BuildMetadata>(key, None)
             .await?;
         Ok(state)
     }
 
-    pub async fn get_version_build(
+    pub async fn get_build_metadata(
         &mut self,
         lease_id: i64,
         namespace: &str,
         id: &str,
         version: u64,
-    ) -> Result<Option<VersionBuild>> {
+    ) -> Result<Option<BuildMetadata>> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = version_build_namespace_id_version(namespace, id, version);
+        let lock_name = build_metadata_namespace_id_version(namespace, id, version);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
-        let resp = self.do_get_version_build(namespace, id, version).await?;
+        let resp = self.do_get_build_metadata(namespace, id, version).await?;
         self.unlock(lock_name.as_str(), key).await?;
         Ok(resp)
     }
 
-    pub async fn list_version_build(
+    pub async fn list_build_metadata(
         &mut self,
         namespace: &str,
         id: Option<String>,
-    ) -> Result<Vec<(String, VersionBuild)>> {
+    ) -> Result<Vec<(String, BuildMetadata)>> {
         let prefix = match id {
-            Some(id) => version_build_namespace_id(namespace, id.as_str()),
+            Some(id) => build_metadata_namespace_id(namespace, id.as_str()),
             None => version_build_namespace(namespace),
         };
-        let version_builds = self.list_kvs::<&str, VersionBuild>(prefix.as_str()).await?;
+        let version_builds = self
+            .list_kvs::<&str, BuildMetadata>(prefix.as_str())
+            .await?;
         Ok(version_builds)
     }
 
-    pub async fn do_put_version_build(
+    pub async fn do_put_build_metadata(
         &mut self,
         namespace: &str,
         id: &str,
         version: u64,
-        state: VersionBuild,
-    ) -> Result<(PutResponse, VersionBuild)> {
-        let key = version_build_namespace_id_version(namespace, id, version);
+        state: BuildMetadata,
+    ) -> Result<(PutResponse, BuildMetadata)> {
+        let key = build_metadata_namespace_id_version(namespace, id, version);
         let value = serde_json::to_vec(&state)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, state))
     }
 
-    pub async fn put_version_build(
+    pub async fn put_build_metadata(
         &mut self,
         lease_id: i64,
         namespace: &str,
         id: &str,
         version: u64,
-        state: VersionBuild,
-    ) -> Result<(PutResponse, VersionBuild)> {
+        state: BuildMetadata,
+    ) -> Result<(PutResponse, BuildMetadata)> {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = version_build_namespace_id_version(namespace, id, version);
+        let lock_name = build_metadata_namespace_id_version(namespace, id, version);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self
-            .do_put_version_build(namespace, id, version, state)
+            .do_put_build_metadata(namespace, id, version, state)
             .await;
         self.unlock(lock_name.as_str(), key).await?;
         resp
@@ -816,13 +818,13 @@ impl Register {
         Ok(resp)
     }
 
-    pub async fn delete_version_build(
+    pub async fn delete_build_metadata(
         &mut self,
         namespace: &str,
         id: &str,
         version: u64,
     ) -> Result<()> {
-        let key = version_build_namespace_id_version(namespace, id, version);
+        let key = build_metadata_namespace_id_version(namespace, id, version);
         let _ = self.delete(key, None).await?;
         Ok(())
     }
@@ -878,7 +880,7 @@ impl Register {
         namespace: &str,
         id: &str,
     ) -> Result<bool> {
-        let prefix = version_build_namespace_id(namespace, id);
+        let prefix = build_metadata_namespace_id(namespace, id);
         self.is_prefix_exist(prefix).await
     }
 

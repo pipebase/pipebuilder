@@ -168,7 +168,7 @@ pub struct DeleteBuildSnapshotResponse {}
 
 // version build model for rest api
 #[derive(Serialize, Deserialize)]
-pub struct VersionBuild {
+pub struct BuildMetadata {
     // id
     pub id: String,
     // version
@@ -185,7 +185,7 @@ pub struct VersionBuild {
     pub message: Option<String>,
 }
 
-impl Display for VersionBuild {
+impl Display for BuildMetadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = match self.message.as_ref() {
             Some(message) => message.as_str(),
@@ -212,7 +212,7 @@ impl Display for VersionBuild {
     }
 }
 
-impl PrintHeader for VersionBuild {
+impl PrintHeader for BuildMetadata {
     fn print_header() {
         println!(
             "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}{col5:<col5_width$}{col6:<col6_width$}",
@@ -363,13 +363,13 @@ pub struct ScanBuilderRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct VersionBuildKey {
+pub struct BuildMetadataKey {
     pub namespace: String,
     pub id: String,
     pub version: u64,
 }
 
-impl Display for VersionBuildKey {
+impl Display for BuildMetadataKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
@@ -384,7 +384,7 @@ impl Display for VersionBuildKey {
     }
 }
 
-impl PrintHeader for VersionBuildKey {
+impl PrintHeader for BuildMetadataKey {
     fn print_header() {
         println!(
             "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}",
@@ -772,12 +772,12 @@ impl From<InternalNodeState> for NodeState {
     }
 }
 
-impl From<build::VersionBuildKey> for VersionBuildKey {
-    fn from(origin: build::VersionBuildKey) -> Self {
+impl From<build::BuildMetadataKey> for BuildMetadataKey {
+    fn from(origin: build::BuildMetadataKey) -> Self {
         let namespace = origin.namespace;
         let id = origin.id;
         let version = origin.version;
-        VersionBuildKey {
+        BuildMetadataKey {
             namespace,
             id,
             version,

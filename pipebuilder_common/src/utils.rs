@@ -1,9 +1,9 @@
 use crate::{
     errors::{cargo_error, Result},
     grpc::{build::builder_client::BuilderClient, node::node_client::NodeClient},
-    node_role_prefix, NodeRole, RESOURCE_APP_METADATA, RESOURCE_BUILD_SNAPSHOT,
-    RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT, RESOURCE_NAMESPACE, RESOURCE_PROJECT,
-    RESOURCE_VERSION_BUILD,
+    node_role_prefix, NodeRole, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA,
+    RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
+    RESOURCE_NAMESPACE, RESOURCE_PROJECT,
 };
 use etcd_client::{Event, EventType};
 use fnv::FnvHasher;
@@ -307,7 +307,7 @@ pub fn project_namespace(namespace: &str) -> String {
 }
 
 pub fn version_build_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_VERSION_BUILD, namespace)
+    resource_namespace(RESOURCE_BUILD_METADATA, namespace)
 }
 
 pub fn app_metadata_namespace_id(namespace: &str, id: &str) -> String {
@@ -330,12 +330,12 @@ pub fn project_namespace_id(namespace: &str, id: &str) -> String {
     resource_namespace_id(RESOURCE_PROJECT, namespace, id)
 }
 
-pub fn version_build_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_VERSION_BUILD, namespace, id)
+pub fn build_metadata_namespace_id(namespace: &str, id: &str) -> String {
+    resource_namespace_id(RESOURCE_BUILD_METADATA, namespace, id)
 }
 
-pub fn version_build_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
-    resource_namespace_id_version(RESOURCE_VERSION_BUILD, namespace, id, version)
+pub fn build_metadata_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
+    resource_namespace_id_version(RESOURCE_BUILD_METADATA, namespace, id, version)
 }
 
 // remove '/resource/namespace/' and return id/<suffix> given a key
