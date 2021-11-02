@@ -531,6 +531,15 @@ pub struct UpdateNamespaceRequest {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct DeleteNamespaceRequest {
+    // namespace id
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteNamespaceResponse {}
+
+#[derive(Serialize, Deserialize)]
 pub struct ListNamespaceRequest {}
 
 #[derive(Serialize, Deserialize)]
@@ -569,6 +578,15 @@ pub struct UpdateProjectRequest {
     pub namespace: String,
     pub id: String,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteProjectRequest {
+    pub namespace: String,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteProjectResponse {}
 
 #[derive(Serialize, Deserialize)]
 pub struct ListProjectRequest {

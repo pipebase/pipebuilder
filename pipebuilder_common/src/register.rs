@@ -833,13 +833,18 @@ impl Register {
         Ok(())
     }
 
-    pub async fn delete_app_meta(&mut self, namespace: &str, id: &str, version: u64) -> Result<()> {
+    pub async fn delete_app_metadata(
+        &mut self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> Result<()> {
         let key = app_metadata_namespace_id_version(namespace, id, version);
         let _ = self.delete(key, None).await?;
         Ok(())
     }
 
-    pub async fn delete_manifest_meta(
+    pub async fn delete_manifest_metadata(
         &mut self,
         namespace: &str,
         id: &str,
@@ -854,6 +859,51 @@ impl Register {
         let key = manifest_snapshot_namespace_id(namespace, id);
         let _ = self.delete(key, None).await?;
         Ok(())
+    }
+
+    pub async fn delete_project(&mut self, namespace: &str, id: &str) -> Result<()> {
+        let key = project_namespace_id(namespace, id);
+        let _ = self.delete(key, None).await?;
+        Ok(())
+    }
+
+    pub async fn delete_namespace(&mut self, id: &str) -> Result<()> {
+        let key = namespace_key(id);
+        let _ = self.delete(key, None).await?;
+        Ok(())
+    }
+
+    pub async fn is_version_build_prefix_exist(
+        &mut self,
+        namespace: &str,
+        id: &str,
+    ) -> Result<bool> {
+        let prefix = version_build_namespace_id(namespace, id);
+        self.is_prefix_exist(prefix).await
+    }
+
+    pub async fn is_build_snapshot_exist(&mut self, namespace: &str, id: &str) -> Result<bool> {
+        let key = build_snapshot_namespace_id(namespace, id);
+        self.is_exist(key).await
+    }
+
+    pub async fn is_manifest_snapshot_exist(&mut self, namespace: &str, id: &str) -> Result<bool> {
+        let key = manifest_snapshot_namespace_id(namespace, id);
+        self.is_exist(key).await
+    }
+
+    pub async fn is_app_metadata_prefix_exist(
+        &mut self,
+        namespace: &str,
+        id: &str,
+    ) -> Result<bool> {
+        let prefix = app_metadata_namespace_id(namespace, id);
+        self.is_prefix_exist(prefix).await
+    }
+
+    pub async fn is_project_prefix_exist(&mut self, namespace: &str) -> Result<bool> {
+        let prefix = project_namespace(namespace);
+        self.is_prefix_exist(prefix).await
     }
 
     fn deserialize_kvs<T>(kvs: &[KeyValue]) -> Result<Vec<(String, T)>>

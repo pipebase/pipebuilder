@@ -168,7 +168,7 @@ impl Repository for RepositoryService {
         };
         let mut register = self.register.clone();
         match register
-            .delete_manifest_meta(namespace.as_str(), id.as_str(), version)
+            .delete_manifest_metadata(namespace.as_str(), id.as_str(), version)
             .await
         {
             Ok(_) => (),
@@ -297,7 +297,7 @@ impl Repository for RepositoryService {
         };
         let mut register = self.register.clone();
         match register
-            .delete_app_meta(namespace.as_str(), id.as_str(), version)
+            .delete_app_metadata(namespace.as_str(), id.as_str(), version)
             .await
         {
             Ok(_) => (),

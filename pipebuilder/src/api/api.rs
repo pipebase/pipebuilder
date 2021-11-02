@@ -71,17 +71,22 @@ pub mod filters {
         register: Register,
         lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        v1_namespace_put(register.clone(), lease_id).or(v1_namespace_list(register))
+        v1_namespace_put(register.clone(), lease_id)
+            .or(v1_namespace_delete(register.clone()))
+            .or(v1_namespace_list(register))
     }
 
-    // namespace api
+    // project api
     pub fn v1_project(
         register: Register,
         lease_id: i64,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        v1_project_put(register.clone(), lease_id).or(v1_project_list(register))
+        v1_project_put(register.clone(), lease_id)
+            .or(v1_project_delete(register.clone()))
+            .or(v1_project_list(register))
     }
 
+    // node api
     pub fn v1_node(
         register: Register,
         lease_id: i64,
@@ -303,6 +308,26 @@ pub mod filters {
             .and_then(handlers::put_namespace)
     }
 
+    pub fn v1_namespace_delete(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "namespace")
+            .and(warp::delete())
+            .and(with_register(register))
+            .and(json_request::<models::DeleteNamespaceRequest>())
+            .and_then(handlers::delete_namespace)
+    }
+
+    pub fn v1_namespace_list(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "namespace")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(warp::query::<models::ListNamespaceRequest>())
+            .and_then(handlers::list_namespace)
+    }
+
     pub fn v1_project_put(
         register: Register,
         lease_id: i64,
@@ -315,14 +340,14 @@ pub mod filters {
             .and_then(handlers::put_project)
     }
 
-    pub fn v1_namespace_list(
+    pub fn v1_project_delete(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "namespace")
-            .and(warp::get())
+        warp::path!("api" / "v1" / "project")
+            .and(warp::delete())
             .and(with_register(register))
-            .and(warp::query::<models::ListNamespaceRequest>())
-            .and_then(handlers::list_namespace)
+            .and(json_request::<models::DeleteProjectRequest>())
+            .and_then(handlers::delete_project)
     }
 
     pub fn v1_project_list(
@@ -595,7 +620,8 @@ mod handlers {
         mut register: Register,
         request: models::DeleteManifestSnapshotRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match validations::validate_delete_manifest_snapshot(&mut register, &request).await {
+        match validations::validate_delete_manifest_snapshot_request(&mut register, &request).await
+        {
             Ok(()) => (),
             Err(err) => return Ok(http_bad_request(err.into())),
         };
@@ -657,7 +683,7 @@ mod handlers {
         mut register: Register,
         request: models::DeleteBuildSnapshotRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match validations::validate_delete_build_snapshot(&mut register, &request).await {
+        match validations::validate_delete_build_snapshot_request(&mut register, &request).await {
             Ok(()) => (),
             Err(err) => return Ok(http_bad_request(err.into())),
         };
@@ -1408,6 +1434,57 @@ mod handlers {
         }
     }
 
+    async fn do_delete_project(
+        register: &mut Register,
+        request: models::DeleteProjectRequest,
+    ) -> pipebuilder_common::Result<models::DeleteProjectResponse> {
+        let namespace = request.namespace;
+        let id = request.id;
+        register
+            .delete_project(namespace.as_str(), id.as_str())
+            .await?;
+        Ok(models::DeleteProjectResponse {})
+    }
+
+    pub async fn delete_project(
+        mut register: Register,
+        request: models::DeleteProjectRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_delete_project_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
+        match do_delete_project(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_delete_namespace(
+        register: &mut Register,
+        request: models::DeleteNamespaceRequest,
+    ) -> pipebuilder_common::Result<models::DeleteNamespaceResponse> {
+        let id = request.id;
+        register.delete_namespace(id.as_str()).await?;
+        Ok(models::DeleteNamespaceResponse {})
+    }
+
+    pub async fn delete_namespace(
+        mut register: Register,
+        request: models::DeleteNamespaceRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        match validations::validate_delete_namespace_request(&mut register, &request).await {
+            Ok(_) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
+        match do_delete_namespace(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
     async fn get_internal_node_state(
         register: &mut Register,
         lease_id: i64,
@@ -1471,7 +1548,7 @@ mod validations {
 
     use pipebuilder_common::{
         api::models, invalid_api_request, manifest_metadata_namespace_id, namespace_key,
-        project_namespace_id, version_build_namespace_id, Build, NodeRole, Register, Result,
+        project_namespace_id, Build, NodeRole, Register, Result,
     };
 
     pub async fn validate_build_request(
@@ -1647,7 +1724,7 @@ mod validations {
         validate_namespace(register, namespace).await
     }
 
-    pub async fn validate_delete_manifest_snapshot(
+    pub async fn validate_delete_manifest_snapshot_request(
         register: &mut Register,
         request: &models::DeleteManifestSnapshotRequest,
     ) -> Result<()> {
@@ -1664,7 +1741,7 @@ mod validations {
         }
     }
 
-    pub async fn validate_delete_build_snapshot(
+    pub async fn validate_delete_build_snapshot_request(
         register: &mut Register,
         request: &models::DeleteBuildSnapshotRequest,
     ) -> Result<()> {
@@ -1672,10 +1749,59 @@ mod validations {
         validate_namespace(register, namespace).await?;
         let id = request.id.as_str();
         validate_project(register, namespace, id).await?;
-        match is_version_build_exist(register, namespace, id).await? {
+        match is_version_build_prefix_exist(register, namespace, id).await? {
             true => Err(invalid_api_request(format!(
                 "can not delete build snapshot '{}/{}', builds found !",
                 namespace, id
+            ))),
+            false => Ok(()),
+        }
+    }
+
+    pub async fn validate_delete_project_request(
+        register: &mut Register,
+        request: &models::DeleteProjectRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await?;
+        match is_build_snapshot_exist(register, namespace, id).await? {
+            true => {
+                return Err(invalid_api_request(format!(
+                    "can not delete project '{}/{}', build snapshot found !",
+                    namespace, id
+                )))
+            }
+            false => (),
+        };
+        match is_manifest_snapshot_exist(register, namespace, id).await? {
+            true => {
+                return Err(invalid_api_request(format!(
+                    "can not delete project '{}/{}', manifest snapshot found !",
+                    namespace, id
+                )))
+            }
+            false => (),
+        };
+        match is_app_metadata_prefix_exist(register, namespace, id).await? {
+            true => Err(invalid_api_request(format!(
+                "can not delete projecct '{}/{}', app metadata found !",
+                namespace, id
+            ))),
+            false => Ok(()),
+        }
+    }
+
+    pub async fn validate_delete_namespace_request(
+        register: &mut Register,
+        request: &models::DeleteNamespaceRequest,
+    ) -> Result<()> {
+        let id = request.id.as_str();
+        match is_project_prefix_exist(register, id).await? {
+            true => Err(invalid_api_request(format!(
+                "can not delete namespace '{}', project found !",
+                id
             ))),
             false => Ok(()),
         }
@@ -1750,12 +1876,40 @@ mod validations {
         register.is_prefix_exist(prefix).await
     }
 
-    async fn is_version_build_exist(
+    // check build metadata exists or not
+    async fn is_version_build_prefix_exist(
         register: &mut Register,
         namespace: &str,
         id: &str,
     ) -> Result<bool> {
-        let prefix = version_build_namespace_id(namespace, id);
-        register.is_prefix_exist(prefix).await
+        register.is_version_build_prefix_exist(namespace, id).await
+    }
+
+    async fn is_build_snapshot_exist(
+        register: &mut Register,
+        namespace: &str,
+        id: &str,
+    ) -> Result<bool> {
+        register.is_build_snapshot_exist(namespace, id).await
+    }
+
+    async fn is_manifest_snapshot_exist(
+        register: &mut Register,
+        namespace: &str,
+        id: &str,
+    ) -> Result<bool> {
+        register.is_manifest_snapshot_exist(namespace, id).await
+    }
+
+    async fn is_app_metadata_prefix_exist(
+        register: &mut Register,
+        namespace: &str,
+        id: &str,
+    ) -> Result<bool> {
+        register.is_app_metadata_prefix_exist(namespace, id).await
+    }
+
+    async fn is_project_prefix_exist(register: &mut Register, namespace: &str) -> Result<bool> {
+        register.is_project_prefix_exist(namespace).await
     }
 }
