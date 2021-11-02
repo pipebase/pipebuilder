@@ -113,6 +113,15 @@ impl PrintHeader for ManifestSnapshot {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct DeleteManifestSnapshotRequest {
+    pub namespace: String,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteManifestSnapshotResponse {}
+
+#[derive(Serialize, Deserialize)]
 pub struct ListBuildSnapshotRequest {
     pub namespace: String,
 }
@@ -147,6 +156,15 @@ impl PrintHeader for BuildSnapshot {
         )
     }
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteBuildSnapshotRequest {
+    pub namespace: String,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteBuildSnapshotResponse {}
 
 // version build model for rest api
 #[derive(Serialize, Deserialize)]

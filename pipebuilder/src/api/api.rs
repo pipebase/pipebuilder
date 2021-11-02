@@ -34,6 +34,7 @@ pub mod filters {
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_build_post(scheduler_client, register.clone())
             .or(v1_build_snapshot_list(register.clone()))
+            .or(v1_build_snapshot_delete(register.clone()))
             .or(v1_build_get(register.clone(), lease_id))
             .or(v1_build_list(register.clone()))
             .or(v1_build_cancel(register.clone(), lease_id))
@@ -50,6 +51,7 @@ pub mod filters {
         v1_manifest_put(repository_client.clone(), register.clone())
             .or(v1_manifest_get(repository_client.clone(), register.clone()))
             .or(v1_manifest_snapshot_list(register.clone()))
+            .or(v1_manifest_snapshot_delete(register.clone()))
             .or(v1_manifest_metadata_list(register.clone()))
             .or(v1_manifest_delete(repository_client, register))
     }
@@ -135,6 +137,16 @@ pub mod filters {
             .and_then(handlers::list_manifest_snapshot)
     }
 
+    pub fn v1_manifest_snapshot_delete(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "manifest" / "snapshot")
+            .and(warp::delete())
+            .and(with_register(register))
+            .and(json_request::<models::DeleteManifestSnapshotRequest>())
+            .and_then(handlers::delete_manifest_snapshot)
+    }
+
     pub fn v1_build_snapshot_list(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -143,6 +155,16 @@ pub mod filters {
             .and(with_register(register))
             .and(warp::query::<models::ListBuildSnapshotRequest>())
             .and_then(handlers::list_build_snapshot)
+    }
+
+    pub fn v1_build_snapshot_delete(
+        register: Register,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "build" / "snapshot")
+            .and(warp::delete())
+            .and(with_register(register))
+            .and(warp::query::<models::DeleteBuildSnapshotRequest>())
+            .and_then(handlers::delete_build_snapshot)
     }
 
     pub fn v1_build_get(
@@ -569,6 +591,32 @@ mod handlers {
         Ok(snapshots)
     }
 
+    pub async fn delete_manifest_snapshot(
+        mut register: Register,
+        request: models::DeleteManifestSnapshotRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match validations::validate_delete_manifest_snapshot(&mut register, &request).await {
+            Ok(()) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
+        match do_delete_manifest_snapshot(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_delete_manifest_snapshot(
+        register: &mut Register,
+        request: models::DeleteManifestSnapshotRequest,
+    ) -> pipebuilder_common::Result<models::DeleteManifestSnapshotResponse> {
+        let namespace = request.namespace;
+        let id = request.id;
+        register
+            .delete_manifest_snapshot(namespace.as_str(), id.as_str())
+            .await?;
+        Ok(models::DeleteManifestSnapshotResponse {})
+    }
+
     pub async fn list_build_snapshot(
         mut register: Register,
         request: models::ListBuildSnapshotRequest,
@@ -603,6 +651,32 @@ mod handlers {
             })
             .collect();
         Ok(snapshots)
+    }
+
+    pub async fn delete_build_snapshot(
+        mut register: Register,
+        request: models::DeleteBuildSnapshotRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match validations::validate_delete_build_snapshot(&mut register, &request).await {
+            Ok(()) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
+        match do_delete_build_snapshot(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_delete_build_snapshot(
+        register: &mut Register,
+        request: models::DeleteBuildSnapshotRequest,
+    ) -> pipebuilder_common::Result<models::DeleteBuildSnapshotResponse> {
+        let namespace = request.namespace;
+        let id = request.id;
+        register
+            .delete_build_snapshot(namespace.as_str(), id.as_str())
+            .await?;
+        Ok(models::DeleteBuildSnapshotResponse {})
     }
 
     pub async fn get_build(
@@ -1396,8 +1470,8 @@ mod handlers {
 mod validations {
 
     use pipebuilder_common::{
-        api::models, invalid_api_request, namespace_key, project_namespace_id, Build, NodeRole,
-        Register, Result,
+        api::models, invalid_api_request, manifest_metadata_namespace_id, namespace_key,
+        project_namespace_id, version_build_namespace_id, Build, NodeRole, Register, Result,
     };
 
     pub async fn validate_build_request(
@@ -1573,6 +1647,40 @@ mod validations {
         validate_namespace(register, namespace).await
     }
 
+    pub async fn validate_delete_manifest_snapshot(
+        register: &mut Register,
+        request: &models::DeleteManifestSnapshotRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await?;
+        match is_manifest_metadata_exist(register, namespace, id).await? {
+            true => Err(invalid_api_request(format!(
+                "can not delete manifest snapshot '{}/{}', manifests found !",
+                namespace, id
+            ))),
+            false => Ok(()),
+        }
+    }
+
+    pub async fn validate_delete_build_snapshot(
+        register: &mut Register,
+        request: &models::DeleteBuildSnapshotRequest,
+    ) -> Result<()> {
+        let namespace = request.namespace.as_str();
+        validate_namespace(register, namespace).await?;
+        let id = request.id.as_str();
+        validate_project(register, namespace, id).await?;
+        match is_version_build_exist(register, namespace, id).await? {
+            true => Err(invalid_api_request(format!(
+                "can not delete build snapshot '{}/{}', builds found !",
+                namespace, id
+            ))),
+            false => Ok(()),
+        }
+    }
+
     pub fn validate_list_node_state_request(request: &models::ListNodeStateRequest) -> Result<()> {
         let role = request.role.as_ref();
         let role = match role {
@@ -1631,5 +1739,23 @@ mod validations {
                 namespace, id
             ))),
         }
+    }
+
+    async fn is_manifest_metadata_exist(
+        register: &mut Register,
+        namespace: &str,
+        id: &str,
+    ) -> Result<bool> {
+        let prefix = manifest_metadata_namespace_id(namespace, id);
+        register.is_prefix_exist(prefix).await
+    }
+
+    async fn is_version_build_exist(
+        register: &mut Register,
+        namespace: &str,
+        id: &str,
+    ) -> Result<bool> {
+        let prefix = version_build_namespace_id(namespace, id);
+        register.is_prefix_exist(prefix).await
     }
 }
