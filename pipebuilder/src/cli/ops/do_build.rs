@@ -85,7 +85,7 @@ pub(crate) async fn delete_build(
     client.delete_build(&request).await
 }
 
-pub(crate) async fn get_build_log(
+pub(crate) async fn pull_build_log(
     client: &ApiClient,
     namespace: String,
     id: String,
@@ -96,5 +96,5 @@ pub(crate) async fn get_build_log(
         id,
         version,
     };
-    client.get_build_log(&request).await
+    client.pull_build_log(&request).await
 }

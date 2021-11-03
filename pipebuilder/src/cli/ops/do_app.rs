@@ -8,7 +8,7 @@ use pipebuilder_common::{
     Result,
 };
 
-pub(crate) async fn get_app(
+pub(crate) async fn pull_app(
     client: &ApiClient,
     namespace: String,
     id: String,
@@ -19,7 +19,7 @@ pub(crate) async fn get_app(
         id,
         build_version,
     };
-    client.get_app(&request).await
+    client.pull_app(&request).await
 }
 
 pub(crate) async fn list_app_metadata(

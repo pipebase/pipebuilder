@@ -195,7 +195,7 @@ impl ApiClient {
         Ok(response)
     }
 
-    pub async fn get_manifest(&self, request: &GetManifestRequest) -> Result<GetManifestResponse> {
+    pub async fn pull_manifest(&self, request: &GetManifestRequest) -> Result<GetManifestResponse> {
         let response = self.query(MANIFEST, request).await?;
         let response = Self::get_response_body::<GetManifestResponse>(response).await?;
         Ok(response)
@@ -217,13 +217,16 @@ impl ApiClient {
         Ok(response)
     }
 
-    pub async fn get_app(&self, request: &GetAppRequest) -> Result<GetAppResponse> {
+    pub async fn pull_app(&self, request: &GetAppRequest) -> Result<GetAppResponse> {
         let response = self.query(APP, request).await?;
         let response = Self::get_response_body::<GetAppResponse>(response).await?;
         Ok(response)
     }
 
-    pub async fn get_build_log(&self, request: &GetBuildLogRequest) -> Result<GetBuildLogResponse> {
+    pub async fn pull_build_log(
+        &self,
+        request: &GetBuildLogRequest,
+    ) -> Result<GetBuildLogResponse> {
         let response = self.query(BUILD_LOG, request).await?;
         let response = Self::get_response_body::<GetBuildLogResponse>(response).await?;
         Ok(response)

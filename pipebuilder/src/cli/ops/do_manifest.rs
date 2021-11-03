@@ -25,7 +25,7 @@ pub(crate) async fn put_manifest(
     client.put_manifest(&request).await
 }
 
-pub(crate) async fn get_manifest(
+pub(crate) async fn pull_manifest(
     client: &ApiClient,
     namespace: String,
     id: String,
@@ -36,7 +36,7 @@ pub(crate) async fn get_manifest(
         id,
         version,
     };
-    client.get_manifest(&request).await
+    client.pull_manifest(&request).await
 }
 
 pub(crate) async fn list_manifest_snapshot(
