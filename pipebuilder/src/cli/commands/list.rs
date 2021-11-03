@@ -14,54 +14,18 @@ use clap::Arg;
 
 pub fn cmd() -> Cmd {
     Cmd::new("list").about("List resource").subcommands(vec![
-        app_metadata(),
-        build_snapshot(),
-        manifest_metadata(),
-        manifest_snapshot(),
-        build_metadata(),
+        app(),
+        build(),
+        manifest(),
         node(),
         namespace(),
         project(),
     ])
 }
 
-pub fn build_snapshot() -> Cmd {
-    Cmd::new("build/snapshot")
-        .about("List build snapshot given namespace")
-        .args(vec![Arg::new("namespace")
-            .short('n')
-            .about("Specify namespace")
-            .required(true)
-            .takes_value(true)])
-}
-
-pub async fn exec_build_snapshot(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
-    let namespace = args.value_of("namespace").unwrap();
-    let response = list_build_snapshot(&client, namespace.to_owned()).await?;
-    print_records(response.as_slice());
-    Ok(())
-}
-
-pub fn manifest_snapshot() -> Cmd {
-    Cmd::new("manifest/snapshot")
-        .about("List manifest snapshot given namespace")
-        .args(vec![Arg::new("namespace")
-            .short('n')
-            .about("Specify namespace")
-            .required(true)
-            .takes_value(true)])
-}
-
-pub async fn exec_manifest_snapshot(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
-    let namespace = args.value_of("namespace").unwrap();
-    let response = list_manifest_snapshot(&client, namespace.to_owned()).await?;
-    print_records(response.as_slice());
-    Ok(())
-}
-
-pub fn build_metadata() -> Cmd {
-    Cmd::new("build/metadata")
-        .about("List build history given namespace and project id")
+pub fn build() -> Cmd {
+    Cmd::new("build")
+        .about("List build metadata given namespace and project id")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -72,15 +36,33 @@ pub fn build_metadata() -> Cmd {
                 .short('i')
                 .about("Specify project id")
                 .takes_value(true),
+            Arg::new("snapshot")
+                .short('s')
+                .about("Specify build snapshot per project id returned"),
         ])
 }
 
-pub async fn exec_build_metadata(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+async fn exec_build_snapshot(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+    let namespace = args.value_of("namespace").unwrap();
+    let response = list_build_snapshot(&client, namespace.to_owned()).await?;
+    print_records(response.as_slice());
+    Ok(())
+}
+
+async fn exec_build_metadata(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let namespace = args.value_of("namespace").unwrap();
     let id = args.value_of("id").map(|id| id.to_owned());
     let response = list_build_metadata(&client, namespace.to_owned(), id.to_owned()).await?;
     print_records(response.as_slice());
     Ok(())
+}
+
+pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+    let is_snapshot = args.is_present("snapshot");
+    if is_snapshot {
+        return exec_build_snapshot(client, args).await;
+    }
+    return exec_build_metadata(client, args).await;
 }
 
 pub fn node() -> Cmd {
@@ -100,23 +82,21 @@ pub async fn exec_node(client: ApiClient, args: &clap::ArgMatches) -> Result<()>
     Ok(())
 }
 
-pub fn app_metadata() -> Cmd {
-    Cmd::new("app/metadata")
-        .about("List app metadata")
-        .args(vec![
-            Arg::new("namespace")
-                .short('n')
-                .about("Specify namespace")
-                .required(true)
-                .takes_value(true),
-            Arg::new("id")
-                .short('i')
-                .about("Specify project id")
-                .takes_value(true),
-        ])
+pub fn app() -> Cmd {
+    Cmd::new("app").about("List app metadata").args(vec![
+        Arg::new("namespace")
+            .short('n')
+            .about("Specify namespace")
+            .required(true)
+            .takes_value(true),
+        Arg::new("id")
+            .short('i')
+            .about("Specify project id")
+            .takes_value(true),
+    ])
 }
 
-pub async fn exec_app_metadata(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+pub async fn exec_app(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let namespace = args.value_of("namespace").unwrap();
     let id = args.value_of("id");
     let id = id.map(|id| id.to_owned());
@@ -125,8 +105,8 @@ pub async fn exec_app_metadata(client: ApiClient, args: &clap::ArgMatches) -> Re
     Ok(())
 }
 
-pub fn manifest_metadata() -> Cmd {
-    Cmd::new("manifest/metadata")
+pub fn manifest() -> Cmd {
+    Cmd::new("manifest")
         .about("List manifest metadata")
         .args(vec![
             Arg::new("namespace")
@@ -138,16 +118,34 @@ pub fn manifest_metadata() -> Cmd {
                 .short('i')
                 .about("Specify project id")
                 .takes_value(true),
+            Arg::new("snapshot")
+                .short('s')
+                .about("Specify manifest snapshot per project id returned"),
         ])
 }
 
-pub async fn exec_manifest_metadata(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+async fn exec_manifest_snapshot(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+    let namespace = args.value_of("namespace").unwrap();
+    let response = list_manifest_snapshot(&client, namespace.to_owned()).await?;
+    print_records(response.as_slice());
+    Ok(())
+}
+
+async fn exec_manifest_metadata(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let namespace = args.value_of("namespace").unwrap();
     let id = args.value_of("id");
     let id = id.map(|id| id.to_owned());
     let response = list_manifest_metadata(&client, namespace.to_owned(), id).await?;
     print_records(response.as_slice());
     Ok(())
+}
+
+pub async fn exec_manifest(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+    let is_snapshot = args.is_present("snapshot");
+    if is_snapshot {
+        return exec_manifest_snapshot(client, args).await;
+    }
+    return exec_manifest_metadata(client, args).await;
 }
 
 pub fn namespace() -> Cmd {
