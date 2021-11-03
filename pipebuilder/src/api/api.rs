@@ -48,7 +48,7 @@ pub mod filters {
         repository_client: RepositoryClient<Channel>,
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        v1_manifest_put(repository_client.clone(), register.clone())
+        v1_manifest_post(repository_client.clone(), register.clone())
             .or(v1_manifest_get(repository_client.clone(), register.clone()))
             .or(v1_manifest_snapshot_list(register.clone()))
             .or(v1_manifest_snapshot_delete(register.clone()))
@@ -108,7 +108,7 @@ pub mod filters {
             .and_then(handlers::build)
     }
 
-    pub fn v1_manifest_put(
+    pub fn v1_manifest_post(
         repository_client: RepositoryClient<Channel>,
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -116,8 +116,8 @@ pub mod filters {
             .and(warp::post())
             .and(with_repository_client(repository_client))
             .and(with_register(register))
-            .and(json_request::<models::PutManifestRequest>())
-            .and_then(handlers::put_manifest)
+            .and(json_request::<models::PostManifestRequest>())
+            .and_then(handlers::post_manifest)
     }
 
     pub fn v1_manifest_get(
@@ -530,26 +530,26 @@ mod handlers {
         Ok(active)
     }
 
-    pub async fn put_manifest(
+    pub async fn post_manifest(
         mut client: RepositoryClient<Channel>,
         mut register: Register,
-        request: models::PutManifestRequest,
+        request: models::PostManifestRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         // validate request
-        match validations::validate_put_manifest_request(&mut register, &request).await {
+        match validations::validate_post_manifest_request(&mut register, &request).await {
             Ok(_) => (),
             Err(err) => return Ok(http_bad_request(err.into())),
         };
-        match do_put_manifest(&mut client, request).await {
+        match do_post_manifest(&mut client, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
     }
 
-    async fn do_put_manifest(
+    async fn do_post_manifest(
         client: &mut RepositoryClient<Channel>,
-        request: models::PutManifestRequest,
-    ) -> pipebuilder_common::Result<models::PutManifestResponse> {
+        request: models::PostManifestRequest,
+    ) -> pipebuilder_common::Result<models::PostManifestResponse> {
         let request: PutManifestRequest = request.into();
         let response = client.put_manifest(request).await?;
         Ok(response.into_inner().into())
@@ -1624,9 +1624,9 @@ mod validations {
         validate_namespace(register, namespace).await
     }
 
-    pub async fn validate_put_manifest_request(
+    pub async fn validate_post_manifest_request(
         register: &mut Register,
-        request: &models::PutManifestRequest,
+        request: &models::PostManifestRequest,
     ) -> Result<()> {
         let namespace = request.namespace.as_str();
         validate_namespace(register, namespace).await?;

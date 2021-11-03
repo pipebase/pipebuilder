@@ -47,18 +47,18 @@ pub struct GetBuildRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct PutManifestRequest {
+pub struct PostManifestRequest {
     pub namespace: String,
     pub id: String,
     pub buffer: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct PutManifestResponse {
+pub struct PostManifestResponse {
     pub version: u64,
 }
 
-impl Display for PutManifestResponse {
+impl Display for PostManifestResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "manifest version: {}", self.version)
     }
@@ -677,8 +677,8 @@ impl From<build::CancelResponse> for CancelBuildResponse {
     }
 }
 
-impl From<PutManifestRequest> for repository::PutManifestRequest {
-    fn from(origin: PutManifestRequest) -> Self {
+impl From<PostManifestRequest> for repository::PutManifestRequest {
+    fn from(origin: PostManifestRequest) -> Self {
         let namespace = origin.namespace;
         let id = origin.id;
         let buffer = origin.buffer;
@@ -690,10 +690,10 @@ impl From<PutManifestRequest> for repository::PutManifestRequest {
     }
 }
 
-impl From<repository::PutManifestResponse> for PutManifestResponse {
+impl From<repository::PutManifestResponse> for PostManifestResponse {
     fn from(origin: repository::PutManifestResponse) -> Self {
         let version = origin.version;
-        PutManifestResponse { version }
+        PostManifestResponse { version }
     }
 }
 

@@ -13,7 +13,7 @@ use super::{
         GetManifestRequest, GetManifestResponse, ListAppMetadataRequest, ListBuildRequest,
         ListBuildSnapshotRequest, ListManifestMetadataRequest, ListManifestSnapshotRequest,
         ListNamespaceRequest, ListNodeStateRequest, ListProjectRequest, ManifestMetadata,
-        ManifestSnapshot, Namespace, NodeState, Project, PutManifestRequest, PutManifestResponse,
+        ManifestSnapshot, Namespace, NodeState, PostManifestRequest, PostManifestResponse, Project,
         ScanBuilderRequest, UpdateNamespaceRequest, UpdateProjectRequest,
     },
 };
@@ -201,10 +201,13 @@ impl ApiClient {
         Ok(response)
     }
 
-    pub async fn put_manifest(&self, request: &PutManifestRequest) -> Result<PutManifestResponse> {
+    pub async fn push_manifest(
+        &self,
+        request: &PostManifestRequest,
+    ) -> Result<PostManifestResponse> {
         let request = Self::serialize_request(request)?;
         let response = self.post(MANIFEST, request).await?;
-        let response = Self::get_response_body::<PutManifestResponse>(response).await?;
+        let response = Self::get_response_body::<PostManifestResponse>(response).await?;
         Ok(response)
     }
 

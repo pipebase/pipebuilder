@@ -8,6 +8,7 @@ pub(crate) mod delete;
 pub(crate) mod get;
 pub(crate) mod list;
 pub(crate) mod pull;
+pub(crate) mod push;
 pub(crate) mod scan;
 
 pub type Cmd = clap::App<'static>;
@@ -23,6 +24,7 @@ pub fn cmds() -> Vec<Cmd> {
         cancel::cmd(),
         scan::cmd(),
         pull::cmd(),
+        push::cmd(),
     ]
 }
 
@@ -40,7 +42,7 @@ pub async fn exec(
         ("pull", "app") => pull::exec_app(client, args).await,
         ("pull", "manifest") => pull::exec_manifest(client, args).await,
         ("pull", "log") => pull::exec_build_log(client, args).await,
-        ("create", "manifest") => create::exec_manifest(client, args).await,
+        ("push", "manifest") => push::exec_manifest(client, args).await,
         ("create", "build") => create::exec_build(client, args).await,
         ("create", "namespace") => create::exec_namespace(client, args).await,
         ("create", "project") => create::exec_project(client, args).await,

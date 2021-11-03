@@ -4,25 +4,25 @@ use pipebuilder_common::{
         models::{
             DeleteManifestRequest, GetManifestRequest, GetManifestResponse,
             ListManifestMetadataRequest, ListManifestSnapshotRequest, ManifestMetadata,
-            ManifestSnapshot, PutManifestRequest, PutManifestResponse,
+            ManifestSnapshot, PostManifestRequest, PostManifestResponse,
         },
     },
     Result,
 };
 use std::fs;
 
-pub(crate) async fn put_manifest(
+pub(crate) async fn push_manifest(
     client: &ApiClient,
     namespace: String,
     id: String,
     buffer: Vec<u8>,
-) -> Result<PutManifestResponse> {
-    let request = PutManifestRequest {
+) -> Result<PostManifestResponse> {
+    let request = PostManifestRequest {
         namespace,
         id,
         buffer,
     };
-    client.put_manifest(&request).await
+    client.push_manifest(&request).await
 }
 
 pub(crate) async fn pull_manifest(
