@@ -2,9 +2,9 @@ use pipebuilder_common::{
     api::{
         client::ApiClient,
         models::{
-            DeleteManifestRequest, GetManifestRequest, GetManifestResponse,
-            ListManifestMetadataRequest, ListManifestSnapshotRequest, ManifestMetadata,
-            ManifestSnapshot, PostManifestRequest, PostManifestResponse,
+            DeleteManifestRequest, DeleteManifestSnapshotRequest, GetManifestRequest,
+            GetManifestResponse, ListManifestMetadataRequest, ListManifestSnapshotRequest,
+            ManifestMetadata, ManifestSnapshot, PostManifestRequest, PostManifestResponse,
         },
     },
     Result,
@@ -59,6 +59,30 @@ pub(crate) async fn delete_manifest(
         version,
     };
     client.delete_manfiest(&request).await
+}
+
+pub(crate) async fn delete_manifest_snapshot(
+    client: &ApiClient,
+    namespace: String,
+    id: String,
+) -> Result<()> {
+    let request = DeleteManifestSnapshotRequest { namespace, id };
+    client.delete_manifest_snapshot(&request).await
+}
+
+pub(crate) async fn delete_manifest_all(
+    client: &ApiClient,
+    namespace: String,
+    id: String,
+) -> Result<()> {
+    for manifest_metadata in
+        list_manifest_metadata(client, namespace.clone(), Some(id.clone())).await?
+    {
+        let id = manifest_metadata.id;
+        let version = manifest_metadata.version;
+        delete_manifest(client, namespace.clone(), id, version).await?;
+    }
+    delete_manifest_snapshot(client, namespace.clone(), id.clone()).await
 }
 
 pub(crate) async fn list_manifest_metadata(

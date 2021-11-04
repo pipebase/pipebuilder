@@ -3,8 +3,9 @@ use pipebuilder_common::{
         client::ApiClient,
         models::{
             BuildMetadata, BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest,
-            CancelBuildResponse, DeleteBuildRequest, GetBuildLogRequest, GetBuildLogResponse,
-            GetBuildRequest, ListBuildRequest, ListBuildSnapshotRequest,
+            CancelBuildResponse, DeleteBuildRequest, DeleteBuildSnapshotRequest,
+            GetBuildLogRequest, GetBuildLogResponse, GetBuildRequest, ListBuildRequest,
+            ListBuildSnapshotRequest,
         },
     },
     Result,
@@ -85,6 +86,15 @@ pub(crate) async fn delete_build(
     client.delete_build(&request).await
 }
 
+pub(crate) async fn delete_build_snapshot(
+    client: &ApiClient,
+    namespace: String,
+    id: String,
+) -> Result<()> {
+    let request = DeleteBuildSnapshotRequest { namespace, id };
+    client.delete_build_snapshot(&request).await
+}
+
 pub(crate) async fn pull_build_log(
     client: &ApiClient,
     namespace: String,
@@ -97,4 +107,19 @@ pub(crate) async fn pull_build_log(
         version,
     };
     client.pull_build_log(&request).await
+}
+
+pub(crate) async fn delete_build_all(
+    client: &ApiClient,
+    namespace: String,
+    id: String,
+) -> Result<()> {
+    for build_metadata in list_build_metadata(client, namespace.clone(), Some(id.clone())).await? {
+        let id = build_metadata.id;
+        let version = build_metadata.version;
+        delete_build(client, namespace.clone(), id, version).await?;
+    }
+    // delete build snapshot
+    delete_build_snapshot(client, namespace.clone(), id.clone()).await?;
+    Ok(())
 }

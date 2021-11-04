@@ -1,5 +1,9 @@
 use super::Cmd;
-use crate::ops::{do_app::delete_app, do_build::delete_build, do_manifest::delete_manifest};
+use crate::ops::{
+    do_app::{delete_app, delete_app_all},
+    do_build::{delete_build, delete_build_all},
+    do_manifest::{delete_manifest, delete_manifest_all},
+};
 use pipebuilder_common::{api::client::ApiClient, Result};
 
 use clap::Arg;
@@ -12,7 +16,7 @@ pub fn cmd() -> Cmd {
 
 pub fn manifest() -> Cmd {
     Cmd::new("manifest")
-        .about("Delete manifest given namespace, project id and manifest version")
+        .about("Delete manifest given namespace, project id and manifest version, if no version provide, all manifest deleted")
         .args(vec![
             Arg::new("namespace")
                 .short('n')
@@ -27,7 +31,6 @@ pub fn manifest() -> Cmd {
             Arg::new("version")
                 .short('v')
                 .about("Specify app manifest version")
-                .required(true)
                 .takes_value(true),
         ])
 }
@@ -35,11 +38,10 @@ pub fn manifest() -> Cmd {
 pub async fn exec_manifest(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let namespace = args.value_of("namespace").unwrap();
     let id = args.value_of("id").unwrap();
-    let manifest_version = args
-        .value_of("version")
-        .unwrap()
-        .parse()
-        .expect("invalid manifest version");
+    let manifest_version: u64 = match args.value_of("version") {
+        Some(version) => version.parse().expect("invalid manifest version"),
+        None => return delete_manifest_all(&client, namespace.to_owned(), id.to_owned()).await,
+    };
     delete_manifest(
         &client,
         namespace.to_owned(),
@@ -66,19 +68,17 @@ pub fn build() -> Cmd {
             Arg::new("version")
                 .short('v')
                 .about("Specify app build version")
-                .takes_value(true)
-                .required(true),
+                .takes_value(true),
         ])
 }
 
 pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let namespace = args.value_of("namespace").unwrap();
     let id = args.value_of("id").unwrap();
-    let build_version = args
-        .value_of("version")
-        .unwrap()
-        .parse()
-        .expect("invalid build version");
+    let build_version: u64 = match args.value_of("version") {
+        Some(version) => version.parse().expect("invalid build version"),
+        None => return delete_build_all(&client, namespace.to_owned(), id.to_owned()).await,
+    };
     delete_build(&client, namespace.to_owned(), id.to_owned(), build_version).await
 }
 
@@ -99,11 +99,6 @@ pub fn app() -> Cmd {
             Arg::new("version")
                 .short('v')
                 .about("Specify app build version")
-                .takes_value(true)
-                .required(true),
-            Arg::new("path")
-                .short('p')
-                .about("Specify app download path")
                 .takes_value(true),
         ])
 }
@@ -111,10 +106,9 @@ pub fn app() -> Cmd {
 pub async fn exec_app(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let namespace = args.value_of("namespace").unwrap();
     let id = args.value_of("id").unwrap();
-    let build_version = args
-        .value_of("version")
-        .unwrap()
-        .parse()
-        .expect("invalid build version");
+    let build_version: u64 = match args.value_of("version") {
+        Some(version) => version.parse().expect("invalid build version"),
+        None => return delete_app_all(&client, namespace.to_owned(), id.to_owned()).await,
+    };
     delete_app(&client, namespace.to_owned(), id.to_owned(), build_version).await
 }

@@ -44,3 +44,16 @@ pub(crate) async fn delete_app(
     };
     client.delete_app(&request).await
 }
+
+pub(crate) async fn delete_app_all(
+    client: &ApiClient,
+    namespace: String,
+    id: String,
+) -> Result<()> {
+    for app_metadata in list_app_metadata(client, namespace.clone(), Some(id.clone())).await? {
+        let id = app_metadata.id;
+        let version = app_metadata.version;
+        delete_app(client, namespace.clone(), id.clone(), version).await?;
+    }
+    Ok(())
+}
