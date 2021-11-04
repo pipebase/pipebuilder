@@ -13,8 +13,10 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     ffi::OsString,
+    future::Future,
     hash::{Hash, Hasher},
-    path::Path,
+    path::{Path, PathBuf},
+    pin::Pin,
 };
 use tokio::{
     fs::{self, File},
@@ -22,7 +24,7 @@ use tokio::{
     process::Command,
 };
 use tonic::transport::Channel;
-use tracing::info;
+use tracing::{info, warn};
 
 // filesystem ops
 pub async fn open_file<P>(path: P) -> Result<File>
@@ -119,12 +121,55 @@ where
     Ok(())
 }
 
-// copy directory and return success flag
-pub async fn copy_directory(src: &str, dst: &str) -> Result<bool> {
+// copy directory and return success flag with linux cmd
+pub async fn os_copy_directory(src: &str, dst: &str) -> Result<bool> {
     let mut cmd = Command::new("cp");
     cmd.arg("-r").arg(src).arg(dst);
     let (code, _) = cmd_status_output(cmd).await?;
     Ok(code == 0)
+}
+
+pub fn copy_directory<P>(from: P, to: P) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>
+where
+    P: AsRef<Path> + Send + 'static,
+{
+    Box::pin(async move {
+        let mut from_path = PathBuf::new();
+        from_path.push(from);
+        let mut to_path = PathBuf::new();
+        to_path.push(to);
+        if !from_path.exists() {
+            warn!("copy from path '{}' does not exist", from_path.display());
+            return Ok(false);
+        }
+        // extract last segment from and append to target
+        let file_name = match from_path.file_name() {
+            Some(file_name) => file_name,
+            None => {
+                warn!("file name not found in path '{}'.", from_path.display());
+                return Ok(false);
+            }
+        };
+        to_path.push(file_name);
+        if from_path.is_file() {
+            copy_file(from_path, to_path).await?;
+            return Ok(true);
+        }
+        if !from_path.is_dir() {
+            warn!(
+                "copy from path '{}' is neither a file or directory",
+                from_path.display()
+            );
+            return Ok(false);
+        }
+        create_directory(to_path.clone()).await?;
+        let mut entries = fs::read_dir(&from_path).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let from_entry_path = entry.path();
+            copy_directory(from_entry_path, to_path.clone()).await?;
+        }
+        Ok(true)
+    })
 }
 
 // move directory and return success flag
@@ -136,9 +181,12 @@ where
     Ok(())
 }
 
-pub fn copy_file(from: &str, to: &str) -> Result<u64> {
-    let size = std::fs::copy(from, to)?;
-    Ok(size)
+pub async fn copy_file<P>(from: P, to: P) -> Result<()>
+where
+    P: AsRef<Path>,
+{
+    let _ = fs::copy(from, to).await?;
+    Ok(())
 }
 
 // run cmd and collect status and output
@@ -482,4 +530,26 @@ where
     let toml_string = toml::to_string(object)?;
     fs::write(path, toml_string).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::{copy_directory, read_file, remove_directory, Result};
+
+    #[tokio::test]
+    async fn test_copy_directory() -> Result<()> {
+        let from = "resources/utils/files/from/app";
+        let to = "resources/utils/files/to";
+        let aloha = "resources/utils/files/to/app/file.txt";
+        let hello = "resources/utils/files/to/app/src/file.txt";
+        assert!(copy_directory(from, to).await.is_ok());
+        let buffer = read_file(aloha).await?;
+        let actual = String::from_utf8(buffer)?;
+        assert_eq!("aloha", actual.as_str());
+        let buffer = read_file(hello).await?;
+        let actual = String::from_utf8(buffer)?;
+        assert_eq!("hello", actual.as_str());
+        remove_directory("resources/utils/files/to/app").await
+    }
 }

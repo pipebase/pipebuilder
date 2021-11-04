@@ -314,8 +314,8 @@ impl Build {
         let target_platform = self.target_platform.as_str();
         let app_restore_directory =
             app_restore_directory(restore_directory, namespace, id, target_platform);
-        let app_restore_path = sub_path(app_restore_directory.as_str(), "app");
-        if !copy_directory(app_restore_path.as_str(), app_workspace.as_str()).await? {
+        let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
+        if !copy_directory(app_restore_path.clone(), app_workspace.clone()).await? {
             // cargo init
             let app_path = sub_path(app_workspace.as_str(), PATH_APP);
             create_directory(app_path.as_str()).await?;
@@ -425,8 +425,8 @@ impl Build {
         // cleanup previous app build cache if any
         // TODO: acquire lock avoid racing of two concurrent build
         let _ = remove_directory(app_restore_path.as_str()).await;
-        create_directory(app_restore_directory.as_str()).await?;
-        move_directory(app_path.as_str(), app_restore_directory.as_str()).await?;
+        create_directory(app_restore_path.as_str()).await?;
+        move_directory(app_path.as_str(), app_restore_path.as_str()).await?;
         Ok(Some(BuildStatus::Succeed))
     }
 
