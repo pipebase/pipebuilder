@@ -114,7 +114,7 @@ impl Builder for BuilderService {
         // cleanup local build workspace
         let app_directory = app_workspace(workspace, namespace.as_str(), id.as_str(), version);
         let app_path = sub_path(app_directory.as_str(), PATH_APP);
-        if !remove_directory(app_path.as_str()).await {
+        if remove_directory(app_path.as_str()).await.is_err() {
             error!(
                 "clean app directory failed for '{}/{}/{}'",
                 namespace, id, version

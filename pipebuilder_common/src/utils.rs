@@ -111,8 +111,12 @@ pub fn sub_path(parent_directory: &str, path: &str) -> String {
 }
 
 // remove directory and return success flag
-pub async fn remove_directory(path: &str) -> bool {
-    fs::remove_dir_all(path).await.is_ok()
+pub async fn remove_directory<P>(path: P) -> Result<()>
+where
+    P: AsRef<Path>,
+{
+    fs::remove_dir_all(path).await?;
+    Ok(())
 }
 
 // copy directory and return success flag
@@ -124,11 +128,12 @@ pub async fn copy_directory(src: &str, dst: &str) -> Result<bool> {
 }
 
 // move directory and return success flag
-pub async fn move_directory(src: &str, dst: &str) -> Result<bool> {
-    let mut cmd = Command::new("mv");
-    cmd.arg(src).arg(dst);
-    let (code, _) = cmd_status_output(cmd).await?;
-    Ok(code == 0)
+pub async fn move_directory<P>(from: P, to: P) -> Result<()>
+where
+    P: AsRef<Path>,
+{
+    fs::rename(from, to).await?;
+    Ok(())
 }
 
 pub fn copy_file(from: &str, to: &str) -> Result<u64> {

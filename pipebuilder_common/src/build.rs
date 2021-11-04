@@ -17,7 +17,7 @@ use chrono::{DateTime, Utc};
 use pipegen::models::App;
 use serde::{Deserialize, Serialize};
 use tonic::transport::Channel;
-use tracing::{error, info};
+use tracing::info;
 
 use crate::grpc::repository::repository_client::RepositoryClient;
 
@@ -423,14 +423,10 @@ impl Build {
             app_restore_directory(restore_directory, namespace, id, target_platform);
         let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
         // cleanup previous app build cache if any
+        // TODO: acquire lock avoid racing of two concurrent build
         let _ = remove_directory(app_restore_path.as_str()).await;
         create_directory(app_restore_directory.as_str()).await?;
-        if !move_directory(app_path.as_str(), app_restore_directory.as_str()).await? {
-            error!(
-                "store app from '{}' to '{}' failed",
-                app_path, app_restore_directory
-            )
-        }
+        move_directory(app_path.as_str(), app_restore_directory.as_str()).await?;
         Ok(Some(BuildStatus::Succeed))
     }
 
