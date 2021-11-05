@@ -3,11 +3,9 @@ mod config;
 mod ops;
 
 use config::Config;
+use ops::print::Printer;
 use pipebuilder_common::Result;
-use std::{
-    io::{self, Write},
-    process,
-};
+use std::process;
 use tracing::instrument;
 
 #[tokio::main]
@@ -16,14 +14,12 @@ async fn main() {
     let result = run().await;
     process::exit(match result {
         Ok(_) => 0,
-        Err(err) => {
-            let _ = writeln!(io::stderr(), "{:#?}", err);
-            1
-        }
+        Err(_) => 1,
     })
 }
 
 async fn run() -> Result<()> {
+    let mut printer = Printer::new();
     let matches = clap::App::new("pbctl")
         .args(vec![clap::Arg::new("config")
             .short('c')
@@ -38,5 +34,11 @@ async fn run() -> Result<()> {
     // parse (action, resource) cmds
     let (action, matches) = matches.subcommand().unwrap();
     let (resource, matches) = matches.subcommand().unwrap();
-    commands::exec(action, resource, api_client, matches).await
+    match commands::exec(action, resource, api_client, matches).await {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            let _ = printer.error(&err);
+            Err(err)
+        }
+    }
 }

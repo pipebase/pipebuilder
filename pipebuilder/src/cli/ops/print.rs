@@ -64,11 +64,11 @@ impl Printer {
         self.print(&status, Some(&message), Color::Green)
     }
 
-    /*
     pub fn error<T: fmt::Display>(&mut self, message: T) -> Result<()> {
         self.print(&"Error", Some(&message), Color::Red)
     }
 
+    /*
     pub fn warning<T: fmt::Display>(&mut self, message: T) -> Result<()> {
         self.print(&"Warning", Some(&message), Color::Yellow)
     }
