@@ -170,7 +170,7 @@ pub fn project() -> Cmd {
 
 pub async fn exec_project(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let namespace = args.value_of("namespace").unwrap();
-    let response = list_project(&client, namespace).await?;
+    let response = list_project(&client, namespace.to_owned()).await?;
     print_records(response.as_slice());
     Ok(())
 }

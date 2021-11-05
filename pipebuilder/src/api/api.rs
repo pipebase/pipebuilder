@@ -168,7 +168,7 @@ pub mod filters {
         warp::path!("api" / "v1" / "build" / "snapshot")
             .and(warp::delete())
             .and(with_register(register))
-            .and(warp::query::<models::DeleteBuildSnapshotRequest>())
+            .and(json_request::<models::DeleteBuildSnapshotRequest>())
             .and_then(handlers::delete_build_snapshot)
     }
 

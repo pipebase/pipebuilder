@@ -1,3 +1,4 @@
+use super::print::Printer;
 use pipebuilder_common::{
     api::{
         client::ApiClient,
@@ -50,9 +51,14 @@ pub(crate) async fn delete_app_all(
     namespace: String,
     id: String,
 ) -> Result<()> {
+    let mut printer = Printer::new();
     for app_metadata in list_app_metadata(client, namespace.clone(), Some(id.clone())).await? {
         let id = app_metadata.id;
         let version = app_metadata.version;
+        printer.status(
+            "Deleting",
+            format!("app '{}/{}/{}'", namespace, id, version),
+        )?;
         delete_app(client, namespace.clone(), id.clone(), version).await?;
     }
     Ok(())

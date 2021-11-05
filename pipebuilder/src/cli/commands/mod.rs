@@ -57,6 +57,8 @@ pub async fn exec(
         ("delete", "app") => delete::exec_app(client, args).await,
         ("delete", "build") => delete::exec_build(client, args).await,
         ("delete", "manifest") => delete::exec_manifest(client, args).await,
+        ("delete", "project") => delete::exec_project(client, args).await,
+        ("delete", "namespace") => delete::exec_namespace(client, args).await,
         _ => unreachable!("unknown cmd ({}, {})", action, resource),
     }
 }

@@ -1,3 +1,4 @@
+use super::print::Printer;
 use pipebuilder_common::{
     api::{
         client::ApiClient,
@@ -75,13 +76,23 @@ pub(crate) async fn delete_manifest_all(
     namespace: String,
     id: String,
 ) -> Result<()> {
+    let mut printer = Printer::new();
     for manifest_metadata in
         list_manifest_metadata(client, namespace.clone(), Some(id.clone())).await?
     {
         let id = manifest_metadata.id;
         let version = manifest_metadata.version;
+        printer.status(
+            "Deleting",
+            format!("manifest '{}/{}/{}'", namespace, id, version),
+        )?;
         delete_manifest(client, namespace.clone(), id, version).await?;
     }
+    // delete manifest snapshot
+    printer.status(
+        "Deleting",
+        format!("manifest snapshot '{}/{}'", namespace, id),
+    )?;
     delete_manifest_snapshot(client, namespace.clone(), id.clone()).await
 }
 

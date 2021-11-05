@@ -8,13 +8,14 @@ use super::{
         ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildMetadata, BuildMetadataKey,
         BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
         DeactivateNodeRequest, DeactivateNodeResponse, DeleteAppRequest, DeleteBuildRequest,
-        DeleteBuildSnapshotRequest, DeleteManifestRequest, DeleteManifestSnapshotRequest, Failure,
-        GetAppRequest, GetAppResponse, GetBuildLogRequest, GetBuildLogResponse, GetBuildRequest,
-        GetManifestRequest, GetManifestResponse, ListAppMetadataRequest, ListBuildRequest,
-        ListBuildSnapshotRequest, ListManifestMetadataRequest, ListManifestSnapshotRequest,
-        ListNamespaceRequest, ListNodeStateRequest, ListProjectRequest, ManifestMetadata,
-        ManifestSnapshot, Namespace, NodeState, PostManifestRequest, PostManifestResponse, Project,
-        ScanBuilderRequest, UpdateNamespaceRequest, UpdateProjectRequest,
+        DeleteBuildSnapshotRequest, DeleteManifestRequest, DeleteManifestSnapshotRequest,
+        DeleteNamespaceRequest, DeleteProjectRequest, Failure, GetAppRequest, GetAppResponse,
+        GetBuildLogRequest, GetBuildLogResponse, GetBuildRequest, GetManifestRequest,
+        GetManifestResponse, ListAppMetadataRequest, ListBuildRequest, ListBuildSnapshotRequest,
+        ListManifestMetadataRequest, ListManifestSnapshotRequest, ListNamespaceRequest,
+        ListNodeStateRequest, ListProjectRequest, ManifestMetadata, ManifestSnapshot, Namespace,
+        NodeState, PostManifestRequest, PostManifestResponse, Project, ScanBuilderRequest,
+        UpdateNamespaceRequest, UpdateProjectRequest,
     },
 };
 use crate::{api_client_error, api_server_error, Result};
@@ -344,6 +345,18 @@ impl ApiClient {
     pub async fn delete_build_snapshot(&self, request: &DeleteBuildSnapshotRequest) -> Result<()> {
         let request = Self::serialize_request(request)?;
         let _ = self.delete(BUILD_SNAPSHOT, request).await?;
+        Ok(())
+    }
+
+    pub async fn delete_project(&self, request: &DeleteProjectRequest) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(PROJECT, request).await?;
+        Ok(())
+    }
+
+    pub async fn delete_namespace(&self, request: &DeleteNamespaceRequest) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(NAMESPACE, request).await?;
         Ok(())
     }
 

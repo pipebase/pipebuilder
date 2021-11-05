@@ -1,3 +1,4 @@
+use super::print::Printer;
 use pipebuilder_common::{
     api::{
         client::ApiClient,
@@ -114,12 +115,18 @@ pub(crate) async fn delete_build_all(
     namespace: String,
     id: String,
 ) -> Result<()> {
+    let mut printer = Printer::new();
     for build_metadata in list_build_metadata(client, namespace.clone(), Some(id.clone())).await? {
         let id = build_metadata.id;
         let version = build_metadata.version;
+        printer.status(
+            "Deleting",
+            format!("build '{}/{}/{}'", namespace, id, version),
+        )?;
         delete_build(client, namespace.clone(), id, version).await?;
     }
     // delete build snapshot
+    printer.status("Deleting", format!("build snapshot '{}/{}'", namespace, id))?;
     delete_build_snapshot(client, namespace.clone(), id.clone()).await?;
     Ok(())
 }
