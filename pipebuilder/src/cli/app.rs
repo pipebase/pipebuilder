@@ -24,11 +24,11 @@ async fn run() -> Result<()> {
         .args(vec![clap::Arg::new("config")
             .short('c')
             .takes_value(true)
-            .about("path to .pb directory")])
+            .about("path to config file, default ~/.pb/config")])
         .subcommands(commands::cmds())
         .get_matches();
-    // TODO: parse config file
-    let config = Config::default();
+    let config_path = matches.value_of("config");
+    let config = Config::parse_or_default(config_path).await;
     let api_config = config.api;
     let api_client = api_config.into();
     // parse (action, resource) cmds
