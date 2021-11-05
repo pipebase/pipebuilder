@@ -448,10 +448,10 @@ mod handlers {
             },
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
-        node_role_prefix, remove_resource, remove_resource_namespace, NodeRole,
-        NodeState as InternalNodeState, Register, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA,
-        RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
-        RESOURCE_NAMESPACE, RESOURCE_NODE, RESOURCE_PROJECT,
+        remove_resource, remove_resource_namespace, NodeRole, NodeState as InternalNodeState,
+        Register, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA, RESOURCE_BUILD_SNAPSHOT,
+        RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT, RESOURCE_NAMESPACE,
+        RESOURCE_PROJECT,
     };
     use serde::Serialize;
     use std::convert::Infallible;
@@ -1076,11 +1076,7 @@ mod handlers {
         request: models::ListNodeStateRequest,
     ) -> pipebuilder_common::Result<Vec<models::NodeState>> {
         let role = request.role;
-        let prefix = match role {
-            Some(role) => node_role_prefix(&role),
-            None => RESOURCE_NODE,
-        };
-        let node_states = register.list_node_state(prefix).await?;
+        let node_states = register.list_node_state(role.as_ref()).await?;
         let node_states = node_states
             .into_iter()
             .map(|(_, node_state)| node_state.into())

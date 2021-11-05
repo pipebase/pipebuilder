@@ -3,7 +3,7 @@ use crate::{
     grpc::{build::builder_client::BuilderClient, node::node_client::NodeClient},
     node_role_prefix, NodeRole, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA,
     RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
-    RESOURCE_NAMESPACE, RESOURCE_PROJECT,
+    RESOURCE_NAMESPACE, RESOURCE_NODE, RESOURCE_PROJECT,
 };
 use etcd_client::{Event, EventType};
 use fnv::FnvHasher;
@@ -329,6 +329,14 @@ pub fn namespace_key(id: &str) -> String {
 pub fn node_key(role: &NodeRole, id: &str) -> String {
     let role_prefix = node_role_prefix(role);
     resource_id(role_prefix, id)
+}
+
+pub fn node_role_prefix_key(role: Option<&NodeRole>) -> String {
+    let role_prefix = match role {
+        Some(role) => node_role_prefix(role),
+        None => RESOURCE_NODE,
+    };
+    root_resource(role_prefix)
 }
 
 pub fn app_metadata_namespace(namespace: &str) -> String {

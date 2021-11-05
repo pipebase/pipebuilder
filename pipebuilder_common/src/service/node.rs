@@ -194,10 +194,7 @@ impl NodeService {
                     status: status_code.into(),
                     timestamp,
                 };
-                match register
-                    .put_node_state(node_role_prefix(&role), &state, lease_id)
-                    .await
-                {
+                match register.put_node_state(&role, &state, lease_id).await {
                     Ok(_) => continue,
                     Err(e) => {
                         error!(

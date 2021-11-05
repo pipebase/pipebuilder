@@ -4,10 +4,10 @@ use crate::{
     build_metadata_namespace_id, build_metadata_namespace_id_version, build_snapshot_namespace,
     build_snapshot_namespace_id, manifest_metadata_namespace, manifest_metadata_namespace_id,
     manifest_metadata_namespace_id_version, manifest_snapshot_namespace,
-    manifest_snapshot_namespace_id, namespace_key, node_key, project_namespace,
-    project_namespace_id, read_file, root_resource, version_build_namespace, AppMetadata,
-    BuildMetadata, BuildSnapshot, ManifestMetadata, ManifestSnapshot, Namespace, NodeRole,
-    NodeState, Project, Result, RESOURCE_NAMESPACE, RESOURCE_NODE_BUILDER,
+    manifest_snapshot_namespace_id, namespace_key, node_key, node_role_prefix_key,
+    project_namespace, project_namespace_id, read_file, root_resource, version_build_namespace,
+    AppMetadata, BuildMetadata, BuildSnapshot, ManifestMetadata, ManifestSnapshot, Namespace,
+    NodeRole, NodeState, Project, Result, RESOURCE_NAMESPACE, RESOURCE_NODE_BUILDER,
 };
 use etcd_client::{
     Certificate, Client, ConnectOptions, DeleteOptions, DeleteResponse, GetOptions, GetResponse,
@@ -273,20 +273,24 @@ impl Register {
 
     pub async fn put_node_state(
         &mut self,
-        role_prefix: &str,
+        role: &NodeRole,
         state: &NodeState,
         lease_id: i64,
     ) -> Result<PutResponse> {
         let id = &state.id;
         let value = serde_json::to_vec(state)?;
         let opts = PutOptions::new().with_lease(lease_id);
-        let key = format!("{}/{}", role_prefix, id);
+        let key = node_key(role, id);
         let resp = self.put(key, value, opts.into()).await?;
         Ok(resp)
     }
 
-    pub async fn list_node_state(&mut self, prefix: &str) -> Result<Vec<(String, NodeState)>> {
-        let node_states = self.list_kvs::<&str, NodeState>(prefix).await?;
+    pub async fn list_node_state(
+        &mut self,
+        role: Option<&NodeRole>,
+    ) -> Result<Vec<(String, NodeState)>> {
+        let prefix = node_role_prefix_key(role);
+        let node_states = self.list_kvs::<&str, NodeState>(prefix.as_str()).await?;
         Ok(node_states)
     }
 
@@ -326,7 +330,8 @@ impl Register {
     }
 
     pub async fn watch_builders(&mut self) -> Result<(Watcher, WatchStream)> {
-        self.watch_prefix(RESOURCE_NODE_BUILDER).await
+        let prefix = root_resource(RESOURCE_NODE_BUILDER);
+        self.watch_prefix(prefix.as_str()).await
     }
 
     pub async fn lock(&mut self, name: &str, options: Option<LockOptions>) -> Result<LockResponse> {
