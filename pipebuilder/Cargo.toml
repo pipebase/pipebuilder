@@ -8,7 +8,7 @@ repository = "https://github.com/pipebase/pipebuilder"
 homepage = "https://github.com/pipebase/pipebuilder"
 documentation = "https://docs.rs/pipebuilder/"
 description = "CI for pipebase application"
-keywords = ["pipebase", "continous-integration"]
+keywords = ["pipebase", "CI"]
 
 [[bin]]
 name = "api"
