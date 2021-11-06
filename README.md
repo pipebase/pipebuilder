@@ -1,5 +1,11 @@
 <div align="center">
 <img src=".github/assets/banner.png"></img>
+
+[![Build Status]][travis]
+
+[Build Status]: https://github.com/pipebase/pipebuilder/actions/workflows/ci.yml/badge.svg
+[travis]: https://github.com/pipebase/pipebuilder/actions?branch%3Amain
+
 </div>
 <br />
 
