@@ -1,0 +1,88 @@
+syntax = "proto3";
+package repository;
+
+message GetManifestRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // project manifest version
+    uint64 version = 3;
+}
+
+message GetManifestResponse {
+    // manifest binaries
+    bytes buffer = 1;
+}
+
+message PutManifestRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // project manifest binaries
+    bytes buffer = 3;
+}
+
+message PutManifestResponse {
+    // manifest version
+    uint64 version = 2;
+}
+
+message DeleteManifestRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // manifest version
+    uint64 version = 3;
+}
+
+message DeleteManifestResponse {}
+
+message GetAppRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // project build version
+    uint64 version = 3;
+}
+
+message GetAppResponse {
+    // app binaries
+    bytes buffer = 1;
+}
+
+message PostAppRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // project build version
+    uint64 version = 3;
+    // app binaries
+    bytes buffer = 4;
+}
+
+message PostAppResponse {}
+
+message DeleteAppRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // app build version
+    uint64 version = 3;
+}
+
+message DeleteAppResponse {}
+
+service Repository {
+    rpc GetManifest(GetManifestRequest) returns (GetManifestResponse) {}
+    rpc PutManifest(PutManifestRequest) returns (PutManifestResponse) {}
+    rpc DeleteManifest(DeleteManifestRequest) returns (DeleteManifestResponse) {}
+    rpc GetApp(GetAppRequest) returns (GetAppResponse) {}
+    rpc PostApp(PostAppRequest) returns (PostAppResponse) {}
+    rpc DeleteApp(DeleteAppRequest) returns (DeleteAppResponse) {}
+}

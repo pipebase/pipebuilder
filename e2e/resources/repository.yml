@@ -1,0 +1,12 @@
+base:
+  node:
+    id: repository0
+    role: Manifest
+    internal_address: 127.0.0.1:17000
+  lease:
+    ttl: 30
+  register:
+    endpoints: ["localhost:2379"]
+repository:
+  manifest: e2e/data/manifests
+  app: e2e/data/apps

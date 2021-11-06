@@ -1,0 +1,10 @@
+base:
+  node:
+    id: scheduler0
+    role: Scheduler
+    internal_address: 127.0.0.1:18000
+  lease:
+    ttl: 30
+  register:
+    endpoints: ["localhost:2379"]
+
