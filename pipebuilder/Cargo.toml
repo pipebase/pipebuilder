@@ -3,6 +3,12 @@ name = "pipebuilder"
 version = "0.1.0"
 authors = ["Li Yu <li.yu.sh0211@gmail.com>"]
 edition = "2018"
+license = "Apache-2.0"
+repository = "https://github.com/pipebase/pipebuilder"
+homepage = "https://github.com/pipebase/pipebuilder"
+documentation = "https://docs.rs/pipebuilder/"
+description = "CI for pipebase application"
+keywords = ["pipebase", "continous-integration"]
 
 [[bin]]
 name = "api"
