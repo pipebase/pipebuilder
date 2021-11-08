@@ -22,7 +22,13 @@ pub struct BuildRequest {
     // project id
     pub id: String,
     pub manifest_version: u64,
-    pub target_platform: String,
+    pub target_platform: Option<String>,
+}
+
+impl BuildRequest {
+    pub fn set_target_platform(&mut self, target_platform: String) {
+        self.target_platform = Some(target_platform)
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -655,7 +661,12 @@ impl From<BuildRequest> for build::BuildRequest {
         let namespace = origin.namespace;
         let id = origin.id;
         let manifest_version = origin.manifest_version;
-        let target_platform = origin.target_platform;
+        let target_platform = origin.target_platform.unwrap_or_else(|| {
+            panic!(
+                "target platform undefined for build {}/{}/{}",
+                namespace, id, manifest_version
+            )
+        });
         build::BuildRequest {
             namespace,
             id,

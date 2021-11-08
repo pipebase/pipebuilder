@@ -168,6 +168,36 @@ pub struct NodeState {
     pub timestamp: DateTime<Utc>,
 }
 
+impl NodeState {
+    pub fn is_active(&self) -> bool {
+        matches!(self.status, NodeStatus::Active)
+    }
+
+    pub fn accept_target_platform(&self, target_platform: &str) -> bool {
+        match target_platform {
+            "aarch64-unknown-linux-gnu" => {
+                matches!(self.arch, NodeArch::AARCH64) && matches!(self.os, NodeOS::LINUX)
+            }
+            "x86_64-apple-darwin" => {
+                matches!(self.arch, NodeArch::X86_64) && matches!(self.os, NodeOS::MACOS)
+            }
+            "x86_64-unknown-linux-gnu" => {
+                matches!(self.arch, NodeArch::X86_64) && matches!(self.os, NodeOS::LINUX)
+            }
+            _ => false,
+        }
+    }
+
+    pub fn get_support_target_platform(&self) -> Option<String> {
+        match (&self.arch, &self.os) {
+            (NodeArch::AARCH64, NodeOS::LINUX) => Some(String::from("aarch64-unknown-linux-gnu")),
+            (NodeArch::X86_64, NodeOS::MACOS) => Some(String::from("x86_64-apple-darwin")),
+            (NodeArch::X86_64, NodeOS::LINUX) => Some(String::from("x86_64-unknown-linux-gnu")),
+            (_, _) => None,
+        }
+    }
+}
+
 pub struct NodeService {
     // node id
     id: String,

@@ -17,7 +17,7 @@ pub(crate) async fn build(
     namespace: String,
     id: String,
     manifest_version: u64,
-    target_platform: String,
+    target_platform: Option<String>,
 ) -> Result<BuildResponse> {
     let request = BuildRequest {
         namespace,
