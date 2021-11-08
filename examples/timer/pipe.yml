@@ -1,0 +1,11 @@
+name: print_timer
+pipes:
+  - name: timer1
+    config:
+      ty: TimerConfig
+      path: catalogs/timer.yml
+    output: UnsignedLongLong
+  - name: printer
+    config:
+      ty: PrinterConfig
+    upstreams: ["timer1"]
