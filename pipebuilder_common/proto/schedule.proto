@@ -6,6 +6,8 @@ message ScheduleRequest {
     string namespace = 1;
     // project id
     string id = 2;
+    // target platform
+    optional string target_platform = 3;
 }
 
 message BuilderInfo {
@@ -13,6 +15,8 @@ message BuilderInfo {
     string id = 1;
     // builder address
     string address = 2;
+    // target platform support by builder
+    string target_platform = 3;
 }
 
 message ScheduleResponse {

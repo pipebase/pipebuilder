@@ -6,6 +6,9 @@ pub struct ScheduleRequest {
     /// project id
     #[prost(string, tag = "2")]
     pub id: ::prost::alloc::string::String,
+    /// target platform
+    #[prost(string, optional, tag = "3")]
+    pub target_platform: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BuilderInfo {
@@ -15,6 +18,9 @@ pub struct BuilderInfo {
     /// builder address
     #[prost(string, tag = "2")]
     pub address: ::prost::alloc::string::String,
+    /// target platform support by builder
+    #[prost(string, tag = "3")]
+    pub target_platform: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ScheduleResponse {

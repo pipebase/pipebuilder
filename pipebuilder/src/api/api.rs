@@ -462,7 +462,7 @@ mod handlers {
     pub async fn build(
         mut client: SchedulerClient<Channel>,
         mut register: Register,
-        request: models::BuildRequest,
+        mut request: models::BuildRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         // validate build request
         match validations::validate_build_request(&mut register, &request).await {
@@ -471,8 +471,9 @@ mod handlers {
         };
         let namespace = request.namespace.clone();
         let id = request.id.clone();
+        let target_platform = request.target_platform.clone();
         // find a builder
-        let response = match schedule(&mut client, namespace, id).await {
+        let response = match schedule(&mut client, namespace, id, target_platform.clone()).await {
             Ok(response) => response,
             Err(err) => return Ok(http_internal_error(err.into())),
         };
@@ -483,6 +484,19 @@ mod handlers {
                     "builder unavailable",
                 ))))
             }
+        };
+        // target platform validation
+        let builder_target_platform = builder_info.target_platform;
+        match target_platform {
+            Some(target_platform) => {
+                if target_platform != builder_target_platform {
+                    return Ok(http_service_unavailable(Failure::new(format!(
+                        "builder target platform miss match '{}' != '{}'",
+                        builder_target_platform, target_platform
+                    ))));
+                }
+            }
+            None => request.set_target_platform(builder_target_platform),
         };
         let builder_id = builder_info.id;
         let builder_address = builder_info.address;
@@ -735,12 +749,13 @@ mod handlers {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        let version_build = register
+        let build_metadata = register
             .get_build_metadata(lease_id, namespace.as_str(), id.as_str(), version)
             .await?;
-        Ok(version_build.map(|b| models::BuildMetadata {
+        Ok(build_metadata.map(|b| models::BuildMetadata {
             id,
             version,
+            target_platform: b.target_platform,
             status: b.status,
             timestamp: b.timestamp,
             builder_id: b.builder_id,
@@ -773,7 +788,7 @@ mod handlers {
         let build_metadatas = register.list_build_metadata(namespace.as_str(), id).await?;
         let build_metadatas = build_metadatas
             .into_iter()
-            .map(|(key, version_build)| {
+            .map(|(key, build_metadata)| {
                 let id_version = remove_resource_namespace(
                     key.as_str(),
                     RESOURCE_BUILD_METADATA,
@@ -789,11 +804,12 @@ mod handlers {
                 models::BuildMetadata {
                     id,
                     version,
-                    status: version_build.status,
-                    timestamp: version_build.timestamp,
-                    builder_id: version_build.builder_id,
-                    builder_address: version_build.builder_address,
-                    message: version_build.message,
+                    target_platform: build_metadata.target_platform,
+                    status: build_metadata.status,
+                    timestamp: build_metadata.timestamp,
+                    builder_id: build_metadata.builder_id,
+                    builder_address: build_metadata.builder_address,
+                    message: build_metadata.message,
                 }
             })
             .collect::<Vec<models::BuildMetadata>>();
@@ -1494,8 +1510,15 @@ mod handlers {
         client: &mut SchedulerClient<Channel>,
         namespace: String,
         id: String,
+        target_platform: Option<String>,
     ) -> pipebuilder_common::Result<ScheduleResponse> {
-        let response = client.schedule(ScheduleRequest { namespace, id }).await?;
+        let response = client
+            .schedule(ScheduleRequest {
+                namespace,
+                id,
+                target_platform,
+            })
+            .await?;
         Ok(response.into_inner())
     }
 
@@ -1551,12 +1574,14 @@ mod validations {
         register: &mut Register,
         request: &models::BuildRequest,
     ) -> Result<()> {
-        let target_platform = request.target_platform.as_str();
-        validate_target_platform(target_platform)?;
         let namespace = request.namespace.as_str();
         validate_namespace(register, namespace).await?;
         let id = request.id.as_str();
-        validate_project(register, namespace, id).await
+        validate_project(register, namespace, id).await?;
+        if let Some(target_platform) = request.target_platform.as_ref() {
+            validate_target_platform(target_platform)?;
+        };
+        Ok(())
     }
 
     pub async fn validate_get_build_request(

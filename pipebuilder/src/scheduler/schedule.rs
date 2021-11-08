@@ -3,7 +3,7 @@ use flurry::HashMap;
 use pipebuilder_common::{
     deserialize_event,
     grpc::schedule::{scheduler_server::Scheduler, BuilderInfo, ScheduleResponse},
-    hash_distance, log_event, NodeState, NodeStatus, Register,
+    hash_distance, log_event, NodeState, Register,
 };
 use std::sync::Arc;
 use tonic::Response;
@@ -26,18 +26,26 @@ impl Scheduler for SchedulerService {
         // select builder using consistent hash, build of same app (namespace, id) landed on same builder for compilcation cache hit
         let request = request.into_inner();
         let request_key = format!("{}/{}", request.namespace, request.id);
+        let request_target_platform = request.target_platform;
         let builders_ref = self.builders.pin();
         let mut selected_builder_info: Option<BuilderInfo> = None;
         let mut min_hash_distance: u64 = u64::MAX;
         for builder in builders_ref.values() {
-            let builder_key = match builder.status {
-                NodeStatus::Active => builder.id.to_owned(),
-                NodeStatus::InActive => continue,
-            };
+            if !builder.is_active() {
+                continue;
+            }
+            if let Some(ref target_platform) = request_target_platform {
+                if !builder.accept_target_platform(target_platform) {
+                    continue;
+                }
+            }
+            let builder_key = builder.id.to_owned();
             let distance = hash_distance(&request_key, &builder_key);
             if distance < min_hash_distance {
-                selected_builder_info = Some(Self::builder_info(builder));
-                min_hash_distance = distance;
+                selected_builder_info = Self::builder_info(builder);
+                if selected_builder_info.is_some() {
+                    min_hash_distance = distance;
+                }
             }
         }
         Ok(Response::new(ScheduleResponse {
@@ -107,9 +115,15 @@ impl SchedulerService {
         Ok(())
     }
 
-    fn builder_info(state: &NodeState) -> BuilderInfo {
+    fn builder_info(state: &NodeState) -> Option<BuilderInfo> {
         let id = state.id.to_owned();
         let address = state.external_address.to_owned();
-        BuilderInfo { id, address }
+        state
+            .get_support_target_platform()
+            .map(|target_platform| BuilderInfo {
+                id,
+                address,
+                target_platform,
+            })
     }
 }

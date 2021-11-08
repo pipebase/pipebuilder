@@ -37,7 +37,6 @@ pub fn build() -> Cmd {
             Arg::new("target-platform")
                 .short('t')
                 .about("Specify target platform, checkout https://doc.rust-lang.org/nightly/rustc/platform-support.html")
-                .required(true)
                 .takes_value(true),
         ])
 }
@@ -50,13 +49,13 @@ pub async fn exec_build(client: ApiClient, args: &clap::ArgMatches) -> Result<()
         .unwrap()
         .parse()
         .expect("invalid manifest version");
-    let target_platform = args.value_of("target-platform").unwrap();
+    let target_platform = args.value_of("target-platform").map(String::from);
     let response = do_build::build(
         &client,
         namespace.to_owned(),
         id.to_owned(),
         manifest_version,
-        target_platform.to_owned(),
+        target_platform,
     )
     .await?;
     print_record(&response);

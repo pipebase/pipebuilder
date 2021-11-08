@@ -66,6 +66,8 @@ impl ToString for BuildStatus {
 // Build state per (build_id, version), persist in registry
 #[derive(Deserialize, Serialize)]
 pub struct BuildMetadata {
+    // target platform
+    pub target_platform: String,
     // build status
     pub status: BuildStatus,
     // timestamp
@@ -80,6 +82,7 @@ pub struct BuildMetadata {
 
 impl BuildMetadata {
     pub fn new(
+        target_platform: String,
         status: BuildStatus,
         timestamp: DateTime<Utc>,
         builder_id: String,
@@ -87,6 +90,7 @@ impl BuildMetadata {
         message: Option<String>,
     ) -> Self {
         BuildMetadata {
+            target_platform,
             status,
             timestamp,
             builder_id,
@@ -156,14 +160,7 @@ impl Build {
     pub fn is_target_platform_support(target_platform: &str) -> bool {
         matches!(
             target_platform,
-            "aarch64-unknown-linux-gnu"
-                | "i686-pc-windows-gnu"
-                | "i686-pc-windows-msvc"
-                | "i686-unknown-linux-gnu"
-                | "x86_64-apple-darwin"
-                | "x86_64-pc-windows-gnu"
-                | "x86_64-pc-windows-msvc"
-                | "x86_64-unknown-linux-gnu"
+            "aarch64-unknown-linux-gnu" | "x86_64-apple-darwin" | "x86_64-unknown-linux-gnu"
         )
     }
 
@@ -223,6 +220,10 @@ impl Build {
         let manifest_version = self.manifest_version;
         let build_version = self.build_version;
         (namespace, id, manifest_version, build_version)
+    }
+
+    pub fn get_target_platform(&self) -> &String {
+        &self.target_platform
     }
 
     pub fn get_build_key_tuple(&self) -> (String, String, u64) {

@@ -250,8 +250,10 @@ async fn update(
 ) -> pipebuilder_common::Result<()> {
     let (namespace, id, _, build_version) = build.get_build_meta();
     let (builder_id, builder_address) = build.get_builder_meta();
+    let target_platform = build.get_target_platform();
     let now = Utc::now();
     let version_build = BuildMetadata::new(
+        target_platform.to_owned(),
         status,
         now,
         builder_id.to_owned(),
