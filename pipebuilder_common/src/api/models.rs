@@ -1,9 +1,10 @@
 use crate::{
     api::constants::{
-        DISPLAY_ADDRESS_WIDTH, DISPLAY_BUILD_STATUS_WIDTH, DISPLAY_COUNT_WIDTH, DISPLAY_ID_WIDTH,
-        DISPLAY_MESSAGE_WIDTH, DISPLAY_NAMESPACE_WIDTH, DISPLAY_NODE_ARCH_WIDTH,
-        DISPLAY_NODE_OS_WIDTH, DISPLAY_NODE_ROLE_WIDTH, DISPLAY_NODE_STATUS_WIDTH,
-        DISPLAY_SIZE_WIDTH, DISPLAY_TIMESTAMP_WIDTH, DISPLAY_VERSION_WIDTH,
+        DISPLAY_ADDRESS_WIDTH, DISPLAY_BUILD_STATUS_WIDTH, DISPLAY_BUILD_TARGET_PLATFORM_WIDTH,
+        DISPLAY_COUNT_WIDTH, DISPLAY_ID_WIDTH, DISPLAY_MESSAGE_WIDTH, DISPLAY_NAMESPACE_WIDTH,
+        DISPLAY_NODE_ARCH_WIDTH, DISPLAY_NODE_OS_WIDTH, DISPLAY_NODE_ROLE_WIDTH,
+        DISPLAY_NODE_STATUS_WIDTH, DISPLAY_SIZE_WIDTH, DISPLAY_TIMESTAMP_WIDTH,
+        DISPLAY_VERSION_WIDTH,
     },
     grpc::{build, node, repository},
     BuildStatus, Error, NodeArch, NodeOS, NodeRole, NodeState as InternalNodeState, NodeStatus,
@@ -179,6 +180,8 @@ pub struct BuildMetadata {
     pub id: String,
     // version
     pub version: u64,
+    // target platform
+    pub target_platform: String,
     // build status
     pub status: BuildStatus,
     // timestamp
@@ -197,13 +200,15 @@ impl Display for BuildMetadata {
             Some(message) => message.as_str(),
             None => "",
         };
+        let target_platform = self.target_platform.to_owned();
         let status = self.status.to_string();
         let timestamp = self.timestamp.to_string();
         writeln!(f,
-                "{id:<id_width$}{version:<version_width$}{status:<status_width$}{builder_id:<id_width$}{builder_address:<address_width$}{timestamp:<timestamp_width$}{message:<message_width$}",
+                "{id:<id_width$}{version:<version_width$}{status:<status_width$}{target_platform:<target_platform_width$}{builder_id:<id_width$}{builder_address:<address_width$}{timestamp:<timestamp_width$}{message:<message_width$}",
                 id = self.id,
                 version = self.version,
                 status = status,
+                target_platform = target_platform,
                 timestamp = timestamp,
                 builder_id = self.builder_id,
                 builder_address = self.builder_address,
@@ -211,6 +216,7 @@ impl Display for BuildMetadata {
                 id_width = DISPLAY_ID_WIDTH,
                 version_width = DISPLAY_VERSION_WIDTH,
                 status_width = DISPLAY_BUILD_STATUS_WIDTH,
+                target_platform_width = DISPLAY_BUILD_TARGET_PLATFORM_WIDTH,
                 timestamp_width = DISPLAY_TIMESTAMP_WIDTH,
                 address_width = DISPLAY_ADDRESS_WIDTH,
                 message_width = DISPLAY_MESSAGE_WIDTH,
@@ -221,21 +227,23 @@ impl Display for BuildMetadata {
 impl PrintHeader for BuildMetadata {
     fn print_header() {
         println!(
-            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}{col5:<col5_width$}{col6:<col6_width$}",
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}{col5:<col5_width$}{col6:<col6_width$}{col7:<col7_width$}",
             col0 = "Id",
             col1 = "Version",
             col2 = "Status",
-            col3 = "Builder Id",
-            col4 = "Builder Address",
-            col5 = "Timestamp",
-            col6 = "Message",
+            col3 = "Target",
+            col4 = "Builder Id",
+            col5 = "Builder Address",
+            col6 = "Timestamp",
+            col7 = "Message",
             col0_width = DISPLAY_ID_WIDTH,
             col1_width = DISPLAY_VERSION_WIDTH,
             col2_width = DISPLAY_BUILD_STATUS_WIDTH,
-            col3_width = DISPLAY_ID_WIDTH,
-            col4_width = DISPLAY_ADDRESS_WIDTH,
-            col5_width = DISPLAY_TIMESTAMP_WIDTH,
-            col6_width = DISPLAY_MESSAGE_WIDTH,
+            col3_width = DISPLAY_BUILD_TARGET_PLATFORM_WIDTH,
+            col4_width = DISPLAY_ID_WIDTH,
+            col5_width = DISPLAY_ADDRESS_WIDTH,
+            col6_width = DISPLAY_TIMESTAMP_WIDTH,
+            col7_width = DISPLAY_MESSAGE_WIDTH,
         )
     }
 }

@@ -749,12 +749,13 @@ mod handlers {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        let version_build = register
+        let build_metadata = register
             .get_build_metadata(lease_id, namespace.as_str(), id.as_str(), version)
             .await?;
-        Ok(version_build.map(|b| models::BuildMetadata {
+        Ok(build_metadata.map(|b| models::BuildMetadata {
             id,
             version,
+            target_platform: b.target_platform,
             status: b.status,
             timestamp: b.timestamp,
             builder_id: b.builder_id,
@@ -787,7 +788,7 @@ mod handlers {
         let build_metadatas = register.list_build_metadata(namespace.as_str(), id).await?;
         let build_metadatas = build_metadatas
             .into_iter()
-            .map(|(key, version_build)| {
+            .map(|(key, build_metadata)| {
                 let id_version = remove_resource_namespace(
                     key.as_str(),
                     RESOURCE_BUILD_METADATA,
@@ -803,11 +804,12 @@ mod handlers {
                 models::BuildMetadata {
                     id,
                     version,
-                    status: version_build.status,
-                    timestamp: version_build.timestamp,
-                    builder_id: version_build.builder_id,
-                    builder_address: version_build.builder_address,
-                    message: version_build.message,
+                    target_platform: build_metadata.target_platform,
+                    status: build_metadata.status,
+                    timestamp: build_metadata.timestamp,
+                    builder_id: build_metadata.builder_id,
+                    builder_address: build_metadata.builder_address,
+                    message: build_metadata.message,
                 }
             })
             .collect::<Vec<models::BuildMetadata>>();
