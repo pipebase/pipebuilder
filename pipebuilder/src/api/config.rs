@@ -8,7 +8,7 @@ pub struct GrpcClientConfig {
 
 #[derive(Deserialize)]
 pub struct GrpcClientConfigs {
-    pub manifest: GrpcClientConfig,
+    pub repository: GrpcClientConfig,
     pub scheduler: GrpcClientConfig,
 }
 

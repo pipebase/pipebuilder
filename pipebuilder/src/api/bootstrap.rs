@@ -14,9 +14,9 @@ pub async fn bootstrap(
     lease_id: i64,
 ) -> Result<impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone> {
     let clients = config.clients;
-    let manifest_endpoint = clients.manifest.endpoint;
+    let repository_endpoint = clients.repository.endpoint;
     let scheduler_endpoint = clients.scheduler.endpoint;
-    let manifest_client = RepositoryClient::connect(manifest_endpoint).await?;
+    let manifest_client = RepositoryClient::connect(repository_endpoint).await?;
     let scheduler_client = SchedulerClient::connect(scheduler_endpoint).await?;
     let api = api::filters::api(manifest_client, scheduler_client, register, lease_id);
     Ok(api)
