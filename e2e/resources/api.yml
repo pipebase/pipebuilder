@@ -9,7 +9,7 @@ base:
     endpoints: ["localhost:2379"]
 api:
   clients:
-    manifest:
+    repository:
       endpoint: http://127.0.0.1:17000
     scheduler:
       endpoint: http://127.0.0.1:18000
