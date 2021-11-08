@@ -94,12 +94,70 @@ pub struct NodeConfig {
     pub heartbeat_period: Option<Period>,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+pub enum NodeArch {
+    X86_64,
+    AARCH64,
+    UNKNOWN,
+}
+
+impl From<&str> for NodeArch {
+    fn from(arch: &str) -> Self {
+        match arch {
+            "x86_64" => NodeArch::X86_64,
+            "aarch64" => NodeArch::AARCH64,
+            _ => NodeArch::UNKNOWN,
+        }
+    }
+}
+
+impl ToString for NodeArch {
+    fn to_string(&self) -> String {
+        match self {
+            NodeArch::X86_64 => String::from("x86_64"),
+            NodeArch::AARCH64 => String::from("aarch64"),
+            &NodeArch::UNKNOWN => String::from("unknown"),
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub enum NodeOS {
+    LINUX,
+    MACOS,
+    UNKNOWN,
+}
+
+impl From<&str> for NodeOS {
+    fn from(os: &str) -> Self {
+        match os {
+            "linux" => NodeOS::LINUX,
+            "macos" => NodeOS::MACOS,
+            _ => NodeOS::UNKNOWN,
+        }
+    }
+}
+
+impl ToString for NodeOS {
+    fn to_string(&self) -> String {
+        match self {
+            NodeOS::LINUX => String::from("linux"),
+            NodeOS::MACOS => String::from("macos"),
+            NodeOS::UNKNOWN => String::from("unknown"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct NodeState {
     // node id
     pub id: String,
     // node role
     pub role: NodeRole,
+    // node arch
+    pub arch: NodeArch,
+    // node os
+    pub os: NodeOS,
     // node internal address
     pub internal_address: String,
     // node external address
@@ -115,6 +173,10 @@ pub struct NodeService {
     id: String,
     // node role
     role: NodeRole,
+    // node arch
+    arch: NodeArch,
+    // node os
+    os: NodeOS,
     // node internal address
     internal_address: String,
     // node external address
@@ -144,9 +206,13 @@ impl NodeService {
         };
         let heartbeat_period = config.heartbeat_period;
         let heartbeat_period = heartbeat_period.unwrap_or(DEFAULT_NODE_HEARTBEAT_PERIOD);
+        let arch: NodeArch = std::env::consts::ARCH.into();
+        let os: NodeOS = std::env::consts::OS.into();
         NodeService {
             id,
             role,
+            arch,
+            os,
             internal_address,
             external_address,
             lease_id,
@@ -176,6 +242,8 @@ impl NodeService {
         let mut interval = tokio::time::interval(heartbeat_period);
         let id = self.id.to_owned();
         let role = self.role.to_owned();
+        let arch = self.arch.to_owned();
+        let os = self.os.to_owned();
         let internal_address = self.internal_address.to_owned();
         let external_address = self.external_address.to_owned();
         let status_code = self.status_code.clone();
@@ -189,6 +257,8 @@ impl NodeService {
                 let state = NodeState {
                     id: id.clone(),
                     role: role.clone(),
+                    arch: arch.clone(),
+                    os: os.clone(),
                     internal_address: internal_address.clone(),
                     external_address: external_address.clone(),
                     status: status_code.into(),

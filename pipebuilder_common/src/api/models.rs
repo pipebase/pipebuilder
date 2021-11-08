@@ -1,12 +1,12 @@
 use crate::{
     api::constants::{
         DISPLAY_ADDRESS_WIDTH, DISPLAY_BUILD_STATUS_WIDTH, DISPLAY_COUNT_WIDTH, DISPLAY_ID_WIDTH,
-        DISPLAY_MESSAGE_WIDTH, DISPLAY_NAMESPACE_WIDTH, DISPLAY_NODE_ROLE_WIDTH,
-        DISPLAY_NODE_STATUS_WIDTH, DISPLAY_SIZE_WIDTH, DISPLAY_TIMESTAMP_WIDTH,
-        DISPLAY_VERSION_WIDTH,
+        DISPLAY_MESSAGE_WIDTH, DISPLAY_NAMESPACE_WIDTH, DISPLAY_NODE_ARCH_WIDTH,
+        DISPLAY_NODE_OS_WIDTH, DISPLAY_NODE_ROLE_WIDTH, DISPLAY_NODE_STATUS_WIDTH,
+        DISPLAY_SIZE_WIDTH, DISPLAY_TIMESTAMP_WIDTH, DISPLAY_VERSION_WIDTH,
     },
     grpc::{build, node, repository},
-    BuildStatus, Error, NodeRole, NodeState as InternalNodeState, NodeStatus,
+    BuildStatus, Error, NodeArch, NodeOS, NodeRole, NodeState as InternalNodeState, NodeStatus,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -316,6 +316,10 @@ pub struct NodeState {
     pub id: String,
     // node role
     pub role: NodeRole,
+    // node arch
+    pub arch: NodeArch,
+    // node os
+    pub os: NodeOS,
     // status
     pub status: NodeStatus,
     // timestamp
@@ -325,16 +329,22 @@ pub struct NodeState {
 impl Display for NodeState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let role = self.role.to_string();
+        let arch = self.arch.to_string();
+        let os = self.os.to_string();
         let status = self.status.to_string();
         let timestamp = self.timestamp.to_string();
         writeln!(f,
-                "{id:<id_width$}{role:<role_width$}{status:<status_width$}{timestamp:<timestamp_width$}",
+                "{id:<id_width$}{role:<role_width$}{arch:<arch_width$}{os:<os_width$}{status:<status_width$}{timestamp:<timestamp_width$}",
                 id = self.id,
                 role = role,
                 status = status,
+                arch = arch,
+                os = os,
                 timestamp = timestamp,
                 id_width = DISPLAY_ID_WIDTH,
                 role_width = DISPLAY_NODE_ROLE_WIDTH,
+                arch_width = DISPLAY_NODE_ARCH_WIDTH,
+                os_width = DISPLAY_NODE_OS_WIDTH,
                 status_width = DISPLAY_NODE_STATUS_WIDTH,
                 timestamp_width = DISPLAY_TIMESTAMP_WIDTH,
                 )
@@ -344,15 +354,19 @@ impl Display for NodeState {
 impl PrintHeader for NodeState {
     fn print_header() {
         println!(
-            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}",
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}{col5:<col5_width$}",
             col0 = "Id",
             col1 = "Role",
-            col2 = "Status",
-            col3 = "Timestamp",
+            col2 = "Arch",
+            col3 = "OS",
+            col4 = "Status",
+            col5 = "Timestamp",
             col0_width = DISPLAY_ID_WIDTH,
             col1_width = DISPLAY_NODE_ROLE_WIDTH,
-            col2_width = DISPLAY_NODE_STATUS_WIDTH,
-            col3_width = DISPLAY_TIMESTAMP_WIDTH,
+            col2_width = DISPLAY_NODE_ARCH_WIDTH,
+            col3_width = DISPLAY_NODE_OS_WIDTH,
+            col4_width = DISPLAY_NODE_STATUS_WIDTH,
+            col5_width = DISPLAY_TIMESTAMP_WIDTH,
         )
     }
 }
@@ -761,11 +775,15 @@ impl From<InternalNodeState> for NodeState {
     fn from(origin: InternalNodeState) -> Self {
         let id = origin.id;
         let role = origin.role;
+        let arch = origin.arch;
+        let os = origin.os;
         let status = origin.status;
         let timestamp = origin.timestamp;
         NodeState {
             id,
             role,
+            arch,
+            os,
             status,
             timestamp,
         }
