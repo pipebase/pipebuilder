@@ -12,6 +12,7 @@ use crate::{
         copy_directory, create_directory, move_directory, parse_toml, remove_directory, sub_path,
         write_file, write_toml, TomlManifest,
     },
+    PATH_APP_CARGO_WORKDIR,
 };
 use chrono::{DateTime, Utc};
 use pipegen::models::App;
@@ -366,19 +367,12 @@ impl Build {
         // cargo build and stream log to file
         let app_workspace = app_workspace(workspace, namespace, id, build_version);
         let target_platform = self.target_platform.as_str();
-        let toml_path = sub_path(app_workspace.as_str(), PATH_APP_TOML_MANIFEST);
-        let target_path = sub_path(app_workspace.as_str(), PATH_APP_TARGET);
+        let cargo_workdir = sub_path(app_workspace.as_str(), PATH_APP_CARGO_WORKDIR);
         // prepare log directory
         let log_directory = app_build_log_directory(log_directory, namespace, id, build_version);
         create_directory(log_directory.as_str()).await?;
         let log_path = sub_path(log_directory.as_str(), PATH_APP_BUILD_LOG);
-        cargo_build(
-            toml_path.as_str(),
-            target_platform,
-            target_path.as_str(),
-            log_path.as_str(),
-        )
-        .await?;
+        cargo_build(cargo_workdir.as_str(), target_platform, log_path.as_str()).await?;
         Ok(Some(BuildStatus::Publish))
     }
 
