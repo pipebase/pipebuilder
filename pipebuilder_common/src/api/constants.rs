@@ -26,6 +26,6 @@ pub(crate) const DISPLAY_NODE_OS_WIDTH: usize = 12;
 pub(crate) const DISPLAY_SIZE_WIDTH: usize = 12;
 pub(crate) const DISPLAY_VERSION_WIDTH: usize = 12;
 pub(crate) const DISPLAY_ADDRESS_WIDTH: usize = 16;
-pub(crate) const DISPLAY_BUILD_TARGET_PLATFORM_WIDTH: usize = 24;
+pub(crate) const DISPLAY_BUILD_TARGET_PLATFORM_WIDTH: usize = 32;
 pub(crate) const DISPLAY_TIMESTAMP_WIDTH: usize = 32;
 pub(crate) const DISPLAY_MESSAGE_WIDTH: usize = 36;
