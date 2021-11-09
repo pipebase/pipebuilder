@@ -233,7 +233,7 @@ impl PrintHeader for BuildMetadata {
             col2 = "Status",
             col3 = "Builder Id",
             col4 = "Builder Address",
-            col5 = "Target",
+            col5 = "Target Platform",
             col6 = "Timestamp",
             col7 = "Message",
             col0_width = DISPLAY_ID_WIDTH,
