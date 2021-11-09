@@ -243,24 +243,20 @@ pub async fn cargo_fmt(manifest_path: &str) -> Result<()> {
 }
 
 // target platform: https://doc.rust-lang.org/cargo/commands/cargo-build.html#compilation-options
-pub async fn cargo_build(
-    manifest_path: &str,
-    target_platform: &str,
-    target_directory: &str,
-    log_path: &str,
-) -> Result<()> {
+pub async fn cargo_build(cargo_workdir: &str, target_platform: &str, log_path: &str) -> Result<()> {
     let log_file = fs::File::create(log_path).await?.into_std().await;
     let mut cmd = Command::new(cargo_binary());
     cmd.arg("build")
-        .arg("--manifest-path")
-        .arg(manifest_path)
         .arg("--target")
         .arg(target_platform)
-        .arg("--target-dir")
-        .arg(target_directory)
         .arg("--release");
     cmd.stderr(log_file);
+    // change cwd as cargo workdir
+    let current_dir = std::env::current_dir()?;
+    std::env::set_current_dir(cargo_workdir)?;
     let code = cmd_status(cmd).await?;
+    // restore previous workdir
+    std::env::set_current_dir(current_dir)?;
     match code == 0 {
         true => Ok(()),
         false => Err(cargo_error("build", code, String::from("check build log"))),

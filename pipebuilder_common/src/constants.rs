@@ -20,6 +20,7 @@ pub const RESOURCE_PROJECT: &str = "project";
 
 pub const PATH_APP: &str = "app";
 pub const PATH_APP_BUILD_LOG: &str = "build.log";
+pub const PATH_APP_CARGO_WORKDIR: &str = "app";
 pub const PATH_APP_TOML_MANIFEST: &str = "app/Cargo.toml";
 pub const PATH_APP_MAIN: &str = "app/src/main.rs";
 pub const PATH_APP_TARGET: &str = "app/target";
