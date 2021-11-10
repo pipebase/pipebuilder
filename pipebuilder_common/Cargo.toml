@@ -13,6 +13,7 @@ keywords = ["pipebase", "pipebuilder", "CI"]
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 etcd-client = { version = "0.7.2", features = ["tls"] }
+filetime = "0.2.15"
 fnv = "1.0.7"
 http = "0.2.5"
 reqwest = "0.11.4"

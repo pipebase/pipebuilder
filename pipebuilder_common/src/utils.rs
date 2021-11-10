@@ -6,6 +6,7 @@ use crate::{
     RESOURCE_NAMESPACE, RESOURCE_NODE, RESOURCE_PROJECT,
 };
 use etcd_client::{Event, EventType};
+use filetime::FileTime;
 use fnv::FnvHasher;
 use pipegen::models::Dependency;
 use serde::de::DeserializeOwned;
@@ -121,14 +122,6 @@ where
     Ok(())
 }
 
-// copy directory and return success flag with linux cmd
-pub async fn os_copy_directory(src: &str, dst: &str) -> Result<bool> {
-    let mut cmd = Command::new("cp");
-    cmd.arg("-r").arg(src).arg(dst);
-    let (code, _) = cmd_status_output(cmd).await?;
-    Ok(code == 0)
-}
-
 pub fn copy_directory<P>(from: P, to: P) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>
 where
     P: AsRef<Path> + Send + 'static,
@@ -152,7 +145,8 @@ where
         };
         to_path.push(file_name);
         if from_path.is_file() {
-            copy_file(from_path, to_path).await?;
+            copy_file(&from_path, &to_path).await?;
+            copy_file_times(&from_path, &to_path).await?;
             return Ok(true);
         }
         if !from_path.is_dir() {
@@ -162,7 +156,8 @@ where
             );
             return Ok(false);
         }
-        create_directory(to_path.clone()).await?;
+        create_directory(&to_path).await?;
+        copy_file_times(&from_path, &to_path).await?;
         let mut entries = fs::read_dir(&from_path).await?;
         while let Some(entry) = entries.next_entry().await? {
             let from_entry_path = entry.path();
@@ -186,6 +181,17 @@ where
     P: AsRef<Path>,
 {
     let _ = fs::copy(from, to).await?;
+    Ok(())
+}
+
+pub async fn copy_file_times<P>(from: P, to: P) -> Result<()>
+where
+    P: AsRef<Path>,
+{
+    let metadata = fs::metadata(from).await?;
+    let atime = FileTime::from_last_access_time(&metadata);
+    let mtime = FileTime::from_last_modification_time(&metadata);
+    filetime::set_file_times(to, atime, mtime)?;
     Ok(())
 }
 
