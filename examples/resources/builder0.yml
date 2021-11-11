@@ -1,0 +1,15 @@
+base:
+  node:
+    id: builder0
+    role: Builder
+    internal_address: 0.0.0.0:19000
+    external_address: builder0:19000
+  lease:
+    ttl: 30
+  register:
+    endpoints: ["etcd1:2379"]
+builder:
+  repository_endpoint: http://repository0:17000
+  workspace: /opt/builder/builds/apps
+  restore_directory: /opt/builder/builds/restores
+  log_directory: /opt/builder/builds/logs

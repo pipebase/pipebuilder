@@ -1,0 +1,72 @@
+version: '3.9'
+
+services:
+  # https://etcd.io/docs/v3.5/op-guide/container/
+  etcd1:
+    container_name: etcd1
+    image: gcr.io/etcd-development/etcd
+    ports:
+      - 2379:2379
+      - 2380:2380
+    command: ["sh", "-c", "/usr/local/bin/etcd --data-dir=/etcd-data --name etcd1 --initial-advertise-peer-urls http://etcd1:2380 --listen-peer-urls http://0.0.0.0:2380 --advertise-client-urls http://etcd1:2379 --listen-client-urls http://0.0.0.0:2379 --initial-cluster etcd1=http://etcd1:2380"]
+  repository0:
+    container_name: repository0
+    image: pipebase/pipebuilder-repository:0.1.4
+    environment:
+      - RUST_LOG=info
+    ports:
+      - 17000:17000
+    volumes:
+      - ./resources/repository.yml:/opt/repository/repository.yml
+    depends_on:
+      - etcd1
+  scheduler0:
+    container_name: scheduler0
+    image: pipebase/pipebuilder-scheduler:0.1.4
+    environment:
+      - RUST_LOG=info
+    ports:
+      - 18000:18000
+    volumes:
+      - ./resources/scheduler.yml:/opt/scheduler/scheduler.yml
+    depends_on:
+      - etcd1
+  builder0:
+    container_name: builder0
+    image: pipebase/pipebuilder-builder:x86_64-linux_0.1.4
+    environment:
+      - RUST_LOG=info
+    ports:
+      - 19000:19000
+    volumes:
+      - ./resources/builder0.yml:/opt/builder/builder.yml
+    depends_on:
+      - etcd1
+      - repository0
+  builder1:
+    container_name: builder1
+    image: pipebase/pipebuilder-builder:aarch64-linux_0.1.4
+    environment:
+      - RUST_LOG=info
+    ports:
+      - 19001:19001
+    volumes:
+      - ./resources/builder1.yml:/opt/builder/builder.yml
+    depends_on:
+      - etcd1
+      - repository0
+  api0:
+    container_name: api0
+    image: pipebase/pipebuilder-api:0.1.4
+    environment:
+      - RUST_LOG=info
+    ports:
+      - 16000:16000
+    volumes:
+      - ./resources/api.yml:/opt/api/api.yml
+    depends_on:
+      - etcd1
+      - builder0
+      - builder1
+      - repository0
+      - scheduler0
