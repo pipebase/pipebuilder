@@ -21,6 +21,6 @@
 * **scheduler**: watch builders and assign build request.
 * **pbctl**: command-line tool allows you to run commands against `pipebuilder` api
 
-[`pipebase`]: https://github.com/pipebase/pipebase/tree/main/pipebase
-[Examples]: https://github.com/pipebase/pipebuider/tree/main/examples
-[Development]: https://github.com/pipebase/pipebuider/tree/main/e2e
+[`pipebase`]: https://github.com/pipebase/pipebase
+[Examples]: https://github.com/pipebase/pipebuilder/tree/main/examples
+[Development]: https://github.com/pipebase/pipebuilder/tree/main/e2e
