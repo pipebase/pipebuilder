@@ -16,8 +16,13 @@ message StatusResponse {
     bool active = 1;
 }
 
+message ShutdownRequest {}
+
+message ShutdownResponse {}
+
 service Node {
     rpc Activate(ActivateRequest) returns (ActivateResponse) {}
     rpc Deactivate(DeactivateRequest) returns (DeactivateResponse) {}
+    rpc Shutdown(ShutdownRequest) returns (ShutdownResponse) {}
     rpc Status(StatusRequest) returns (StatusResponse) {}
 }

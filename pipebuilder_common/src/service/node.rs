@@ -13,7 +13,8 @@ use std::{
     },
     time::Duration,
 };
-use tracing::error;
+use tokio::sync::oneshot::Sender;
+use tracing::{error, info};
 
 #[derive(Clone, Deserialize, Serialize)]
 pub enum NodeRole {
@@ -63,6 +64,7 @@ pub fn node_role_prefix(role: &NodeRole) -> &'static str {
 pub enum NodeStatus {
     Active,
     InActive,
+    Shutdown,
 }
 
 impl From<u8> for NodeStatus {
@@ -70,6 +72,7 @@ impl From<u8> for NodeStatus {
         match origin {
             0 => NodeStatus::Active,
             1 => NodeStatus::InActive,
+            2 => NodeStatus::Shutdown,
             _ => unreachable!(),
         }
     }
@@ -80,6 +83,7 @@ impl ToString for NodeStatus {
         let status_text = match self {
             NodeStatus::Active => "Active",
             NodeStatus::InActive => "Inactive",
+            NodeStatus::Shutdown => "Shutdown",
         };
         String::from(status_text)
     }
@@ -267,7 +271,7 @@ impl NodeService {
         self.status_code.clone()
     }
 
-    pub fn run(&self, mut register: Register) {
+    pub fn run(&self, mut register: Register, shutdown_tx: Sender<()>) {
         let heartbeat_period = self.heartbeat_period.to_owned();
         let mut interval = tokio::time::interval(heartbeat_period);
         let id = self.id.to_owned();
@@ -284,6 +288,7 @@ impl NodeService {
                 // register or patch local node state
                 let timestamp = Utc::now();
                 let status_code = status_code.load(Ordering::Acquire);
+                let status: NodeStatus = status_code.into();
                 let state = NodeState {
                     id: id.clone(),
                     role: role.clone(),
@@ -291,11 +296,11 @@ impl NodeService {
                     os: os.clone(),
                     internal_address: internal_address.clone(),
                     external_address: external_address.clone(),
-                    status: status_code.into(),
+                    status: status.clone(),
                     timestamp,
                 };
                 match register.put_node_state(&role, &state, lease_id).await {
-                    Ok(_) => continue,
+                    Ok(_) => (),
                     Err(e) => {
                         error!(
                             "put node state error {:?}, node service stop state patching",
@@ -303,8 +308,14 @@ impl NodeService {
                         );
                         break;
                     }
+                };
+                if matches!(status, NodeStatus::Shutdown) {
+                    break;
                 }
             }
+            // shutdown server either we received ctrl signal or patch node state failed
+            info!("{} {} shutdown ...", role.to_string(), id);
+            shutdown_tx.send(()).unwrap();
         });
     }
 }
@@ -336,8 +347,17 @@ impl Node for NodeService {
         let status: NodeStatus = self.status_code.load(Ordering::Acquire).into();
         let active = match status {
             NodeStatus::Active => true,
-            NodeStatus::InActive => false,
+            _ => false,
         };
         Ok(tonic::Response::new(node::StatusResponse { active }))
+    }
+
+    async fn shutdown(
+        &self,
+        _request: tonic::Request<node::ShutdownRequest>,
+    ) -> Result<tonic::Response<node::ShutdownResponse>, tonic::Status> {
+        self.status_code
+            .store(NodeStatus::Shutdown as u8, Ordering::Release);
+        Ok(tonic::Response::new(node::ShutdownResponse {}))
     }
 }

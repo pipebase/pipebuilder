@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
     let file = open_file(std::env::var(ENV_PIPEBUILDER_CONFIG_FILE)?).await?;
     let config = parse_config::<Config>(file).await?;
     // bootstrap base service
-    let (register, node_svc, _, lease_svc) = pipebuilder_common::bootstrap(config.base).await?;
+    let (register, node_svc, _, lease_svc, _) = pipebuilder_common::bootstrap(config.base).await?;
     // bootstrap api service
     let lease_id = lease_svc.get_lease_id();
     let api = bootstrap(config.api, register, lease_id).await?;
