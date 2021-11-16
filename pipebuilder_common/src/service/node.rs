@@ -20,7 +20,7 @@ use tracing::{error, info};
 pub enum NodeRole {
     Api,
     Builder,
-    Respository,
+    Repository,
     Scheduler,
     Undefined,
 }
@@ -30,7 +30,7 @@ impl ToString for NodeRole {
         let role_text = match self {
             NodeRole::Api => "Api",
             NodeRole::Builder => "Builder",
-            NodeRole::Respository => "Repository",
+            NodeRole::Repository => "Repository",
             NodeRole::Scheduler => "Scheduler",
             NodeRole::Undefined => unreachable!(),
         };
@@ -43,7 +43,7 @@ impl From<&str> for NodeRole {
         match text {
             "api" | "Api" => NodeRole::Api,
             "builder" | "Builder" => NodeRole::Builder,
-            "repository" | "Repository" => NodeRole::Respository,
+            "repository" | "Repository" => NodeRole::Repository,
             "scheduler" | "Scheduler" => NodeRole::Scheduler,
             _ => NodeRole::Undefined,
         }
@@ -54,7 +54,7 @@ pub fn node_role_prefix(role: &NodeRole) -> &'static str {
     match role {
         NodeRole::Api => RESOURCE_NODE_API,
         NodeRole::Builder => RESOURCE_NODE_BUILDER,
-        NodeRole::Respository => RESOURCE_NODE_REPOSITORY,
+        NodeRole::Repository => RESOURCE_NODE_REPOSITORY,
         NodeRole::Scheduler => RESOURCE_NODE_SCHEDULER,
         NodeRole::Undefined => unreachable!(),
     }

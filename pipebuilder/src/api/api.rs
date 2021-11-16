@@ -1922,7 +1922,7 @@ mod validations {
 
     fn validate_shutdown_role(role: &NodeRole) -> Result<()> {
         match role {
-            NodeRole::Builder | NodeRole::Respository | NodeRole::Scheduler => Ok(()),
+            NodeRole::Builder | NodeRole::Repository | NodeRole::Scheduler => Ok(()),
             _ => Err(invalid_api_request(String::from("can not shutdown node"))),
         }
     }

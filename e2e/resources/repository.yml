@@ -1,7 +1,7 @@
 base:
   node:
     id: repository0
-    role: Manifest
+    role: Repository
     internal_address: 127.0.0.1:17000
   lease:
     ttl: 30
