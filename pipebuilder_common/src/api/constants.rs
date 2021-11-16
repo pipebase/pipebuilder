@@ -12,6 +12,7 @@ pub(crate) const NODE_STATE: &str = "/api/v1/node";
 pub(crate) const SCAN_BUILDER: &str = "/api/v1/builder/scan";
 pub(crate) const ACTIVATE_NODE: &str = "/api/v1/node/activate";
 pub(crate) const DEACTIVATE_NODE: &str = "/api/v1/node/deactivate";
+pub(crate) const SHUTDOWN_NODE: &str = "/api/v1/node/shutdown";
 pub(crate) const NAMESPACE: &str = "/api/v1/namespace";
 pub(crate) const PROJECT: &str = "/api/v1/project";
 

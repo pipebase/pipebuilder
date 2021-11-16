@@ -445,6 +445,15 @@ pub struct DeactivateNodeRequest {
 pub struct DeactivateNodeResponse {}
 
 #[derive(Serialize, Deserialize)]
+pub struct ShutdownNodeRequest {
+    pub role: NodeRole,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ShutdownNodeResponse {}
+
+#[derive(Serialize, Deserialize)]
 pub struct ListAppMetadataRequest {
     pub namespace: String,
     pub id: Option<String>,
@@ -837,6 +846,12 @@ impl From<node::ActivateResponse> for ActivateNodeResponse {
 impl From<node::DeactivateResponse> for DeactivateNodeResponse {
     fn from(_: node::DeactivateResponse) -> Self {
         DeactivateNodeResponse {}
+    }
+}
+
+impl From<node::ShutdownResponse> for ShutdownNodeResponse {
+    fn from(_: node::ShutdownResponse) -> Self {
+        ShutdownNodeResponse {}
     }
 }
 

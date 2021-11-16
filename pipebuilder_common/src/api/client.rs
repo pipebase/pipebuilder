@@ -2,7 +2,7 @@ use super::{
     constants::{
         ACTIVATE_NODE, APP, APP_METADATA, BUILD, BUILD_LOG, BUILD_METADATA, BUILD_SNAPSHOT,
         CANCEL_BUILD, DEACTIVATE_NODE, MANIFEST, MANIFEST_METADATA, MANIFEST_SNAPSHOT, NAMESPACE,
-        NODE_STATE, PROJECT, SCAN_BUILDER,
+        NODE_STATE, PROJECT, SCAN_BUILDER, SHUTDOWN_NODE,
     },
     models::{
         ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildMetadata, BuildMetadataKey,
@@ -15,7 +15,7 @@ use super::{
         ListManifestMetadataRequest, ListManifestSnapshotRequest, ListNamespaceRequest,
         ListNodeStateRequest, ListProjectRequest, ManifestMetadata, ManifestSnapshot, Namespace,
         NodeState, PostManifestRequest, PostManifestResponse, Project, ScanBuilderRequest,
-        UpdateNamespaceRequest, UpdateProjectRequest,
+        ShutdownNodeRequest, ShutdownNodeResponse, UpdateNamespaceRequest, UpdateProjectRequest,
     },
 };
 use crate::{api_client_error, api_server_error, Result};
@@ -268,6 +268,16 @@ impl ApiClient {
         let request = Self::serialize_request(request)?;
         let response = self.post(DEACTIVATE_NODE, request).await?;
         let response = Self::get_response_body::<DeactivateNodeResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn shutdown_node(
+        &self,
+        request: &ShutdownNodeRequest,
+    ) -> Result<ShutdownNodeResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(SHUTDOWN_NODE, request).await?;
+        let response = Self::get_response_body::<ShutdownNodeResponse>(response).await?;
         Ok(response)
     }
 

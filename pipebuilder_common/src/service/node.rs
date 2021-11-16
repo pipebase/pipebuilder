@@ -20,7 +20,7 @@ use tracing::{error, info};
 pub enum NodeRole {
     Api,
     Builder,
-    Manifest,
+    Respository,
     Scheduler,
     Undefined,
 }
@@ -30,7 +30,7 @@ impl ToString for NodeRole {
         let role_text = match self {
             NodeRole::Api => "Api",
             NodeRole::Builder => "Builder",
-            NodeRole::Manifest => "Manifest",
+            NodeRole::Respository => "Repository",
             NodeRole::Scheduler => "Scheduler",
             NodeRole::Undefined => unreachable!(),
         };
@@ -43,7 +43,7 @@ impl From<&str> for NodeRole {
         match text {
             "api" | "Api" => NodeRole::Api,
             "builder" | "Builder" => NodeRole::Builder,
-            "manifest" | "Manifest" => NodeRole::Manifest,
+            "repository" | "Repository" => NodeRole::Respository,
             "scheduler" | "Scheduler" => NodeRole::Scheduler,
             _ => NodeRole::Undefined,
         }
@@ -54,7 +54,7 @@ pub fn node_role_prefix(role: &NodeRole) -> &'static str {
     match role {
         NodeRole::Api => RESOURCE_NODE_API,
         NodeRole::Builder => RESOURCE_NODE_BUILDER,
-        NodeRole::Manifest => RESOURCE_NODE_REPOSITORY,
+        NodeRole::Respository => RESOURCE_NODE_REPOSITORY,
         NodeRole::Scheduler => RESOURCE_NODE_SCHEDULER,
         NodeRole::Undefined => unreachable!(),
     }
@@ -120,7 +120,7 @@ impl ToString for NodeArch {
         match self {
             NodeArch::X86_64 => String::from("x86_64"),
             NodeArch::AARCH64 => String::from("aarch64"),
-            &NodeArch::UNKNOWN => String::from("unknown"),
+            NodeArch::UNKNOWN => String::from("unknown"),
         }
     }
 }
@@ -345,10 +345,7 @@ impl Node for NodeService {
         _request: tonic::Request<node::StatusRequest>,
     ) -> Result<tonic::Response<node::StatusResponse>, tonic::Status> {
         let status: NodeStatus = self.status_code.load(Ordering::Acquire).into();
-        let active = match status {
-            NodeStatus::Active => true,
-            _ => false,
-        };
+        let active = matches!(status, NodeStatus::Active);
         Ok(tonic::Response::new(node::StatusResponse { active }))
     }
 

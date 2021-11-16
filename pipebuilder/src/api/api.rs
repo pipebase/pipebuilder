@@ -93,7 +93,8 @@ pub mod filters {
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_node_state_list(register.clone())
             .or(v1_node_activate(register.clone(), lease_id))
-            .or(v1_node_deactivate(register, lease_id))
+            .or(v1_node_deactivate(register.clone(), lease_id))
+            .or(v1_node_shutdown(register, lease_id))
     }
 
     pub fn v1_build_post(
@@ -276,6 +277,18 @@ pub mod filters {
             .and_then(handlers::deactivate_node)
     }
 
+    pub fn v1_node_shutdown(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "node" / "shutdown")
+            .and(warp::post())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(json_request::<models::ShutdownNodeRequest>())
+            .and_then(handlers::shutdown_node)
+    }
+
     pub fn v1_app_metadata_list(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -441,7 +454,10 @@ mod handlers {
                 builder_client::BuilderClient, BuildRequest, CancelRequest, GetLogRequest,
                 ScanRequest,
             },
-            node::{node_client::NodeClient, ActivateRequest, DeactivateRequest, StatusRequest},
+            node::{
+                node_client::NodeClient, ActivateRequest, DeactivateRequest, ShutdownRequest,
+                StatusRequest,
+            },
             repository::{
                 repository_client::RepositoryClient, DeleteAppRequest, DeleteManifestRequest,
                 GetAppRequest, GetManifestRequest, PutManifestRequest,
@@ -1223,6 +1239,43 @@ mod handlers {
         }
     }
 
+    pub async fn shutdown_node(
+        mut register: Register,
+        lease_id: i64,
+        request: models::ShutdownNodeRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match validations::validate_shutdown_node_request(&request) {
+            Ok(()) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
+        let node_id = request.id.as_str();
+        let node_role = request.role;
+        let node_state =
+            match get_internal_node_state(&mut register, lease_id, &node_role, node_id).await {
+                Ok(node_state) => node_state,
+                Err(err) => return Ok(http_internal_error(err.into())),
+            };
+        // find node address
+        let address = match node_state {
+            Some(node_state) => node_state.external_address,
+            None => {
+                return Ok(http_not_found(Failure::new(format!(
+                    "node '({}, {})' not found",
+                    node_role.to_string(),
+                    node_id
+                ))))
+            }
+        };
+        let mut client = match node_client(address.as_str()).await {
+            Ok(node_client) => node_client,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match do_shutdown_node(&mut client).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
     async fn do_activate_node(
         client: &mut NodeClient<Channel>,
     ) -> pipebuilder_common::Result<models::ActivateNodeResponse> {
@@ -1235,6 +1288,14 @@ mod handlers {
         client: &mut NodeClient<Channel>,
     ) -> pipebuilder_common::Result<models::DeactivateNodeResponse> {
         let response = client.deactivate(DeactivateRequest {}).await?;
+        let response = response.into_inner();
+        Ok(response.into())
+    }
+
+    async fn do_shutdown_node(
+        client: &mut NodeClient<Channel>,
+    ) -> pipebuilder_common::Result<models::ShutdownNodeResponse> {
+        let response = client.shutdown(ShutdownRequest {}).await?;
         let response = response.into_inner();
         Ok(response.into())
     }
@@ -1839,18 +1900,44 @@ mod validations {
 
     pub fn validate_activate_node_request(request: &models::ActivateNodeRequest) -> Result<()> {
         let role = &request.role;
-        validate_role(role)
+        validate_activate_role(role)
     }
 
     pub fn validate_deactivate_node_request(request: &models::DeactivateNodeRequest) -> Result<()> {
         let role = &request.role;
-        validate_role(role)
+        validate_deactivate_role(role)
+    }
+
+    pub fn validate_shutdown_node_request(request: &models::ShutdownNodeRequest) -> Result<()> {
+        let role = &request.role;
+        validate_shutdown_role(role)
     }
 
     fn validate_role(role: &NodeRole) -> Result<()> {
         match role {
             NodeRole::Undefined => Err(invalid_api_request(String::from("undefined node role"))),
             _ => Ok(()),
+        }
+    }
+
+    fn validate_shutdown_role(role: &NodeRole) -> Result<()> {
+        match role {
+            NodeRole::Builder | NodeRole::Respository | NodeRole::Scheduler => Ok(()),
+            _ => Err(invalid_api_request(String::from("can not shutdown node"))),
+        }
+    }
+
+    fn validate_activate_role(role: &NodeRole) -> Result<()> {
+        match role {
+            NodeRole::Builder => Ok(()),
+            _ => Err(invalid_api_request(String::from("can not shutdown node"))),
+        }
+    }
+
+    fn validate_deactivate_role(role: &NodeRole) -> Result<()> {
+        match role {
+            NodeRole::Builder => Ok(()),
+            _ => Err(invalid_api_request(String::from("can not shutdown node"))),
         }
     }
 
