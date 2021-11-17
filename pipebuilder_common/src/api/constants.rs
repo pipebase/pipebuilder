@@ -1,3 +1,4 @@
+pub(crate) const SHUTDOWN: &str = "/admin/shutdown";
 pub(crate) const APP: &str = "/api/v1/app";
 pub(crate) const APP_METADATA: &str = "/api/v1/app/metadata";
 pub(crate) const BUILD: &str = "/api/v1/build";

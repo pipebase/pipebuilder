@@ -453,6 +453,13 @@ pub struct ShutdownNodeRequest {
 #[derive(Serialize, Deserialize)]
 pub struct ShutdownNodeResponse {}
 
+// shutdown local api node
+#[derive(Serialize, Deserialize)]
+pub struct ShutdownRequest {}
+
+#[derive(Serialize, Deserialize)]
+pub struct ShutdownResponse {}
+
 #[derive(Serialize, Deserialize)]
 pub struct ListAppMetadataRequest {
     pub namespace: String,
@@ -852,6 +859,18 @@ impl From<node::DeactivateResponse> for DeactivateNodeResponse {
 impl From<node::ShutdownResponse> for ShutdownNodeResponse {
     fn from(_: node::ShutdownResponse) -> Self {
         ShutdownNodeResponse {}
+    }
+}
+
+impl From<ShutdownRequest> for node::ShutdownRequest {
+    fn from(_: ShutdownRequest) -> Self {
+        node::ShutdownRequest {}
+    }
+}
+
+impl From<node::ShutdownResponse> for ShutdownResponse {
+    fn from(_: node::ShutdownResponse) -> Self {
+        ShutdownResponse {}
     }
 }
 

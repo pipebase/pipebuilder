@@ -202,6 +202,7 @@ impl NodeState {
     }
 }
 
+#[derive(Clone)]
 pub struct NodeService {
     // node id
     id: String,

@@ -6,7 +6,7 @@ pub mod filters {
             repository::repository_client::RepositoryClient,
             schedule::scheduler_client::SchedulerClient,
         },
-        Register,
+        NodeService, Register,
     };
     use serde::de::DeserializeOwned;
     use tonic::transport::Channel;
@@ -17,6 +17,7 @@ pub mod filters {
         scheduler_client: SchedulerClient<Channel>,
         register: Register,
         lease_id: i64,
+        node_svc: NodeService,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_app(repository_client.clone(), register.clone())
             .or(v1_build(scheduler_client, register.clone(), lease_id))
@@ -24,6 +25,7 @@ pub mod filters {
             .or(v1_namespace(register.clone(), lease_id))
             .or(v1_node(register.clone(), lease_id))
             .or(v1_project(register, lease_id))
+            .or(admin(node_svc))
     }
 
     // build api
@@ -95,6 +97,12 @@ pub mod filters {
             .or(v1_node_activate(register.clone(), lease_id))
             .or(v1_node_deactivate(register.clone(), lease_id))
             .or(v1_node_shutdown(register, lease_id))
+    }
+
+    pub fn admin(
+        node_svc: NodeService,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        admin_shutdown(node_svc)
     }
 
     pub fn v1_build_post(
@@ -409,6 +417,16 @@ pub mod filters {
             .and_then(handlers::delete_manifest)
     }
 
+    pub fn admin_shutdown(
+        node_svc: NodeService,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("admin" / "shutdown")
+            .and(warp::post())
+            .and(with_node_service(node_svc))
+            .and(json_request::<models::ShutdownRequest>())
+            .and_then(handlers::shutdown)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -435,6 +453,12 @@ pub mod filters {
         warp::any().map(move || lease_id)
     }
 
+    fn with_node_service(
+        node_svc: NodeService,
+    ) -> impl Filter<Extract = (NodeService,), Error = std::convert::Infallible> + Clone {
+        warp::any().map(move || node_svc.clone())
+    }
+
     fn json_request<T>() -> impl Filter<Extract = (T,), Error = warp::Rejection> + Clone
     where
         T: Send + DeserializeOwned,
@@ -455,8 +479,8 @@ mod handlers {
                 ScanRequest,
             },
             node::{
-                node_client::NodeClient, ActivateRequest, DeactivateRequest, ShutdownRequest,
-                StatusRequest,
+                node_client::NodeClient, node_server::Node, ActivateRequest, DeactivateRequest,
+                ShutdownRequest, StatusRequest,
             },
             repository::{
                 repository_client::RepositoryClient, DeleteAppRequest, DeleteManifestRequest,
@@ -464,14 +488,14 @@ mod handlers {
             },
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
-        remove_resource, remove_resource_namespace, NodeRole, NodeState as InternalNodeState,
-        Register, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA, RESOURCE_BUILD_SNAPSHOT,
-        RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT, RESOURCE_NAMESPACE,
-        RESOURCE_PROJECT,
+        remove_resource, remove_resource_namespace, NodeRole, NodeService,
+        NodeState as InternalNodeState, Register, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA,
+        RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
+        RESOURCE_NAMESPACE, RESOURCE_PROJECT,
     };
     use serde::Serialize;
     use std::convert::Infallible;
-    use tonic::transport::Channel;
+    use tonic::{transport::Channel, IntoRequest};
     use tracing::info;
     use warp::http::{Response, StatusCode};
 
@@ -1553,6 +1577,25 @@ mod handlers {
             Err(err) => return Ok(http_bad_request(err.into())),
         };
         match do_delete_namespace(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_shutdown(
+        node_svc: &NodeService,
+        request: models::ShutdownRequest,
+    ) -> pipebuilder_common::Result<models::ShutdownResponse> {
+        let request: ShutdownRequest = request.into();
+        let response = node_svc.shutdown(request.into_request()).await?;
+        Ok(response.into_inner().into())
+    }
+
+    pub async fn shutdown(
+        node_svc: NodeService,
+        request: models::ShutdownRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_shutdown(&node_svc, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
