@@ -14,6 +14,10 @@ pub struct StatusResponse {
     #[prost(bool, tag = "1")]
     pub active: bool,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShutdownRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShutdownResponse {}
 #[doc = r" Generated client implementations."]
 pub mod node_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -99,6 +103,20 @@ pub mod node_client {
             let path = http::uri::PathAndQuery::from_static("/node.Node/Deactivate");
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn shutdown(
+            &mut self,
+            request: impl tonic::IntoRequest<super::ShutdownRequest>,
+        ) -> Result<tonic::Response<super::ShutdownResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/node.Node/Shutdown");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
         pub async fn status(
             &mut self,
             request: impl tonic::IntoRequest<super::StatusRequest>,
@@ -130,6 +148,10 @@ pub mod node_server {
             &self,
             request: tonic::Request<super::DeactivateRequest>,
         ) -> Result<tonic::Response<super::DeactivateResponse>, tonic::Status>;
+        async fn shutdown(
+            &self,
+            request: tonic::Request<super::ShutdownRequest>,
+        ) -> Result<tonic::Response<super::ShutdownResponse>, tonic::Status>;
         async fn status(
             &self,
             request: tonic::Request<super::StatusRequest>,
@@ -226,6 +248,37 @@ pub mod node_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = DeactivateSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/node.Node/Shutdown" => {
+                    #[allow(non_camel_case_types)]
+                    struct ShutdownSvc<T: Node>(pub Arc<T>);
+                    impl<T: Node> tonic::server::UnaryService<super::ShutdownRequest> for ShutdownSvc<T> {
+                        type Response = super::ShutdownResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::ShutdownRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).shutdown(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ShutdownSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
                             accept_compression_encodings,

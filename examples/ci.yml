@@ -11,7 +11,7 @@ services:
     command: ["sh", "-c", "/usr/local/bin/etcd --data-dir=/etcd-data --name etcd1 --initial-advertise-peer-urls http://etcd1:2380 --listen-peer-urls http://0.0.0.0:2380 --advertise-client-urls http://etcd1:2379 --listen-client-urls http://0.0.0.0:2379 --initial-cluster etcd1=http://etcd1:2380"]
   repository0:
     container_name: repository0
-    image: pipebase/pipebuilder-repository:1.56_0.1.4
+    image: pipebase/pipebuilder-repository:1.56_0.1.5
     environment:
       - RUST_LOG=info
     ports:
@@ -22,7 +22,7 @@ services:
       - etcd1
   scheduler0:
     container_name: scheduler0
-    image: pipebase/pipebuilder-scheduler:1.56_0.1.4
+    image: pipebase/pipebuilder-scheduler:1.56_0.1.5
     environment:
       - RUST_LOG=info
     ports:
@@ -33,7 +33,7 @@ services:
       - etcd1
   builder0:
     container_name: builder0
-    image: pipebase/pipebuilder-builder:x86_64-linux_1.56_0.1.4
+    image: pipebase/pipebuilder-builder:x86_64-linux_1.56_0.1.5
     environment:
       - RUST_LOG=info
     ports:
@@ -45,7 +45,7 @@ services:
       - repository0
   builder1:
     container_name: builder1
-    image: pipebase/pipebuilder-builder:aarch64-linux_1.56_0.1.4
+    image: pipebase/pipebuilder-builder:aarch64-linux_1.56_0.1.5
     environment:
       - RUST_LOG=info
     ports:
@@ -57,7 +57,7 @@ services:
       - repository0
   api0:
     container_name: api0
-    image: pipebase/pipebuilder-api:1.56_0.1.4
+    image: pipebase/pipebuilder-api:1.56_0.1.5
     environment:
       - RUST_LOG=info
     ports:

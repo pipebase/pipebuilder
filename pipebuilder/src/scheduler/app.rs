@@ -3,6 +3,7 @@ mod config;
 mod schedule;
 
 use config::Config;
+use futures_util::FutureExt;
 use pipebuilder_common::{
     bootstrap,
     grpc::{
@@ -24,7 +25,7 @@ async fn main() -> Result<()> {
     info!("read configuration ...");
     let file = open_file(std::env::var(ENV_PIPEBUILDER_CONFIG_FILE)?).await?;
     let config = parse_config::<Config>(file).await?;
-    let (register, node_svc, health_svc, _) = bootstrap(config.base).await?;
+    let (register, node_svc, health_svc, _, shutdown_rx) = bootstrap(config.base).await?;
     let node_id = node_svc.get_id();
     let internal_address = node_svc.get_internal_address();
     let addr: SocketAddr = internal_address.parse()?;
@@ -38,7 +39,7 @@ async fn main() -> Result<()> {
         .add_service(HealthServer::new(health_svc))
         .add_service(SchedulerServer::new(scheduler_svc))
         .add_service(NodeServer::new(node_svc))
-        .serve(addr)
+        .serve_with_shutdown(addr, shutdown_rx.map(drop))
         .await?;
     info!("scheduler server {:?} exit ...", node_id);
     Ok(())

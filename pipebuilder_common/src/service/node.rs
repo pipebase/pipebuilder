@@ -13,13 +13,14 @@ use std::{
     },
     time::Duration,
 };
-use tracing::error;
+use tokio::sync::oneshot::Sender;
+use tracing::{error, info};
 
 #[derive(Clone, Deserialize, Serialize)]
 pub enum NodeRole {
     Api,
     Builder,
-    Manifest,
+    Repository,
     Scheduler,
     Undefined,
 }
@@ -29,7 +30,7 @@ impl ToString for NodeRole {
         let role_text = match self {
             NodeRole::Api => "Api",
             NodeRole::Builder => "Builder",
-            NodeRole::Manifest => "Manifest",
+            NodeRole::Repository => "Repository",
             NodeRole::Scheduler => "Scheduler",
             NodeRole::Undefined => unreachable!(),
         };
@@ -42,7 +43,7 @@ impl From<&str> for NodeRole {
         match text {
             "api" | "Api" => NodeRole::Api,
             "builder" | "Builder" => NodeRole::Builder,
-            "manifest" | "Manifest" => NodeRole::Manifest,
+            "repository" | "Repository" => NodeRole::Repository,
             "scheduler" | "Scheduler" => NodeRole::Scheduler,
             _ => NodeRole::Undefined,
         }
@@ -53,7 +54,7 @@ pub fn node_role_prefix(role: &NodeRole) -> &'static str {
     match role {
         NodeRole::Api => RESOURCE_NODE_API,
         NodeRole::Builder => RESOURCE_NODE_BUILDER,
-        NodeRole::Manifest => RESOURCE_NODE_REPOSITORY,
+        NodeRole::Repository => RESOURCE_NODE_REPOSITORY,
         NodeRole::Scheduler => RESOURCE_NODE_SCHEDULER,
         NodeRole::Undefined => unreachable!(),
     }
@@ -63,6 +64,7 @@ pub fn node_role_prefix(role: &NodeRole) -> &'static str {
 pub enum NodeStatus {
     Active,
     InActive,
+    Shutdown,
 }
 
 impl From<u8> for NodeStatus {
@@ -70,6 +72,7 @@ impl From<u8> for NodeStatus {
         match origin {
             0 => NodeStatus::Active,
             1 => NodeStatus::InActive,
+            2 => NodeStatus::Shutdown,
             _ => unreachable!(),
         }
     }
@@ -80,6 +83,7 @@ impl ToString for NodeStatus {
         let status_text = match self {
             NodeStatus::Active => "Active",
             NodeStatus::InActive => "Inactive",
+            NodeStatus::Shutdown => "Shutdown",
         };
         String::from(status_text)
     }
@@ -116,7 +120,7 @@ impl ToString for NodeArch {
         match self {
             NodeArch::X86_64 => String::from("x86_64"),
             NodeArch::AARCH64 => String::from("aarch64"),
-            &NodeArch::UNKNOWN => String::from("unknown"),
+            NodeArch::UNKNOWN => String::from("unknown"),
         }
     }
 }
@@ -198,6 +202,7 @@ impl NodeState {
     }
 }
 
+#[derive(Clone)]
 pub struct NodeService {
     // node id
     id: String,
@@ -267,7 +272,7 @@ impl NodeService {
         self.status_code.clone()
     }
 
-    pub fn run(&self, mut register: Register) {
+    pub fn run(&self, mut register: Register, shutdown_tx: Sender<()>) {
         let heartbeat_period = self.heartbeat_period.to_owned();
         let mut interval = tokio::time::interval(heartbeat_period);
         let id = self.id.to_owned();
@@ -284,6 +289,7 @@ impl NodeService {
                 // register or patch local node state
                 let timestamp = Utc::now();
                 let status_code = status_code.load(Ordering::Acquire);
+                let status: NodeStatus = status_code.into();
                 let state = NodeState {
                     id: id.clone(),
                     role: role.clone(),
@@ -291,11 +297,11 @@ impl NodeService {
                     os: os.clone(),
                     internal_address: internal_address.clone(),
                     external_address: external_address.clone(),
-                    status: status_code.into(),
+                    status: status.clone(),
                     timestamp,
                 };
                 match register.put_node_state(&role, &state, lease_id).await {
-                    Ok(_) => continue,
+                    Ok(_) => (),
                     Err(e) => {
                         error!(
                             "put node state error {:?}, node service stop state patching",
@@ -303,8 +309,14 @@ impl NodeService {
                         );
                         break;
                     }
+                };
+                if matches!(status, NodeStatus::Shutdown) {
+                    break;
                 }
             }
+            // shutdown server either we received ctrl signal or patch node state failed
+            info!("{} {} shutdown ...", role.to_string(), id);
+            shutdown_tx.send(()).unwrap();
         });
     }
 }
@@ -334,10 +346,16 @@ impl Node for NodeService {
         _request: tonic::Request<node::StatusRequest>,
     ) -> Result<tonic::Response<node::StatusResponse>, tonic::Status> {
         let status: NodeStatus = self.status_code.load(Ordering::Acquire).into();
-        let active = match status {
-            NodeStatus::Active => true,
-            NodeStatus::InActive => false,
-        };
+        let active = matches!(status, NodeStatus::Active);
         Ok(tonic::Response::new(node::StatusResponse { active }))
+    }
+
+    async fn shutdown(
+        &self,
+        _request: tonic::Request<node::ShutdownRequest>,
+    ) -> Result<tonic::Response<node::ShutdownResponse>, tonic::Status> {
+        self.status_code
+            .store(NodeStatus::Shutdown as u8, Ordering::Release);
+        Ok(tonic::Response::new(node::ShutdownResponse {}))
     }
 }

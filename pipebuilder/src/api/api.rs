@@ -6,7 +6,7 @@ pub mod filters {
             repository::repository_client::RepositoryClient,
             schedule::scheduler_client::SchedulerClient,
         },
-        Register,
+        NodeService, Register,
     };
     use serde::de::DeserializeOwned;
     use tonic::transport::Channel;
@@ -17,6 +17,7 @@ pub mod filters {
         scheduler_client: SchedulerClient<Channel>,
         register: Register,
         lease_id: i64,
+        node_svc: NodeService,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_app(repository_client.clone(), register.clone())
             .or(v1_build(scheduler_client, register.clone(), lease_id))
@@ -24,6 +25,7 @@ pub mod filters {
             .or(v1_namespace(register.clone(), lease_id))
             .or(v1_node(register.clone(), lease_id))
             .or(v1_project(register, lease_id))
+            .or(admin(node_svc))
     }
 
     // build api
@@ -93,7 +95,14 @@ pub mod filters {
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         v1_node_state_list(register.clone())
             .or(v1_node_activate(register.clone(), lease_id))
-            .or(v1_node_deactivate(register, lease_id))
+            .or(v1_node_deactivate(register.clone(), lease_id))
+            .or(v1_node_shutdown(register, lease_id))
+    }
+
+    pub fn admin(
+        node_svc: NodeService,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        admin_shutdown(node_svc)
     }
 
     pub fn v1_build_post(
@@ -276,6 +285,18 @@ pub mod filters {
             .and_then(handlers::deactivate_node)
     }
 
+    pub fn v1_node_shutdown(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "node" / "shutdown")
+            .and(warp::post())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(json_request::<models::ShutdownNodeRequest>())
+            .and_then(handlers::shutdown_node)
+    }
+
     pub fn v1_app_metadata_list(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -396,6 +417,16 @@ pub mod filters {
             .and_then(handlers::delete_manifest)
     }
 
+    pub fn admin_shutdown(
+        node_svc: NodeService,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("admin" / "shutdown")
+            .and(warp::post())
+            .and(with_node_service(node_svc))
+            .and(json_request::<models::ShutdownRequest>())
+            .and_then(handlers::shutdown)
+    }
+
     fn with_scheduler_client(
         client: SchedulerClient<Channel>,
     ) -> impl Filter<Extract = (SchedulerClient<Channel>,), Error = std::convert::Infallible> + Clone
@@ -422,6 +453,12 @@ pub mod filters {
         warp::any().map(move || lease_id)
     }
 
+    fn with_node_service(
+        node_svc: NodeService,
+    ) -> impl Filter<Extract = (NodeService,), Error = std::convert::Infallible> + Clone {
+        warp::any().map(move || node_svc.clone())
+    }
+
     fn json_request<T>() -> impl Filter<Extract = (T,), Error = warp::Rejection> + Clone
     where
         T: Send + DeserializeOwned,
@@ -441,21 +478,24 @@ mod handlers {
                 builder_client::BuilderClient, BuildRequest, CancelRequest, GetLogRequest,
                 ScanRequest,
             },
-            node::{node_client::NodeClient, ActivateRequest, DeactivateRequest, StatusRequest},
+            node::{
+                node_client::NodeClient, node_server::Node, ActivateRequest, DeactivateRequest,
+                ShutdownRequest, StatusRequest,
+            },
             repository::{
                 repository_client::RepositoryClient, DeleteAppRequest, DeleteManifestRequest,
                 GetAppRequest, GetManifestRequest, PutManifestRequest,
             },
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
-        remove_resource, remove_resource_namespace, NodeRole, NodeState as InternalNodeState,
-        Register, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA, RESOURCE_BUILD_SNAPSHOT,
-        RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT, RESOURCE_NAMESPACE,
-        RESOURCE_PROJECT,
+        remove_resource, remove_resource_namespace, NodeRole, NodeService,
+        NodeState as InternalNodeState, Register, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA,
+        RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
+        RESOURCE_NAMESPACE, RESOURCE_PROJECT,
     };
     use serde::Serialize;
     use std::convert::Infallible;
-    use tonic::transport::Channel;
+    use tonic::{transport::Channel, IntoRequest};
     use tracing::info;
     use warp::http::{Response, StatusCode};
 
@@ -1223,6 +1263,43 @@ mod handlers {
         }
     }
 
+    pub async fn shutdown_node(
+        mut register: Register,
+        lease_id: i64,
+        request: models::ShutdownNodeRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match validations::validate_shutdown_node_request(&request) {
+            Ok(()) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        };
+        let node_id = request.id.as_str();
+        let node_role = request.role;
+        let node_state =
+            match get_internal_node_state(&mut register, lease_id, &node_role, node_id).await {
+                Ok(node_state) => node_state,
+                Err(err) => return Ok(http_internal_error(err.into())),
+            };
+        // find node address
+        let address = match node_state {
+            Some(node_state) => node_state.external_address,
+            None => {
+                return Ok(http_not_found(Failure::new(format!(
+                    "node '({}, {})' not found",
+                    node_role.to_string(),
+                    node_id
+                ))))
+            }
+        };
+        let mut client = match node_client(address.as_str()).await {
+            Ok(node_client) => node_client,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match do_shutdown_node(&mut client).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
     async fn do_activate_node(
         client: &mut NodeClient<Channel>,
     ) -> pipebuilder_common::Result<models::ActivateNodeResponse> {
@@ -1235,6 +1312,14 @@ mod handlers {
         client: &mut NodeClient<Channel>,
     ) -> pipebuilder_common::Result<models::DeactivateNodeResponse> {
         let response = client.deactivate(DeactivateRequest {}).await?;
+        let response = response.into_inner();
+        Ok(response.into())
+    }
+
+    async fn do_shutdown_node(
+        client: &mut NodeClient<Channel>,
+    ) -> pipebuilder_common::Result<models::ShutdownNodeResponse> {
+        let response = client.shutdown(ShutdownRequest {}).await?;
         let response = response.into_inner();
         Ok(response.into())
     }
@@ -1492,6 +1577,25 @@ mod handlers {
             Err(err) => return Ok(http_bad_request(err.into())),
         };
         match do_delete_namespace(&mut register, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_shutdown(
+        node_svc: &NodeService,
+        request: models::ShutdownRequest,
+    ) -> pipebuilder_common::Result<models::ShutdownResponse> {
+        let request: ShutdownRequest = request.into();
+        let response = node_svc.shutdown(request.into_request()).await?;
+        Ok(response.into_inner().into())
+    }
+
+    pub async fn shutdown(
+        node_svc: NodeService,
+        request: models::ShutdownRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match do_shutdown(&node_svc, request).await {
             Ok(response) => Ok(ok(&response)),
             Err(err) => Ok(http_internal_error(err.into())),
         }
@@ -1839,18 +1943,44 @@ mod validations {
 
     pub fn validate_activate_node_request(request: &models::ActivateNodeRequest) -> Result<()> {
         let role = &request.role;
-        validate_role(role)
+        validate_activate_role(role)
     }
 
     pub fn validate_deactivate_node_request(request: &models::DeactivateNodeRequest) -> Result<()> {
         let role = &request.role;
-        validate_role(role)
+        validate_deactivate_role(role)
+    }
+
+    pub fn validate_shutdown_node_request(request: &models::ShutdownNodeRequest) -> Result<()> {
+        let role = &request.role;
+        validate_shutdown_role(role)
     }
 
     fn validate_role(role: &NodeRole) -> Result<()> {
         match role {
             NodeRole::Undefined => Err(invalid_api_request(String::from("undefined node role"))),
             _ => Ok(()),
+        }
+    }
+
+    fn validate_shutdown_role(role: &NodeRole) -> Result<()> {
+        match role {
+            NodeRole::Builder | NodeRole::Repository | NodeRole::Scheduler => Ok(()),
+            _ => Err(invalid_api_request(String::from("can not shutdown node"))),
+        }
+    }
+
+    fn validate_activate_role(role: &NodeRole) -> Result<()> {
+        match role {
+            NodeRole::Builder => Ok(()),
+            _ => Err(invalid_api_request(String::from("can not shutdown node"))),
+        }
+    }
+
+    fn validate_deactivate_role(role: &NodeRole) -> Result<()> {
+        match role {
+            NodeRole::Builder => Ok(()),
+            _ => Err(invalid_api_request(String::from("can not shutdown node"))),
         }
     }
 

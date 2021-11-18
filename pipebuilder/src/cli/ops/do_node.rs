@@ -1,7 +1,10 @@
 use pipebuilder_common::{
     api::{
         client::ApiClient,
-        models::{ActivateNodeRequest, DeactivateNodeRequest, ListNodeStateRequest, NodeState},
+        models::{
+            ActivateNodeRequest, DeactivateNodeRequest, ListNodeStateRequest, NodeState,
+            ShutdownNodeRequest,
+        },
     },
     NodeRole, Result,
 };
@@ -23,5 +26,11 @@ pub(crate) async fn activate_node(client: &ApiClient, role: NodeRole, id: String
 pub(crate) async fn deactivate_node(client: &ApiClient, role: NodeRole, id: String) -> Result<()> {
     let request = DeactivateNodeRequest { role, id };
     let _ = client.deactivate_node(&request).await?;
+    Ok(())
+}
+
+pub(crate) async fn shutdown_node(client: &ApiClient, role: NodeRole, id: String) -> Result<()> {
+    let request = ShutdownNodeRequest { role, id };
+    let _ = client.shutdown_node(&request).await?;
     Ok(())
 }

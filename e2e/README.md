@@ -13,7 +13,6 @@ cleanup local data volume
 setup etcd
 ```sh
 # at project root
-docker-compose -f e2e/etcd.yml down
 docker-compose -f e2e/etcd.yml up -d
 ```
 run `repository`, `builder`, `scheduler`, `api` services
@@ -21,7 +20,7 @@ run `repository`, `builder`, `scheduler`, `api` services
 # at project root
 RUST_LOG=info PIPEBUILDER_CONFIG_FILE=e2e/resources/SERVICE.yml cargo run --bin SERVICE
 ```
-## Run test
+## Run Test
 go to test directory
 ```sh
 cd e2e/tests/A_TEST_PROJECT
@@ -46,4 +45,25 @@ cd tests/A_TEST_PROJECT && \
 pbctl pull -n dev -i A_TEST_PROJECT -v BUILD_VERSION && \
 chmod +x app && \
 ./app
+```
+## Cleanup
+shutdown internal node
+```sh
+pbctl shutdown builder -i builder0 && \
+pbctl shutdown builder -i scheduler0 && \
+pbctl shutdown builder -i repository0 && \
+```
+shutdown api server
+```sh
+curl -X POST http://localhost:16000/admin/shutdown \
+    -H 'Content-Type: application/json' \
+    -d '{}'
+```
+shutdown etcd
+```sh
+docker-compose -f e2e/etcd.yml down
+```
+cleanup data directory
+```sh
+./e2e/setup-data-volume.sh
 ```

@@ -3,7 +3,7 @@ base:
     id: scheduler0
     role: Scheduler
     internal_address: 0.0.0.0:18000
-    external_address: scheduler:18000
+    external_address: scheduler0:18000
   lease:
     ttl: 30
   register:
