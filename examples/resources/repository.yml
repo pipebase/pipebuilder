@@ -3,7 +3,7 @@ base:
     id: repository0
     role: Repository
     internal_address: 0.0.0.0:17000
-    external_address: repository:17000
+    external_address: repository0:17000
   lease:
     ttl: 30
   register:
