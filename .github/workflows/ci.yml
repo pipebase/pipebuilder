@@ -21,7 +21,6 @@ jobs:
         with:
           command: check
           args: --workspace
-
   test:
     name: Test Suite
     runs-on: ubuntu-latest
