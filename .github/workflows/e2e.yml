@@ -1,0 +1,47 @@
+on: 
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 13 * * *"
+
+name: E2E
+
+jobs:
+  node:
+    name: Node Itest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: setup data volume
+        run: ./e2e/setup-data-volume.sh
+      - name: setup CI
+        run: ./e2e/setup-ci.sh
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --package e2e --features itest node::tests::test_node
+  build:
+    name: Build Itest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: setup data volume
+        run: ./e2e/setup-data-volume.sh
+      - name: setup CI
+        run: ./e2e/setup-ci.sh
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --package e2e --features itest build::tests::test_build

@@ -20,7 +20,7 @@ run `repository`, `builder`, `scheduler`, `api` services
 # at project root
 RUST_LOG=info PIPEBUILDER_CONFIG_FILE=e2e/resources/SERVICE.yml cargo run --bin SERVICE
 ```
-## Run Test
+## Test Sample App
 go to test directory
 ```sh
 cd e2e/tests/A_TEST_PROJECT
@@ -66,4 +66,8 @@ docker-compose -f e2e/etcd.yml down
 cleanup data directory
 ```sh
 ./e2e/setup-data-volume.sh
+```
+## Run Integration Tests
+```sh
+RUST_TEST_TASKS=1 cargo test --package e2e --features itest
 ```

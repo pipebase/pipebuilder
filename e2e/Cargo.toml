@@ -1,0 +1,11 @@
+[package]
+name = "e2e"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+pipebuilder_common = { version = "0.1.5", path = "../pipebuilder_common" }
+tokio = { version = "1.11.0" }
+
+[features]
+itest = []

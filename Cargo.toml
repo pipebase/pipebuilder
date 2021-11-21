@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "e2e",
     "pipebuilder",
     "pipebuilder_common",
 ]
