@@ -2,7 +2,6 @@
 set -o nounset
 set -o pipefail
 
-# Checker: validate and check pipe manifest
 # Entrypoint: main
 
 # workspace

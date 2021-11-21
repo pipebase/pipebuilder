@@ -16,7 +16,7 @@ use std::{
 use tokio::sync::oneshot::Sender;
 use tracing::{error, info};
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum NodeRole {
     Api,
     Builder,
