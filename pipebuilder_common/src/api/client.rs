@@ -39,7 +39,7 @@ pub struct ApiClientConfig {
     pub endpoint: String,
     pub basic_auth: Option<BasicAuth>,
     pub bearer_auth_token: Option<String>,
-    pub headers: HashMap<String, String>,
+    pub headers: Option<HashMap<String, String>>,
 }
 
 impl Default for ApiClientConfig {
@@ -48,9 +48,23 @@ impl Default for ApiClientConfig {
             endpoint: String::from("http://127.0.0.1:16000"),
             basic_auth: None,
             bearer_auth_token: None,
-            headers: HashMap::new(),
+            headers: None,
         }
     }
+}
+
+fn build_header_map(headers: &HashMap<String, String>) -> HeaderMap {
+    let mut hmap = HeaderMap::new();
+    for (name, value) in headers {
+        hmap.insert::<HeaderName>(
+            name.parse()
+                .unwrap_or_else(|_| panic!("invalid header name '{}'", name)),
+            value
+                .parse()
+                .unwrap_or_else(|_| panic!("invalid header value '{}'", value)),
+        );
+    }
+    hmap
 }
 
 pub struct ApiClient {
@@ -67,16 +81,10 @@ impl From<ApiClientConfig> for ApiClient {
         let basic_auth = config.basic_auth;
         let bearer_auth_token = config.bearer_auth_token;
         let headers = config.headers;
-        let mut hmap = HeaderMap::new();
-        for (name, value) in &headers {
-            hmap.insert::<HeaderName>(
-                name.parse()
-                    .unwrap_or_else(|_| panic!("invalid header name '{}'", name)),
-                value
-                    .parse()
-                    .unwrap_or_else(|_| panic!("invalid header value '{}'", value)),
-            );
-        }
+        let hmap: HeaderMap = match headers {
+            Some(headers) => build_header_map(&headers),
+            None => HeaderMap::new(),
+        };
         ApiClient {
             client: Client::new(),
             endpoint,
