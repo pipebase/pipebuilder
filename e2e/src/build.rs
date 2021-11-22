@@ -10,6 +10,7 @@ mod tests {
 
     const TEST_NAMESPACE: &str = "dev";
     const TEST_PROJECT: &str = "timer";
+    const TEST_BUILD_COUNT: u64 = 3;
     const TEST_BUILD_WAIT_MILLIS: u64 = 30000;
     const TEST_BUILD_WAIT_RETRY: u64 = 3;
 
@@ -62,47 +63,51 @@ mod tests {
         assert_eq!(String::from(TEST_PROJECT), actual_manifest_metadata.id);
         assert_eq!(0, actual_manifest_metadata.version);
 
-        // build
-        let _ = build(
-            &client,
-            String::from(TEST_NAMESPACE),
-            String::from(TEST_PROJECT),
-            0,
-            None,
-        )
-        .await
-        .unwrap();
-        wait(TEST_BUILD_WAIT_MILLIS).await;
-        for i in 0..TEST_BUILD_WAIT_RETRY {
-            let build_metadata = get_build_metadata(
+        for i in 0..TEST_BUILD_COUNT {
+            // build
+            let build_response = build(
                 &client,
                 String::from(TEST_NAMESPACE),
                 String::from(TEST_PROJECT),
                 0,
+                None,
+            )
+            .await
+            .unwrap();
+            let build_version = build_response.build_version;
+            assert_eq!(i, build_version);
+            wait(TEST_BUILD_WAIT_MILLIS).await;
+            for j in 0..TEST_BUILD_WAIT_RETRY {
+                let build_metadata = get_build_metadata(
+                    &client,
+                    String::from(TEST_NAMESPACE),
+                    String::from(TEST_PROJECT),
+                    build_version,
+                )
+                .await
+                .unwrap();
+                let status = build_metadata.status;
+                match status {
+                    BuildStatus::Cancel | BuildStatus::Fail | BuildStatus::Succeed => break,
+                    _ => {
+                        println!(
+                            "build in progress, retry({}) in {} millis",
+                            j, TEST_BUILD_WAIT_MILLIS
+                        );
+                        wait(TEST_BUILD_WAIT_MILLIS).await;
+                    }
+                }
+            }
+            let build_metadata = get_build_metadata(
+                &client,
+                String::from(TEST_NAMESPACE),
+                String::from(TEST_PROJECT),
+                build_version,
             )
             .await
             .unwrap();
             let status = build_metadata.status;
-            match status {
-                BuildStatus::Cancel | BuildStatus::Fail | BuildStatus::Succeed => break,
-                _ => {
-                    println!(
-                        "build in progress, retry({}) in {} millis",
-                        i, TEST_BUILD_WAIT_MILLIS
-                    );
-                    wait(TEST_BUILD_WAIT_MILLIS).await;
-                }
-            }
+            assert!(matches!(status, BuildStatus::Succeed));
         }
-        let build_metadata = get_build_metadata(
-            &client,
-            String::from(TEST_NAMESPACE),
-            String::from(TEST_PROJECT),
-            0,
-        )
-        .await
-        .unwrap();
-        let status = build_metadata.status;
-        assert!(matches!(status, BuildStatus::Succeed));
     }
 }

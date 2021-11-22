@@ -1,24 +1,23 @@
 use crate::{
     app_workspace,
     constants::{
-        PATH_APP, PATH_APP_BUILD_LOG, PATH_APP_MAIN, PATH_APP_RELEASE_BINARY, PATH_APP_TARGET,
-        PATH_APP_TOML_MANIFEST,
+        PATH_APP, PATH_APP_BUILD_LOG, PATH_APP_LOCK, PATH_APP_MAIN, PATH_APP_RELEASE_BINARY,
+        PATH_APP_TARGET, PATH_APP_TOML_MANIFEST,
     },
     errors::Result,
     grpc::repository::{GetManifestRequest, PostAppRequest},
-    read_file,
+    open_lock_file, read_file,
     utils::{
         app_build_log_directory, app_restore_directory, cargo_build, cargo_fmt, cargo_init,
         copy_directory, create_directory, move_directory, parse_toml, remove_directory, sub_path,
         write_file, write_toml, TomlManifest,
     },
-    PATH_APP_CARGO_WORKDIR,
 };
 use chrono::{DateTime, Utc};
 use pipegen::models::App;
 use serde::{Deserialize, Serialize};
 use tonic::transport::Channel;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::grpc::repository::repository_client::RepositoryClient;
 
@@ -367,7 +366,7 @@ impl Build {
         // cargo build and stream log to file
         let app_workspace = app_workspace(workspace, namespace, id, build_version);
         let target_platform = self.target_platform.as_str();
-        let cargo_workdir = sub_path(app_workspace.as_str(), PATH_APP_CARGO_WORKDIR);
+        let cargo_workdir = sub_path(app_workspace.as_str(), PATH_APP);
         // prepare log directory
         let log_directory = app_build_log_directory(log_directory, namespace, id, build_version);
         create_directory(log_directory.as_str()).await?;
@@ -416,13 +415,30 @@ impl Build {
         let target_platform = self.target_platform.as_str();
         let app_restore_directory =
             app_restore_directory(restore_directory, namespace, id, target_platform);
+        create_directory(app_restore_directory.as_str()).await?;
         let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
+        let app_lock_path = sub_path(app_restore_directory.as_str(), PATH_APP_LOCK);
+        let mut app_lock_file = open_lock_file(app_lock_path.as_str())?;
+        // lock file before store compiled app - avoid corruption due to race
+        if !app_lock_file.try_lock()? {
+            warn!("lock file '{}' failed, skip app store ...", app_lock_path);
+            return Ok(Some(BuildStatus::Succeed));
+        }
+        // do store compiled app
+        let r = Self::do_store_app(app_path, app_restore_path).await;
+        // unlock file regardless of store succeed or fail
+        app_lock_file.unlock()?;
+        match r {
+            Ok(_) => Ok(Some(BuildStatus::Succeed)),
+            Err(err) => Err(err),
+        }
+    }
+
+    async fn do_store_app(app_path: String, app_restore_path: String) -> Result<()> {
         // cleanup previous app build cache if any
-        // TODO: acquire lock avoid racing of two concurrent build
         let _ = remove_directory(app_restore_path.as_str()).await;
         create_directory(app_restore_path.as_str()).await?;
-        move_directory(app_path.as_str(), app_restore_path.as_str()).await?;
-        Ok(Some(BuildStatus::Succeed))
+        move_directory(app_path.as_str(), app_restore_path.as_str()).await
     }
 
     pub fn succeed(&mut self) -> Result<Option<BuildStatus>> {
