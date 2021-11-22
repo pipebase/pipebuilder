@@ -8,6 +8,7 @@ use crate::{
 use etcd_client::{Event, EventType};
 use filetime::FileTime;
 use fnv::FnvHasher;
+use fslock::{LockFile, ToOsStr};
 use pipegen::models::Dependency;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -64,6 +65,14 @@ where
     wrt.write_all(buffer).await?;
     wrt.flush().await?;
     Ok(())
+}
+
+pub fn open_lock_file<P>(path: &P) -> Result<LockFile>
+where
+    P: ToOsStr + ?Sized,
+{
+    let file = LockFile::open(path)?;
+    Ok(file)
 }
 
 pub async fn create_directory<P>(path: P) -> Result<()>
