@@ -1,6 +1,6 @@
 [package]
 name = "pipebuilder"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Li Yu <li.yu.sh0211@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0"
@@ -36,7 +36,7 @@ etcd-client = "0.7.2"
 flurry = "0.3.1"
 futures-util = "0.3"
 http = "0.2.5"
-pipebuilder_common = { version = "0.1.6", path = "../pipebuilder_common" }
+pipebuilder_common = { version = "0.1.7", path = "../pipebuilder_common" }
 prost = "0.8"
 reqwest = "0.11.4"
 serde = { version = "1.0", features = ["derive"] }
