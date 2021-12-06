@@ -1,5 +1,10 @@
 use crate::Period;
 
+pub const FULL_FORMATTER: &str = "full";
+pub const PRETTY_FORMATTER: &str = "pretty";
+pub const JSON_FORMATTER: &str = "json";
+
+pub const ENV_FORMATTER: &str = "PIPEBUILDER_LOG_FORMATTER";
 pub const ENV_PIPEBUILDER_CONFIG_FILE: &str = "PIPEBUILDER_CONFIG_FILE";
 pub const ENV_PIPEBUILDER_NODE_ID: &str = "PIPEBUILDER_NODE_ID";
 pub const ENV_PIPEBUILDER_EXTERNAL_ADDR: &str = "PIPEBUILDER_EXTERNAL_ADDR";

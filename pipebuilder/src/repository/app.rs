@@ -10,7 +10,7 @@ use pipebuilder_common::{
         health::health_server::HealthServer, node::node_server::NodeServer,
         repository::repository_server::RepositoryServer,
     },
-    open_file, parse_config, Result, ENV_PIPEBUILDER_CONFIG_FILE,
+    init_tracing_subscriber, open_file, parse_config, Result, ENV_PIPEBUILDER_CONFIG_FILE,
 };
 use std::net::SocketAddr;
 use tonic::transport::Server;
@@ -19,7 +19,7 @@ use tracing::{info, instrument};
 #[tokio::main]
 #[instrument]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
+    init_tracing_subscriber();
     info!("read configuration ...");
     let file = open_file(std::env::var(ENV_PIPEBUILDER_CONFIG_FILE)?).await?;
     let config = parse_config::<Config>(file).await?;
