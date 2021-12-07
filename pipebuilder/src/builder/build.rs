@@ -53,7 +53,12 @@ impl Builder for BuilderService {
         let namespace = request.namespace;
         let id = request.id;
         let manifest_version = request.manifest_version;
-        info!("build '{}/{}/{}'", namespace, id, manifest_version);
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            manifest_version = manifest_version,
+            "build"
+        );
         // lock build snapshot with manifest id
         // update latest build version
         let mut register = self.register.clone();
@@ -64,7 +69,13 @@ impl Builder for BuilderService {
         {
             Ok((_, snapshot)) => snapshot,
             Err(err) => {
-                error!("trigger build failed, error: {:#?}", err);
+                error!(
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    manifest_version = manifest_version,
+                    "trigger build failed, error: {:#?}",
+                    err
+                );
                 return Err(tonic::Status::internal(format!("{:#?}", err)));
             }
         };
@@ -74,7 +85,13 @@ impl Builder for BuilderService {
         let build_context = self.context.to_owned();
         let target_platform = request.target_platform;
         // start build
-        info!("start build '{}/{}/{}'", namespace, id, build_version);
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            manifest_version = manifest_version,
+            build_version = build_version,
+            "start build"
+        );
         let build = Build::new(
             namespace,
             id,
@@ -102,12 +119,18 @@ impl Builder for BuilderService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.build_version;
-        info!("cancel build '{}/{}/{}'", namespace, id, version);
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            build_version = version,
+            "cancel build"
+        );
         let builds = self.builds.clone();
         let workspace = self.context.workspace.as_str();
+        // stop local build thread
         if !cancel_local_build(builds, namespace.as_str(), id.as_str(), version) {
             return Err(tonic::Status::invalid_argument(format!(
-                "local build not found for '{}/{}/{}'",
+                "local build not found for (namespace = {}, id = {}, build_version = {})",
                 namespace, id, version
             )));
         }
@@ -116,12 +139,15 @@ impl Builder for BuilderService {
         let app_path = sub_path(app_directory.as_str(), PATH_APP);
         if remove_directory(app_path.as_str()).await.is_err() {
             error!(
-                "clean app directory failed for '{}/{}/{}'",
-                namespace, id, version
+                namespace = namespace.as_str(),
+                id = id.as_str(),
+                build_version = version,
+                "clean app directory failed"
             )
         };
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
+        // update metadata
         match cancel_build(
             &mut register,
             lease_id,
@@ -166,12 +192,17 @@ impl Builder for BuilderService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.build_version;
-        info!("get build log for '{}/{}/{}'", namespace, id, version);
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            build_version = version,
+            "get build log"
+        );
         let log_directory = self.context.log_directory.as_str();
         match Build::read_log(log_directory, namespace.as_str(), id.as_str(), version).await {
             Ok(buffer) => Ok(Response::new(GetLogResponse { buffer })),
             Err(err) => Err(tonic::Status::not_found(format!(
-                "build log for '{}/{}/{}' not found, error: '{}'",
+                "build log for (namespace = {}, id = {}, build_version = {}) not found, error: '{}'",
                 namespace, id, version, err
             ))),
         }
@@ -193,10 +224,14 @@ fn start_build(
             match update(&mut register, lease_id, &build, status.clone(), None).await {
                 Ok(()) => (),
                 Err(err) => {
-                    let (namespace, id, _, build_version) = build.get_build_meta();
+                    let (namespace, id, manifest_version, build_version) = build.get_build_meta();
                     error!(
-                        "update build status for '{}/{}:{}' fail, error: '{}'",
-                        namespace, id, build_version, err
+                        namespace = namespace.as_str(),
+                        id = id.as_str(),
+                        manifest_version = manifest_version,
+                        build_version = build_version,
+                        "update build status fail, error: '{:#?}'",
+                        err
                     );
                     break;
                 }
@@ -206,12 +241,13 @@ fn start_build(
             let next_status = match result {
                 Ok(next_status) => next_status,
                 Err(err) => {
-                    let (namespace, id, _, build_version) = build.get_build_meta();
+                    let (namespace, id, manifest_version, build_version) = build.get_build_meta();
                     error!(
-                        "run build for '{}/{}:{}' fail, status: '{}', error: '{}'",
-                        namespace,
-                        id,
-                        build_version,
+                        namespace = namespace.as_str(),
+                        id = id.as_str(),
+                        manifest_version = manifest_version,
+                        build_version = build_version,
+                        "run build fail, status: '{}', error: '{:#?}'",
                         status.to_string(),
                         err
                     );
@@ -287,8 +323,10 @@ fn cancel_local_build(
         }
         None => {
             warn!(
-                "cancel non-extists build '{}/{}/{}'",
-                namespace, id, version
+                namespace = namespace,
+                id = id,
+                build_version = version,
+                "cancel non-exists build"
             );
             false
         }
@@ -309,8 +347,10 @@ async fn cancel_build(
         Some(version_build) => version_build,
         None => {
             warn!(
-                "cancel non-extists build '{}/{}/{}'",
-                namespace, id, version
+                namespace = namespace,
+                id = id,
+                build_version = version,
+                "cancel non-extists build"
             );
             return Ok(());
         }

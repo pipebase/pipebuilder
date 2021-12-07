@@ -540,7 +540,11 @@ mod handlers {
         };
         let builder_id = builder_info.id;
         let builder_address = builder_info.address;
-        info!("scheduled builder ({}, {})", builder_id, builder_address);
+        info!(
+            builder_id = builder_id.as_str(),
+            builder_address = builder_address.as_str(),
+            "scheduled builder"
+        );
         // check whether builder is active
         let mut node_client = match node_client(builder_address.as_str()).await {
             Ok(node_client) => node_client,
@@ -889,7 +893,7 @@ mod handlers {
             Some(build_metadata) => build_metadata,
             None => {
                 return Ok(http_not_found(Failure::new(format!(
-                    "build metadata {}/{}/{} not found",
+                    "build metadata (namespace = {}, id = {}, build_version = {}) not found",
                     namespace, id, version
                 ))))
             }
@@ -898,8 +902,9 @@ mod handlers {
         let builder_id = build_metadata.builder_id;
         let builder_address = build_metadata.builder_address;
         info!(
-            "cancel build at builder ({}, {})",
-            builder_id, builder_address
+            builder_id = builder_id.as_str(),
+            builder_address = builder_address.as_str(),
+            "cancel build at builder",
         );
         let mut builder_client = match builder_client(builder_address.as_str()).await {
             Ok(builder_client) => builder_client,
@@ -1090,8 +1095,9 @@ mod handlers {
         let builder_id = build_metadata.builder_id;
         let builder_address = build_metadata.builder_address;
         info!(
-            "get build log at builder ({}, {})",
-            builder_id, builder_address
+            builder_id = builder_id.as_str(),
+            builder_address = builder_address.as_str(),
+            "get build log at builder",
         );
         let mut builder_client = match builder_client(builder_address.as_str()).await {
             Ok(builder_client) => builder_client,
@@ -1859,7 +1865,7 @@ mod validations {
         validate_project(register, namespace, id).await?;
         match is_manifest_metadata_exist(register, namespace, id).await? {
             true => Err(invalid_api_request(format!(
-                "can not delete manifest snapshot '{}/{}', manifests found !",
+                "can not delete manifest snapshot (namespace = {}, id = {}), manifests found",
                 namespace, id
             ))),
             false => Ok(()),
@@ -1876,7 +1882,7 @@ mod validations {
         validate_project(register, namespace, id).await?;
         match is_version_build_prefix_exist(register, namespace, id).await? {
             true => Err(invalid_api_request(format!(
-                "can not delete build snapshot '{}/{}', builds found !",
+                "can not delete build snapshot (namespace = {}, id = {}), builds found",
                 namespace, id
             ))),
             false => Ok(()),
@@ -1894,7 +1900,7 @@ mod validations {
         match is_build_snapshot_exist(register, namespace, id).await? {
             true => {
                 return Err(invalid_api_request(format!(
-                    "can not delete project '{}/{}', build snapshot found !",
+                    "can not delete project (namespace = {}, id = {}), build snapshot found.",
                     namespace, id
                 )))
             }
@@ -1903,7 +1909,7 @@ mod validations {
         match is_manifest_snapshot_exist(register, namespace, id).await? {
             true => {
                 return Err(invalid_api_request(format!(
-                    "can not delete project '{}/{}', manifest snapshot found !",
+                    "can not delete project (namespace = {}, id = {}), manifest snapshot found.",
                     namespace, id
                 )))
             }
@@ -1911,7 +1917,7 @@ mod validations {
         };
         match is_app_metadata_prefix_exist(register, namespace, id).await? {
             true => Err(invalid_api_request(format!(
-                "can not delete projecct '{}/{}', app metadata found !",
+                "can not delete project (namespace = {}, id = {}), app metadata found.",
                 namespace, id
             ))),
             false => Ok(()),
@@ -1925,7 +1931,7 @@ mod validations {
         let id = request.id.as_str();
         match is_project_prefix_exist(register, id).await? {
             true => Err(invalid_api_request(format!(
-                "can not delete namespace '{}', project found !",
+                "can not delete namespace '{}', project found",
                 id
             ))),
             false => Ok(()),
@@ -2012,7 +2018,7 @@ mod validations {
         match is_exist {
             true => Ok(()),
             false => Err(invalid_api_request(format!(
-                "invalid project '{}/{}'",
+                "invalid project (namespace = {}, id = {})",
                 namespace, id
             ))),
         }

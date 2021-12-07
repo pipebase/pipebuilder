@@ -10,7 +10,7 @@ use pipebuilder_common::{
         build::builder_server::BuilderServer, health::health_server::HealthServer,
         node::node_server::NodeServer,
     },
-    open_file, parse_config, Result, ENV_PIPEBUILDER_CONFIG_FILE,
+    init_tracing_subscriber, open_file, parse_config, Result, ENV_PIPEBUILDER_CONFIG_FILE,
 };
 use std::net::SocketAddr;
 use tonic::transport::Server;
@@ -19,7 +19,7 @@ use tracing::{info, instrument};
 #[tokio::main]
 #[instrument]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
+    init_tracing_subscriber();
     info!("read configuration ...");
     let file = open_file(std::env::var(ENV_PIPEBUILDER_CONFIG_FILE)?).await?;
     let config = parse_config::<Config>(file).await?;
@@ -42,8 +42,9 @@ async fn main() -> Result<()> {
     let internal_address = node_svc.get_internal_address();
     let addr: SocketAddr = internal_address.parse()?;
     info!(
-        "run builder server {:?}, internal address {:?}...",
-        node_id, internal_address
+        node_id = node_id.as_str(),
+        internal_address = internal_address.as_str(),
+        "run builder server ..."
     );
     Server::builder()
         .add_service(HealthServer::new(health_svc))
@@ -51,6 +52,6 @@ async fn main() -> Result<()> {
         .add_service(NodeServer::new(node_svc))
         .serve_with_shutdown(addr, shutdown_rx.map(drop))
         .await?;
-    info!("builder server {:?} exit ...", node_id);
+    info!(node_id = node_id.as_str(), "builder server exit ...");
     Ok(())
 }
