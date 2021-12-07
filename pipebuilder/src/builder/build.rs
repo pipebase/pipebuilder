@@ -4,8 +4,8 @@ use pipebuilder_common::{
     app_workspace,
     grpc::{
         build::{
-            builder_server::Builder, BuildMetadataKey, BuildResponse, CancelResponse,
-            GetLogResponse, ScanResponse,
+            builder_server::Builder, BuildMetadataKey, BuildResponse, CancelBuildResponse,
+            GetBuildLogResponse, ScanBuildResponse,
         },
         repository::repository_client::RepositoryClient,
     },
@@ -110,10 +110,10 @@ impl Builder for BuilderService {
         }))
     }
 
-    async fn cancel(
+    async fn cancel_build(
         &self,
-        request: tonic::Request<pipebuilder_common::grpc::build::CancelRequest>,
-    ) -> Result<tonic::Response<pipebuilder_common::grpc::build::CancelResponse>, tonic::Status>
+        request: tonic::Request<pipebuilder_common::grpc::build::CancelBuildRequest>,
+    ) -> Result<tonic::Response<pipebuilder_common::grpc::build::CancelBuildResponse>, tonic::Status>
     {
         let request = request.into_inner();
         let namespace = request.namespace;
@@ -157,7 +157,7 @@ impl Builder for BuilderService {
         )
         .await
         {
-            Ok(_) => Ok(Response::new(CancelResponse {})),
+            Ok(_) => Ok(Response::new(CancelBuildResponse {})),
             Err(err) => Err(tonic::Status::internal(format!(
                 "cancel version build failed, error: '{:#?}'",
                 err
@@ -165,10 +165,11 @@ impl Builder for BuilderService {
         }
     }
 
-    async fn scan(
+    async fn scan_build(
         &self,
-        _request: tonic::Request<pipebuilder_common::grpc::build::ScanRequest>,
-    ) -> Result<tonic::Response<pipebuilder_common::grpc::build::ScanResponse>, tonic::Status> {
+        _request: tonic::Request<pipebuilder_common::grpc::build::ScanBuildRequest>,
+    ) -> Result<tonic::Response<pipebuilder_common::grpc::build::ScanBuildResponse>, tonic::Status>
+    {
         info!("scan local build");
         let builds_ref = self.builds.pin();
         let builds = builds_ref
@@ -180,13 +181,13 @@ impl Builder for BuilderService {
                 version: build_version.to_owned(),
             })
             .collect::<Vec<BuildMetadataKey>>();
-        Ok(Response::new(ScanResponse { builds }))
+        Ok(Response::new(ScanBuildResponse { builds }))
     }
 
-    async fn get_log(
+    async fn get_build_log(
         &self,
-        request: tonic::Request<pipebuilder_common::grpc::build::GetLogRequest>,
-    ) -> Result<tonic::Response<pipebuilder_common::grpc::build::GetLogResponse>, tonic::Status>
+        request: tonic::Request<pipebuilder_common::grpc::build::GetBuildLogRequest>,
+    ) -> Result<tonic::Response<pipebuilder_common::grpc::build::GetBuildLogResponse>, tonic::Status>
     {
         let request = request.into_inner();
         let namespace = request.namespace;
@@ -200,7 +201,7 @@ impl Builder for BuilderService {
         );
         let log_directory = self.context.log_directory.as_str();
         match Build::read_log(log_directory, namespace.as_str(), id.as_str(), version).await {
-            Ok(buffer) => Ok(Response::new(GetLogResponse { buffer })),
+            Ok(buffer) => Ok(Response::new(GetBuildLogResponse { buffer })),
             Err(err) => Err(tonic::Status::not_found(format!(
                 "build log for (namespace = {}, id = {}, build_version = {}) not found, error: '{}'",
                 namespace, id, version, err

@@ -386,8 +386,8 @@ impl PrintHeader for NodeState {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ScanBuilderRequest {
-    pub id: String,
+pub struct ScanBuildRequest {
+    pub builder_id: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -707,12 +707,12 @@ impl From<build::BuildResponse> for BuildResponse {
     }
 }
 
-impl From<CancelBuildRequest> for build::CancelRequest {
+impl From<CancelBuildRequest> for build::CancelBuildRequest {
     fn from(origin: CancelBuildRequest) -> Self {
         let namespace = origin.namespace;
         let id = origin.id;
         let version = origin.version;
-        build::CancelRequest {
+        build::CancelBuildRequest {
             namespace,
             id,
             build_version: version,
@@ -720,8 +720,8 @@ impl From<CancelBuildRequest> for build::CancelRequest {
     }
 }
 
-impl From<build::CancelResponse> for CancelBuildResponse {
-    fn from(_origin: build::CancelResponse) -> Self {
+impl From<build::CancelBuildResponse> for CancelBuildResponse {
+    fn from(_origin: build::CancelBuildResponse) -> Self {
         CancelBuildResponse {}
     }
 }
@@ -786,12 +786,12 @@ impl From<repository::GetAppResponse> for GetAppResponse {
     }
 }
 
-impl From<GetBuildLogRequest> for build::GetLogRequest {
+impl From<GetBuildLogRequest> for build::GetBuildLogRequest {
     fn from(origin: GetBuildLogRequest) -> Self {
         let namespace = origin.namespace;
         let id = origin.id;
         let build_version = origin.version;
-        build::GetLogRequest {
+        build::GetBuildLogRequest {
             namespace,
             id,
             build_version,
@@ -799,8 +799,8 @@ impl From<GetBuildLogRequest> for build::GetLogRequest {
     }
 }
 
-impl From<build::GetLogResponse> for GetBuildLogResponse {
-    fn from(origin: build::GetLogResponse) -> Self {
+impl From<build::GetBuildLogResponse> for GetBuildLogResponse {
+    fn from(origin: build::GetBuildLogResponse) -> Self {
         let buffer = origin.buffer;
         GetBuildLogResponse { buffer }
     }
@@ -838,9 +838,9 @@ impl From<build::BuildMetadataKey> for BuildMetadataKey {
     }
 }
 
-impl From<ScanBuilderRequest> for build::ScanRequest {
-    fn from(_: ScanBuilderRequest) -> Self {
-        build::ScanRequest {}
+impl From<ScanBuildRequest> for build::ScanBuildRequest {
+    fn from(_: ScanBuildRequest) -> Self {
+        build::ScanBuildRequest {}
     }
 }
 

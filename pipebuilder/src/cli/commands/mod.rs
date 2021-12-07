@@ -58,7 +58,7 @@ pub async fn exec(
         ("list", "namespace") => list::exec_namespace(client, args).await,
         ("list", "project") => list::exec_project(client, args).await,
         ("cancel", "build") => cancel::exec_build(client, args).await,
-        ("scan", "builder") => scan::exec_builder(client, args).await,
+        ("scan", "build") => scan::exec_build(client, args).await,
         ("delete", "app") => delete::exec_app(client, args).await,
         ("delete", "build") => delete::exec_build(client, args).await,
         ("delete", "manifest") => delete::exec_manifest(client, args).await,

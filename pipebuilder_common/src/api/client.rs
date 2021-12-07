@@ -2,7 +2,7 @@ use super::{
     constants::{
         ACTIVATE_NODE, APP, APP_METADATA, BUILD, BUILD_LOG, BUILD_METADATA, BUILD_SNAPSHOT,
         CANCEL_BUILD, DEACTIVATE_NODE, MANIFEST, MANIFEST_METADATA, MANIFEST_SNAPSHOT, NAMESPACE,
-        NODE_STATE, PROJECT, SCAN_BUILDER, SHUTDOWN, SHUTDOWN_NODE,
+        NODE_STATE, PROJECT, SCAN_BUILD, SHUTDOWN, SHUTDOWN_NODE,
     },
     models::{
         ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildMetadata, BuildMetadataKey,
@@ -14,7 +14,7 @@ use super::{
         GetManifestResponse, ListAppMetadataRequest, ListBuildRequest, ListBuildSnapshotRequest,
         ListManifestMetadataRequest, ListManifestSnapshotRequest, ListNamespaceRequest,
         ListNodeStateRequest, ListProjectRequest, ManifestMetadata, ManifestSnapshot, Namespace,
-        NodeState, PostManifestRequest, PostManifestResponse, Project, ScanBuilderRequest,
+        NodeState, PostManifestRequest, PostManifestResponse, Project, ScanBuildRequest,
         ShutdownNodeRequest, ShutdownNodeResponse, ShutdownRequest, ShutdownResponse,
         UpdateNamespaceRequest, UpdateProjectRequest,
     },
@@ -251,11 +251,8 @@ impl ApiClient {
         Ok(response)
     }
 
-    pub async fn scan_builder(
-        &self,
-        request: &ScanBuilderRequest,
-    ) -> Result<Vec<BuildMetadataKey>> {
-        let response = self.query(SCAN_BUILDER, request).await?;
+    pub async fn scan_build(&self, request: &ScanBuildRequest) -> Result<Vec<BuildMetadataKey>> {
+        let response = self.query(SCAN_BUILD, request).await?;
         let response = Self::get_response_body::<Vec<BuildMetadataKey>>(response).await?;
         Ok(response)
     }

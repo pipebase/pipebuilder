@@ -20,7 +20,7 @@ pub struct BuildResponse {
     pub version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CancelRequest {
+pub struct CancelBuildRequest {
     /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
@@ -32,9 +32,9 @@ pub struct CancelRequest {
     pub build_version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CancelResponse {}
+pub struct CancelBuildResponse {}
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ScanRequest {}
+pub struct ScanBuildRequest {}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BuildMetadataKey {
     /// project namespace
@@ -48,12 +48,12 @@ pub struct BuildMetadataKey {
     pub version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ScanResponse {
+pub struct ScanBuildResponse {
     #[prost(message, repeated, tag = "1")]
     pub builds: ::prost::alloc::vec::Vec<BuildMetadataKey>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetLogRequest {
+pub struct GetBuildLogRequest {
     /// project namespace
     #[prost(string, tag = "1")]
     pub namespace: ::prost::alloc::string::String,
@@ -65,7 +65,7 @@ pub struct GetLogRequest {
     pub build_version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GetLogResponse {
+pub struct GetBuildLogResponse {
     /// log context
     #[prost(bytes = "vec", tag = "1")]
     pub buffer: ::prost::alloc::vec::Vec<u8>,
@@ -144,10 +144,10 @@ pub mod builder_client {
             let path = http::uri::PathAndQuery::from_static("/build.Builder/Build");
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn cancel(
+        pub async fn cancel_build(
             &mut self,
-            request: impl tonic::IntoRequest<super::CancelRequest>,
-        ) -> Result<tonic::Response<super::CancelResponse>, tonic::Status> {
+            request: impl tonic::IntoRequest<super::CancelBuildRequest>,
+        ) -> Result<tonic::Response<super::CancelBuildResponse>, tonic::Status> {
             self.inner.ready().await.map_err(|e| {
                 tonic::Status::new(
                     tonic::Code::Unknown,
@@ -155,13 +155,13 @@ pub mod builder_client {
                 )
             })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/build.Builder/Cancel");
+            let path = http::uri::PathAndQuery::from_static("/build.Builder/CancelBuild");
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn get_log(
+        pub async fn get_build_log(
             &mut self,
-            request: impl tonic::IntoRequest<super::GetLogRequest>,
-        ) -> Result<tonic::Response<super::GetLogResponse>, tonic::Status> {
+            request: impl tonic::IntoRequest<super::GetBuildLogRequest>,
+        ) -> Result<tonic::Response<super::GetBuildLogResponse>, tonic::Status> {
             self.inner.ready().await.map_err(|e| {
                 tonic::Status::new(
                     tonic::Code::Unknown,
@@ -169,13 +169,13 @@ pub mod builder_client {
                 )
             })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/build.Builder/GetLog");
+            let path = http::uri::PathAndQuery::from_static("/build.Builder/GetBuildLog");
             self.inner.unary(request.into_request(), path, codec).await
         }
-        pub async fn scan(
+        pub async fn scan_build(
             &mut self,
-            request: impl tonic::IntoRequest<super::ScanRequest>,
-        ) -> Result<tonic::Response<super::ScanResponse>, tonic::Status> {
+            request: impl tonic::IntoRequest<super::ScanBuildRequest>,
+        ) -> Result<tonic::Response<super::ScanBuildResponse>, tonic::Status> {
             self.inner.ready().await.map_err(|e| {
                 tonic::Status::new(
                     tonic::Code::Unknown,
@@ -183,7 +183,7 @@ pub mod builder_client {
                 )
             })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/build.Builder/Scan");
+            let path = http::uri::PathAndQuery::from_static("/build.Builder/ScanBuild");
             self.inner.unary(request.into_request(), path, codec).await
         }
     }
@@ -199,18 +199,18 @@ pub mod builder_server {
             &self,
             request: tonic::Request<super::BuildRequest>,
         ) -> Result<tonic::Response<super::BuildResponse>, tonic::Status>;
-        async fn cancel(
+        async fn cancel_build(
             &self,
-            request: tonic::Request<super::CancelRequest>,
-        ) -> Result<tonic::Response<super::CancelResponse>, tonic::Status>;
-        async fn get_log(
+            request: tonic::Request<super::CancelBuildRequest>,
+        ) -> Result<tonic::Response<super::CancelBuildResponse>, tonic::Status>;
+        async fn get_build_log(
             &self,
-            request: tonic::Request<super::GetLogRequest>,
-        ) -> Result<tonic::Response<super::GetLogResponse>, tonic::Status>;
-        async fn scan(
+            request: tonic::Request<super::GetBuildLogRequest>,
+        ) -> Result<tonic::Response<super::GetBuildLogResponse>, tonic::Status>;
+        async fn scan_build(
             &self,
-            request: tonic::Request<super::ScanRequest>,
-        ) -> Result<tonic::Response<super::ScanResponse>, tonic::Status>;
+            request: tonic::Request<super::ScanBuildRequest>,
+        ) -> Result<tonic::Response<super::ScanBuildResponse>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct BuilderServer<T: Builder> {
@@ -282,18 +282,18 @@ pub mod builder_server {
                     };
                     Box::pin(fut)
                 }
-                "/build.Builder/Cancel" => {
+                "/build.Builder/CancelBuild" => {
                     #[allow(non_camel_case_types)]
-                    struct CancelSvc<T: Builder>(pub Arc<T>);
-                    impl<T: Builder> tonic::server::UnaryService<super::CancelRequest> for CancelSvc<T> {
-                        type Response = super::CancelResponse;
+                    struct CancelBuildSvc<T: Builder>(pub Arc<T>);
+                    impl<T: Builder> tonic::server::UnaryService<super::CancelBuildRequest> for CancelBuildSvc<T> {
+                        type Response = super::CancelBuildResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::CancelRequest>,
+                            request: tonic::Request<super::CancelBuildRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).cancel(request).await };
+                            let fut = async move { (*inner).cancel_build(request).await };
                             Box::pin(fut)
                         }
                     }
@@ -302,7 +302,7 @@ pub mod builder_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = CancelSvc(inner);
+                        let method = CancelBuildSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
                             accept_compression_encodings,
@@ -313,18 +313,18 @@ pub mod builder_server {
                     };
                     Box::pin(fut)
                 }
-                "/build.Builder/GetLog" => {
+                "/build.Builder/GetBuildLog" => {
                     #[allow(non_camel_case_types)]
-                    struct GetLogSvc<T: Builder>(pub Arc<T>);
-                    impl<T: Builder> tonic::server::UnaryService<super::GetLogRequest> for GetLogSvc<T> {
-                        type Response = super::GetLogResponse;
+                    struct GetBuildLogSvc<T: Builder>(pub Arc<T>);
+                    impl<T: Builder> tonic::server::UnaryService<super::GetBuildLogRequest> for GetBuildLogSvc<T> {
+                        type Response = super::GetBuildLogResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::GetLogRequest>,
+                            request: tonic::Request<super::GetBuildLogRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).get_log(request).await };
+                            let fut = async move { (*inner).get_build_log(request).await };
                             Box::pin(fut)
                         }
                     }
@@ -333,7 +333,7 @@ pub mod builder_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = GetLogSvc(inner);
+                        let method = GetBuildLogSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
                             accept_compression_encodings,
@@ -344,18 +344,18 @@ pub mod builder_server {
                     };
                     Box::pin(fut)
                 }
-                "/build.Builder/Scan" => {
+                "/build.Builder/ScanBuild" => {
                     #[allow(non_camel_case_types)]
-                    struct ScanSvc<T: Builder>(pub Arc<T>);
-                    impl<T: Builder> tonic::server::UnaryService<super::ScanRequest> for ScanSvc<T> {
-                        type Response = super::ScanResponse;
+                    struct ScanBuildSvc<T: Builder>(pub Arc<T>);
+                    impl<T: Builder> tonic::server::UnaryService<super::ScanBuildRequest> for ScanBuildSvc<T> {
+                        type Response = super::ScanBuildResponse;
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::ScanRequest>,
+                            request: tonic::Request<super::ScanBuildRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).scan(request).await };
+                            let fut = async move { (*inner).scan_build(request).await };
                             Box::pin(fut)
                         }
                     }
@@ -364,7 +364,7 @@ pub mod builder_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = ScanSvc(inner);
+                        let method = ScanBuildSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
                             accept_compression_encodings,

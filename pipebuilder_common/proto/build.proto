@@ -17,7 +17,7 @@ message BuildResponse {
     uint64 version = 1;
 }
 
-message CancelRequest {
+message CancelBuildRequest {
     // project namespace
     string namespace = 1;
     // project id
@@ -26,9 +26,9 @@ message CancelRequest {
     uint64 build_version = 3;
 }
 
-message CancelResponse {}
+message CancelBuildResponse {}
 
-message ScanRequest {}
+message ScanBuildRequest {}
 
 message BuildMetadataKey {
     // project namespace
@@ -39,11 +39,11 @@ message BuildMetadataKey {
     uint64 version = 3;
 }
 
-message ScanResponse {
+message ScanBuildResponse {
     repeated BuildMetadataKey builds = 1;
 }
 
-message GetLogRequest {
+message GetBuildLogRequest {
     // project namespace
     string namespace = 1;
     // project id
@@ -52,14 +52,14 @@ message GetLogRequest {
     uint64 build_version = 3;
 }
 
-message GetLogResponse {
+message GetBuildLogResponse {
     // log context
     bytes buffer = 1;
 }
 
 service Builder {
     rpc Build(BuildRequest) returns (BuildResponse) {}
-    rpc Cancel(CancelRequest) returns (CancelResponse) {}
-    rpc GetLog(GetLogRequest) returns (GetLogResponse) {}
-    rpc Scan(ScanRequest) returns (ScanResponse) {}
+    rpc CancelBuild(CancelBuildRequest) returns (CancelBuildResponse) {}
+    rpc GetBuildLog(GetBuildLogRequest) returns (GetBuildLogResponse) {}
+    rpc ScanBuild(ScanBuildRequest) returns (ScanBuildResponse) {}
 }
