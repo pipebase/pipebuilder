@@ -335,14 +335,14 @@ impl Register {
     }
 
     pub async fn lock(&mut self, name: &str, options: Option<LockOptions>) -> Result<LockResponse> {
-        info!("acquire lock, name {} ...", name);
+        info!(lock_name = name, "acquire lock ...");
         let resp = self.client.lock(name, options).await?;
         Ok(resp)
     }
 
     pub async fn unlock(&mut self, name: &str, key: &[u8]) -> Result<()> {
         self.client.unlock(key).await?;
-        info!("released lock, name {} ...", name);
+        info!(lock_name = name, "released lock ...");
         Ok(())
     }
 
