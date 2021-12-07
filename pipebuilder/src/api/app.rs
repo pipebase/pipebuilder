@@ -26,14 +26,18 @@ async fn main() -> Result<()> {
     let internal_address = node_svc.get_internal_address();
     let addr: SocketAddr = internal_address.parse()?;
     info!(
-        "run api server {:?}, internal address {:?}...",
-        node_id, internal_address
+        node_id = node_id.as_str(),
+        internal_address = internal_address.as_str(),
+        "run api server ..."
     );
     let api = bootstrap(config.api, register, lease_id, node_svc).await?;
     let (_, server) = warp::serve(api).bind_with_graceful_shutdown(addr, async move {
         match shutdown_rx.await {
-            Ok(_) => info!("shutdown ..."),
-            Err(_) => error!("sender(node service) drop, shutdown ..."),
+            Ok(_) => info!(node_id = node_id.as_str(), "shutdown ..."),
+            Err(_) => error!(
+                node_id = node_id.as_str(),
+                "sender(node service) drop, shutdown ..."
+            ),
         }
     });
     server.await;

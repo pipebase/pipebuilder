@@ -34,8 +34,9 @@ async fn main() -> Result<()> {
     let internal_address = node_svc.get_internal_address();
     let addr: SocketAddr = internal_address.parse()?;
     info!(
-        "run repository server {:?}, internal address {:?}...",
-        node_id, internal_address
+        node_id = node_id.as_str(),
+        internal_address = internal_address.as_str(),
+        "run repository server ..."
     );
     Server::builder()
         .add_service(HealthServer::new(health_svc))
@@ -43,6 +44,6 @@ async fn main() -> Result<()> {
         .add_service(NodeServer::new(node_svc))
         .serve_with_shutdown(addr, shutdown_rx.map(drop))
         .await?;
-    info!("repository server {:?} exit ...", node_id);
+    info!(node_id = node_id.as_str(), "repository server exit ...");
     Ok(())
 }

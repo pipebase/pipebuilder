@@ -52,7 +52,12 @@ impl Repository for RepositoryService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        info!("get manifest {}/{}/{}", namespace, id, version);
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            manifest_version = version,
+            "get manifest"
+        );
         let repository = self.manifest_repository.as_str();
         let buffer = match read_target_from_repo(
             repository,
@@ -66,8 +71,11 @@ impl Repository for RepositoryService {
             Ok(buffer) => buffer,
             Err(err) => {
                 error!(
-                    "read manifest {}/{}/{} fail, error '{}'",
-                    namespace, id, version, err
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    manifest_version = version,
+                    "read manifest fail, error '{:#?}'",
+                    err
                 );
                 return Err(rpc_not_found("manifest not found"));
             }
@@ -82,7 +90,13 @@ impl Repository for RepositoryService {
         {
             Ok(_) => Ok(Response::new(GetManifestResponse { buffer })),
             Err(err) => {
-                error!("update manifest metadata fail, error '{}'", err);
+                error!(
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    manifest_version = version,
+                    "update manifest metadata fail, error '{:#?}'",
+                    err
+                );
                 Err(rpc_internal_error(err))
             }
         }
@@ -98,7 +112,11 @@ impl Repository for RepositoryService {
         let request = request.into_inner();
         let namespace = request.namespace;
         let id = request.id;
-        info!("get manifest {}/{}", namespace, id);
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            "get manifest"
+        );
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         let version = match register
@@ -107,7 +125,12 @@ impl Repository for RepositoryService {
         {
             Ok((_, snapshot)) => snapshot.latest_version,
             Err(err) => {
-                error!("increase manifest snapshot version fail, error '{}'", err);
+                error!(
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    "increase manifest snapshot version fail, error '{:#?}'",
+                    err
+                );
                 return Err(rpc_internal_error(err));
             }
         };
@@ -125,7 +148,13 @@ impl Repository for RepositoryService {
         {
             Ok(_) => (),
             Err(err) => {
-                error!("write manifest fail, error '{}'", err);
+                error!(
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    manifest_version = version,
+                    "write manifest fail, error '{:#?}'",
+                    err
+                );
                 return Err(rpc_internal_error(err));
             }
         };
@@ -137,7 +166,13 @@ impl Repository for RepositoryService {
         {
             Ok(_) => Ok(Response::new(PutManifestResponse { version })),
             Err(err) => {
-                error!("update manifest metadata fail, error '{}'", err);
+                error!(
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    manifest_version = version,
+                    "update manifest metadata fail, error '{:#?}'",
+                    err
+                );
                 Err(rpc_internal_error(err))
             }
         }
@@ -154,14 +189,22 @@ impl Repository for RepositoryService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        info!("delete manifest '{}/{}/{}'", namespace, id, version);
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            manifest_version = version,
+            "delete manifest"
+        );
         let repository = self.manifest_repository.as_str();
         match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
             Ok(_) => (),
             Err(err) => {
                 error!(
-                    "delete manifest '{}/{}/{}' fail, error: '{:#?}'",
-                    namespace, id, version, err
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    manifest_version = version,
+                    "delete manifest fail, error: '{:#?}'",
+                    err
                 );
                 // return error ?
             }
@@ -174,8 +217,11 @@ impl Repository for RepositoryService {
             Ok(_) => (),
             Err(err) => {
                 error!(
-                    "delete manifest metadata '{}/{}/{}' fail, error: '{:#?}'",
-                    namespace, id, version, err
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    manifest_version = version,
+                    "delete manifest metadata fail, error: '{:#?}'",
+                    err
                 )
                 // return error ?
             }
@@ -192,7 +238,12 @@ impl Repository for RepositoryService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        info!("get app '{}/{}/{}'", namespace, id, version);
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            build_version = version,
+            "get app"
+        );
         let repository = self.app_repository.as_str();
         let buffer = match read_target_from_repo(
             repository,
@@ -206,8 +257,11 @@ impl Repository for RepositoryService {
             Ok(buffer) => buffer,
             Err(err) => {
                 error!(
-                    "read app '{}/{}/{}' fail, error '{}'",
-                    namespace, id, version, err
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    build_version = version,
+                    "read app fail, error '{:#?}'",
+                    err
                 );
                 return Err(rpc_not_found("app not found"));
             }
@@ -222,7 +276,13 @@ impl Repository for RepositoryService {
         {
             Ok(_) => Ok(Response::new(GetAppResponse { buffer })),
             Err(err) => {
-                error!("update app metadata fail, error '{}'", err);
+                error!(
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    build_version = version,
+                    "update app metadata fail, error '{}'",
+                    err
+                );
                 Err(rpc_internal_error(err))
             }
         }
@@ -237,7 +297,12 @@ impl Repository for RepositoryService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        info!("post app '{}/{}/{}'", namespace, id, version);
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            build_version = version,
+            "post app"
+        );
         let buffer = request.buffer.as_slice();
         let repository = self.app_repository.as_str();
         match write_target_into_repo(
@@ -252,7 +317,13 @@ impl Repository for RepositoryService {
         {
             Ok(_) => (),
             Err(err) => {
-                error!("post app fail, error '{}'", err);
+                error!(
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    build_version = version,
+                    "post app fail, error '{:#?}'",
+                    err
+                );
                 return Err(rpc_internal_error(err));
             }
         };
@@ -266,7 +337,13 @@ impl Repository for RepositoryService {
         {
             Ok(_) => Ok(Response::new(PostAppResponse {})),
             Err(err) => {
-                error!("update app metadata fail, error '{}'", err);
+                error!(
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    build_version = version,
+                    "update app metadata fail, error '{:#?}'",
+                    err
+                );
                 Err(rpc_internal_error(err))
             }
         }
@@ -283,14 +360,22 @@ impl Repository for RepositoryService {
         let namespace = request.namespace;
         let id = request.id;
         let version = request.version;
-        info!("delete app '{}/{}/{}'", namespace, id, version);
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            build_version = version,
+            "delete app"
+        );
         let repository = self.app_repository.as_str();
         match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
             Ok(_) => (),
             Err(err) => {
                 error!(
-                    "delete app '{}/{}/{}' fail, error: '{:#?}'",
-                    namespace, id, version, err
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    build_version = version,
+                    "delete app fail, error: '{:#?}'",
+                    err
                 );
                 // return error ?
             }
@@ -303,8 +388,11 @@ impl Repository for RepositoryService {
             Ok(_) => (),
             Err(err) => {
                 error!(
-                    "delete app metadata '{}/{}/{}' fail, error: '{:#?}'",
-                    namespace, id, version, err
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    build_version = version,
+                    "delete app metadata fail, error: '{:#?}'",
+                    err
                 )
                 // return error ?
             }

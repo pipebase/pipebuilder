@@ -266,7 +266,7 @@ impl Register {
         let (mut keeper, mut stream) = self.client.lease_keep_alive(id).await?;
         keeper.keep_alive().await?;
         if let Some(resp) = stream.message().await? {
-            info!("lease {:?} keep alive, new ttl {:?}", resp.id(), resp.ttl());
+            info!(lease_id = resp.id(), ttl = resp.ttl(), "lease keep alive");
         }
         Ok(())
     }

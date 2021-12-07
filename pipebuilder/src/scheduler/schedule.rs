@@ -22,11 +22,17 @@ impl Scheduler for SchedulerService {
         request: tonic::Request<pipebuilder_common::grpc::schedule::ScheduleRequest>,
     ) -> Result<tonic::Response<pipebuilder_common::grpc::schedule::ScheduleResponse>, tonic::Status>
     {
-        info!("schedule build");
         // select builder using consistent hash, build of same app (namespace, id) landed on same builder for compilcation cache hit
         let request = request.into_inner();
-        let request_key = format!("{}/{}", request.namespace, request.id);
-        let request_target_platform = request.target_platform;
+        let namespace = request.namespace;
+        let id = request.id;
+        let target_platform = request.target_platform;
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            "schedule build"
+        );
+        let request_key = format!("{}/{}", namespace, id);
         let builders_ref = self.builders.pin();
         let mut selected_builder_info: Option<BuilderInfo> = None;
         let mut min_hash_distance: u64 = u64::MAX;
@@ -34,7 +40,7 @@ impl Scheduler for SchedulerService {
             if !builder.is_active() {
                 continue;
             }
-            if let Some(ref target_platform) = request_target_platform {
+            if let Some(ref target_platform) = target_platform {
                 if !builder.accept_target_platform(target_platform) {
                     continue;
                 }

@@ -315,7 +315,11 @@ impl NodeService {
                 }
             }
             // shutdown server either we received ctrl signal or patch node state failed
-            info!("{} {} shutdown ...", role.to_string(), id);
+            info!(
+                role = role.to_string().as_str(),
+                id = id.as_str(),
+                "shutdown ..."
+            );
             shutdown_tx.send(()).unwrap();
         });
     }
