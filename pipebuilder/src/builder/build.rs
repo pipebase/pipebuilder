@@ -225,12 +225,14 @@ fn start_build(
             match update(&mut register, lease_id, &build, status.clone(), None).await {
                 Ok(()) => (),
                 Err(err) => {
-                    let (namespace, id, manifest_version, build_version) = build.get_build_meta();
+                    let (namespace, id, manifest_version, build_version, target_platform) =
+                        build.get_build_meta();
                     error!(
                         namespace = namespace.as_str(),
                         id = id.as_str(),
                         manifest_version = manifest_version,
                         build_version = build_version,
+                        target_platform = target_platform.as_str(),
                         "update build status fail, error: '{:#?}'",
                         err
                     );
@@ -242,12 +244,14 @@ fn start_build(
             let next_status = match result {
                 Ok(next_status) => next_status,
                 Err(err) => {
-                    let (namespace, id, manifest_version, build_version) = build.get_build_meta();
+                    let (namespace, id, manifest_version, build_version, target_platform) =
+                        build.get_build_meta();
                     error!(
                         namespace = namespace.as_str(),
                         id = id.as_str(),
                         manifest_version = manifest_version,
                         build_version = build_version,
+                        target_platform = target_platform.as_str(),
                         "run build fail, status: '{}', error: '{:#?}'",
                         status.to_string(),
                         err
@@ -285,9 +289,8 @@ async fn update(
     status: BuildStatus,
     message: Option<String>,
 ) -> pipebuilder_common::Result<()> {
-    let (namespace, id, _, build_version) = build.get_build_meta();
+    let (namespace, id, _, build_version, target_platform) = build.get_build_meta();
     let (builder_id, builder_address) = build.get_builder_meta();
-    let target_platform = build.get_target_platform();
     let now = Utc::now();
     let version_build = BuildMetadata::new(
         target_platform.to_owned(),

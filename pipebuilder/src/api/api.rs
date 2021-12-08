@@ -780,7 +780,7 @@ mod handlers {
         match response {
             Some(response) => Ok(ok(&response)),
             None => Ok(http_not_found(Failure::new(String::from(
-                "version build not found",
+                "build metadata not found",
             )))),
         }
     }
