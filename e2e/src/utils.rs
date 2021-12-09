@@ -4,11 +4,12 @@ use pipebuilder_common::{
     api::{
         client::{ApiClient, ApiClientConfig},
         models::{
-            BuildMetadata, BuildRequest, BuildResponse, GetBuildRequest,
-            ListManifestMetadataRequest, ListNamespaceRequest, ListNodeStateRequest,
-            ListProjectRequest, ManifestMetadata, Namespace, NodeState, PostManifestRequest,
-            PostManifestResponse, Project, ShutdownNodeRequest, ShutdownRequest,
-            UpdateNamespaceRequest, UpdateProjectRequest,
+            BuildCacheMetadata, BuildMetadata, BuildRequest, BuildResponse,
+            DeleteBuildCacheRequest, GetBuildRequest, ListManifestMetadataRequest,
+            ListNamespaceRequest, ListNodeStateRequest, ListProjectRequest, ManifestMetadata,
+            Namespace, NodeState, PostManifestRequest, PostManifestResponse, Project,
+            ScanBuildCacheRequest, ShutdownNodeRequest, ShutdownRequest, UpdateNamespaceRequest,
+            UpdateProjectRequest,
         },
     },
     open_file, parse_config, NodeRole, Result,
@@ -152,6 +153,30 @@ pub async fn get_build_metadata(
         version,
     };
     client.get_build_metadata(&request).await
+}
+
+pub async fn scan_build_cache_metadata(
+    client: &ApiClient,
+    builder_id: String,
+) -> Result<Vec<BuildCacheMetadata>> {
+    let request = ScanBuildCacheRequest { builder_id };
+    client.scan_build_cache(&request).await
+}
+
+pub async fn delete_build_cache(
+    client: &ApiClient,
+    builder_id: String,
+    namespace: String,
+    id: String,
+    target_platform: String,
+) -> Result<()> {
+    let request = DeleteBuildCacheRequest {
+        builder_id,
+        namespace,
+        id,
+        target_platform,
+    };
+    client.delete_build_cache(&request).await
 }
 
 pub async fn wait(millis: u64) {

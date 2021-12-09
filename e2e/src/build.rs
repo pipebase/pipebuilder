@@ -3,8 +3,9 @@
 mod tests {
 
     use crate::utils::{
-        build, build_api_client, create_namespace, create_project, get_build_metadata,
-        list_manifest_metadata, list_namespace, list_project, push_manifest, wait,
+        build, build_api_client, create_namespace, create_project, delete_build_cache,
+        get_build_metadata, list_manifest_metadata, list_namespace, list_project, push_manifest,
+        scan_build_cache_metadata, wait,
     };
     use pipebuilder_common::{read_file, BuildStatus};
 
@@ -13,6 +14,8 @@ mod tests {
     const TEST_BUILD_COUNT: u64 = 3;
     const TEST_BUILD_WAIT_MILLIS: u64 = 30000;
     const TEST_BUILD_WAIT_RETRY: u64 = 3;
+    const TEST_BUILDER_ID: &str = "builder0";
+    const TEST_TARGET_PLATFORM: &str = "x86_64-unknown-linux-gnu";
 
     #[tokio::test]
     async fn test_build() {
@@ -62,7 +65,11 @@ mod tests {
         let actual_manifest_metadata = manifest_metadatas.get(0).unwrap();
         assert_eq!(String::from(TEST_PROJECT), actual_manifest_metadata.id);
         assert_eq!(0, actual_manifest_metadata.version);
-
+        // no build cache
+        let build_caches = scan_build_cache_metadata(&client, String::from(TEST_BUILDER_ID))
+            .await
+            .unwrap();
+        assert!(build_caches.is_empty());
         for i in 0..TEST_BUILD_COUNT {
             // build
             let build_response = build(
@@ -108,6 +115,25 @@ mod tests {
             .unwrap();
             let status = build_metadata.status;
             assert!(matches!(status, BuildStatus::Succeed));
+            // build cache hit
+            let build_caches = scan_build_cache_metadata(&client, String::from(TEST_BUILDER_ID))
+                .await
+                .unwrap();
+            assert_eq!(1, build_caches.len());
         }
+        // cleanup build cache
+        delete_build_cache(
+            &client,
+            String::from(TEST_BUILDER_ID),
+            String::from(TEST_NAMESPACE),
+            String::from(TEST_PROJECT),
+            String::from(TEST_TARGET_PLATFORM),
+        )
+        .await
+        .unwrap();
+        let build_caches = scan_build_cache_metadata(&client, String::from(TEST_BUILDER_ID))
+            .await
+            .unwrap();
+        assert!(build_caches.is_empty());
     }
 }
