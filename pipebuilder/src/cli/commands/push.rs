@@ -19,17 +19,17 @@ pub fn manifest() -> Cmd {
         .args(vec![
             Arg::new("namespace")
                 .short('n')
-                .about("Specify namespace")
+                .help("Specify namespace")
                 .required(true)
                 .takes_value(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify project id")
+                .help("Specify project id")
                 .required(true)
                 .takes_value(true),
             Arg::new("file")
                 .short('f')
-                .about("Specify app manifest file path")
+                .help("Specify app manifest file path")
                 .required(true)
                 .takes_value(true),
         ])

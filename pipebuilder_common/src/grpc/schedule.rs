@@ -49,7 +49,7 @@ pub mod scheduler_client {
     impl<T> SchedulerClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
-        T::ResponseBody: Body + Send + Sync + 'static,
+        T::ResponseBody: Body + Send + 'static,
         T::Error: Into<StdError>,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
@@ -142,7 +142,7 @@ pub mod scheduler_server {
     impl<T, B> tonic::codegen::Service<http::Request<B>> for SchedulerServer<T>
     where
         T: Scheduler,
-        B: Body + Send + Sync + 'static,
+        B: Body + Send + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;

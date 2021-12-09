@@ -30,6 +30,7 @@ pub async fn bootstrap(
     let workspace = config.workspace;
     let restore_directory = config.restore_directory;
     let log_directory = config.log_directory;
+    // TODO: cleanup workspace, restore directory and log directory
     let build_context = LocalBuildContext::new(
         node_id,
         external_address,

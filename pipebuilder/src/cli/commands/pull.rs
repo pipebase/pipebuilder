@@ -20,17 +20,17 @@ pub fn manifest() -> Cmd {
         .args(vec![
             Arg::new("namespace")
                 .short('n')
-                .about("Specify namespace")
+                .help("Specify namespace")
                 .required(true)
                 .takes_value(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify project id")
+                .help("Specify project id")
                 .required(true)
                 .takes_value(true),
             Arg::new("version")
                 .short('v')
-                .about("Specify app manifest version")
+                .help("Specify app manifest version")
                 .required(true)
                 .takes_value(true),
         ])
@@ -60,22 +60,22 @@ pub fn app() -> Cmd {
         .args(vec![
             Arg::new("namespace")
                 .short('n')
-                .about("Specify namespace")
+                .help("Specify namespace")
                 .takes_value(true)
                 .required(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify project id")
+                .help("Specify project id")
                 .takes_value(true)
                 .required(true),
             Arg::new("version")
                 .short('v')
-                .about("Specify app build version")
+                .help("Specify app build version")
                 .takes_value(true)
                 .required(true),
             Arg::new("path")
                 .short('p')
-                .about("Specify app download path")
+                .help("Specify app download path")
                 .takes_value(true),
         ])
 }
@@ -101,17 +101,17 @@ pub fn build_log() -> Cmd {
         .args(vec![
             Arg::new("namespace")
                 .short('n')
-                .about("Specify namespace")
+                .help("Specify namespace")
                 .takes_value(true)
                 .required(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify project id")
+                .help("Specify project id")
                 .takes_value(true)
                 .required(true),
             Arg::new("version")
                 .short('v')
-                .about("Specify app build version")
+                .help("Specify app build version")
                 .takes_value(true)
                 .required(true),
         ])

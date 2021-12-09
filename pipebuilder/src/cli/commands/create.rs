@@ -21,22 +21,22 @@ pub fn build() -> Cmd {
         .args(vec![
             Arg::new("namespace")
                 .short('n')
-                .about("Specify namespace")
+                .help("Specify namespace")
                 .required(true)
                 .takes_value(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify project id")
+                .help("Specify project id")
                 .required(true)
                 .takes_value(true),
             Arg::new("version")
                 .short('v')
-                .about("Specify manifest version")
+                .help("Specify manifest version")
                 .required(true)
                 .takes_value(true),
             Arg::new("target-platform")
                 .short('t')
-                .about("Specify target platform, checkout https://doc.rust-lang.org/nightly/rustc/platform-support.html")
+                .help("Specify target platform, checkout https://doc.rust-lang.org/nightly/rustc/platform-support.html")
                 .takes_value(true),
         ])
 }
@@ -67,7 +67,7 @@ pub fn namespace() -> Cmd {
         .about("Create namespace given namespace id")
         .args(vec![Arg::new("id")
             .short('i')
-            .about("Specify namespace id")
+            .help("Specify namespace id")
             .required(true)
             .takes_value(true)])
 }
@@ -86,12 +86,12 @@ pub fn project() -> Cmd {
         .args(vec![
             Arg::new("namespace")
                 .short('n')
-                .about("Specify namespace")
+                .help("Specify namespace")
                 .required(true)
                 .takes_value(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify project id")
+                .help("Specify project id")
                 .required(true)
                 .takes_value(true),
         ])

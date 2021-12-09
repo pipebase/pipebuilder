@@ -7,6 +7,7 @@ use crate::{
         DISPLAY_VERSION_WIDTH,
     },
     grpc::{build, node, repository},
+    utils::prost_timestamp_to_datetime_utc,
     BuildStatus, Error, NodeArch, NodeOS, NodeRole, NodeState as InternalNodeState, NodeStatus,
 };
 use chrono::{DateTime, Utc};
@@ -386,8 +387,8 @@ impl PrintHeader for NodeState {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ScanBuilderRequest {
-    pub id: String,
+pub struct ScanBuildRequest {
+    pub builder_id: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -425,6 +426,63 @@ impl PrintHeader for BuildMetadataKey {
         )
     }
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct ScanBuildCacheRequest {
+    pub builder_id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BuildCacheMetadata {
+    pub namespace: String,
+    pub id: String,
+    pub target_platform: String,
+    pub timestamp: DateTime<Utc>,
+}
+
+impl Display for BuildCacheMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{namespace:<namespace_width$}{id:<id_width$}{target_platform:<target_platform_width$}{timestamp:<timestamp_width$}",
+            namespace = self.namespace,
+            id = self.id,
+            target_platform = self.target_platform,
+            timestamp = self.timestamp,
+            namespace_width = DISPLAY_NAMESPACE_WIDTH,
+            id_width = DISPLAY_ID_WIDTH,
+            target_platform_width = DISPLAY_BUILD_TARGET_PLATFORM_WIDTH,
+            timestamp_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for BuildCacheMetadata {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}",
+            col0 = "Namespace",
+            col1 = "Id",
+            col2 = "Target Platform",
+            col3 = "Timestamp",
+            col0_width = DISPLAY_NAMESPACE_WIDTH,
+            col1_width = DISPLAY_ID_WIDTH,
+            col2_width = DISPLAY_BUILD_TARGET_PLATFORM_WIDTH,
+            col3_width = DISPLAY_TIMESTAMP_WIDTH
+        )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteBuildCacheRequest {
+    pub builder_id: String,
+    pub namespace: String,
+    pub id: String,
+    pub target_platform: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteBuildCacheResponse {}
 
 #[derive(Serialize, Deserialize)]
 pub struct ActivateNodeRequest {
@@ -707,12 +765,12 @@ impl From<build::BuildResponse> for BuildResponse {
     }
 }
 
-impl From<CancelBuildRequest> for build::CancelRequest {
+impl From<CancelBuildRequest> for build::CancelBuildRequest {
     fn from(origin: CancelBuildRequest) -> Self {
         let namespace = origin.namespace;
         let id = origin.id;
         let version = origin.version;
-        build::CancelRequest {
+        build::CancelBuildRequest {
             namespace,
             id,
             build_version: version,
@@ -720,8 +778,8 @@ impl From<CancelBuildRequest> for build::CancelRequest {
     }
 }
 
-impl From<build::CancelResponse> for CancelBuildResponse {
-    fn from(_origin: build::CancelResponse) -> Self {
+impl From<build::CancelBuildResponse> for CancelBuildResponse {
+    fn from(_origin: build::CancelBuildResponse) -> Self {
         CancelBuildResponse {}
     }
 }
@@ -786,12 +844,12 @@ impl From<repository::GetAppResponse> for GetAppResponse {
     }
 }
 
-impl From<GetBuildLogRequest> for build::GetLogRequest {
+impl From<GetBuildLogRequest> for build::GetBuildLogRequest {
     fn from(origin: GetBuildLogRequest) -> Self {
         let namespace = origin.namespace;
         let id = origin.id;
         let build_version = origin.version;
-        build::GetLogRequest {
+        build::GetBuildLogRequest {
             namespace,
             id,
             build_version,
@@ -799,8 +857,8 @@ impl From<GetBuildLogRequest> for build::GetLogRequest {
     }
 }
 
-impl From<build::GetLogResponse> for GetBuildLogResponse {
-    fn from(origin: build::GetLogResponse) -> Self {
+impl From<build::GetBuildLogResponse> for GetBuildLogResponse {
+    fn from(origin: build::GetBuildLogResponse) -> Self {
         let buffer = origin.buffer;
         GetBuildLogResponse { buffer }
     }
@@ -838,9 +896,49 @@ impl From<build::BuildMetadataKey> for BuildMetadataKey {
     }
 }
 
-impl From<ScanBuilderRequest> for build::ScanRequest {
-    fn from(_: ScanBuilderRequest) -> Self {
-        build::ScanRequest {}
+impl From<ScanBuildRequest> for build::ScanBuildRequest {
+    fn from(_: ScanBuildRequest) -> Self {
+        build::ScanBuildRequest {}
+    }
+}
+
+impl From<build::BuildCacheMetadata> for BuildCacheMetadata {
+    fn from(origin: build::BuildCacheMetadata) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let target_platform = origin.target_platform;
+        let timestamp = match origin.timestamp {
+            Some(timestamp) => prost_timestamp_to_datetime_utc(timestamp),
+            None => Utc::now(),
+        };
+        BuildCacheMetadata {
+            namespace,
+            id,
+            target_platform,
+            timestamp,
+        }
+    }
+}
+
+impl From<ScanBuildCacheRequest> for build::ScanBuildCacheRequest {
+    fn from(_: ScanBuildCacheRequest) -> Self {
+        build::ScanBuildCacheRequest {}
+    }
+}
+
+impl From<DeleteBuildCacheRequest> for build::DeleteBuildCacheRequest {
+    fn from(origin: DeleteBuildCacheRequest) -> Self {
+        build::DeleteBuildCacheRequest {
+            namespace: origin.namespace,
+            id: origin.id,
+            target_platform: origin.target_platform,
+        }
+    }
+}
+
+impl From<build::DeleteBuildCacheResponse> for DeleteBuildCacheResponse {
+    fn from(_: build::DeleteBuildCacheResponse) -> Self {
+        DeleteBuildCacheResponse {}
     }
 }
 

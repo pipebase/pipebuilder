@@ -4,9 +4,9 @@ use pipebuilder_common::{
         client::ApiClient,
         models::{
             BuildMetadata, BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest,
-            CancelBuildResponse, DeleteBuildRequest, DeleteBuildSnapshotRequest,
-            GetBuildLogRequest, GetBuildLogResponse, GetBuildRequest, ListBuildRequest,
-            ListBuildSnapshotRequest,
+            CancelBuildResponse, DeleteBuildCacheRequest, DeleteBuildRequest,
+            DeleteBuildSnapshotRequest, GetBuildLogRequest, GetBuildLogResponse, GetBuildRequest,
+            ListBuildRequest, ListBuildSnapshotRequest,
         },
     },
     Result,
@@ -129,4 +129,20 @@ pub(crate) async fn delete_build_all(
     printer.status("Deleting", format!("build snapshot '{}/{}'", namespace, id))?;
     delete_build_snapshot(client, namespace.clone(), id.clone()).await?;
     Ok(())
+}
+
+pub(crate) async fn delete_build_cache(
+    client: &ApiClient,
+    builder_id: String,
+    namespace: String,
+    id: String,
+    target_platform: String,
+) -> Result<()> {
+    let request = DeleteBuildCacheRequest {
+        builder_id,
+        namespace,
+        id,
+        target_platform,
+    };
+    client.delete_build_cache(&request).await
 }

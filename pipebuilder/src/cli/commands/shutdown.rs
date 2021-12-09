@@ -15,7 +15,7 @@ pub fn builder() -> Cmd {
         .about("Shutdown builder given node id")
         .args(vec![Arg::new("id")
             .short('i')
-            .about("Specify builder id")
+            .help("Specify builder id")
             .takes_value(true)
             .required(true)])
 }
@@ -31,7 +31,7 @@ pub fn scheduler() -> Cmd {
         .about("Shutdown scheduler given node id")
         .args(vec![Arg::new("id")
             .short('i')
-            .about("Specify scheduler id")
+            .help("Specify scheduler id")
             .takes_value(true)
             .required(true)])
 }
@@ -47,7 +47,7 @@ pub fn repository() -> Cmd {
         .about("Shutdown repository given node id")
         .args(vec![Arg::new("id")
             .short('i')
-            .about("Specify repository id")
+            .help("Specify repository id")
             .takes_value(true)
             .required(true)])
 }

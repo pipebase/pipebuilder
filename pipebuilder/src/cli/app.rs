@@ -24,7 +24,7 @@ async fn run() -> Result<()> {
         .args(vec![clap::Arg::new("config")
             .short('c')
             .takes_value(true)
-            .about("path to config file, default ~/.pb/config")])
+            .help("path to config file, default ~/.pb/config")])
         .subcommands(commands::cmds())
         .get_matches();
     let config_path = matches.value_of("config");

@@ -29,16 +29,16 @@ pub fn build() -> Cmd {
         .args(vec![
             Arg::new("namespace")
                 .short('n')
-                .about("Specify namespace")
+                .help("Specify namespace")
                 .required(true)
                 .takes_value(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify project id")
+                .help("Specify project id")
                 .takes_value(true),
             Arg::new("snapshot")
                 .short('s')
-                .about("Specify build snapshot per project id returned"),
+                .help("Specify build snapshot per project id returned"),
         ])
 }
 
@@ -70,7 +70,7 @@ pub fn node() -> Cmd {
         .about("List node given role")
         .args(vec![Arg::new("role")
             .short('r')
-            .about("Specify node role")
+            .help("Specify node role")
             .takes_value(true)])
 }
 
@@ -86,12 +86,12 @@ pub fn app() -> Cmd {
     Cmd::new("app").about("List app metadata").args(vec![
         Arg::new("namespace")
             .short('n')
-            .about("Specify namespace")
+            .help("Specify namespace")
             .required(true)
             .takes_value(true),
         Arg::new("id")
             .short('i')
-            .about("Specify project id")
+            .help("Specify project id")
             .takes_value(true),
     ])
 }
@@ -111,16 +111,16 @@ pub fn manifest() -> Cmd {
         .args(vec![
             Arg::new("namespace")
                 .short('n')
-                .about("Specify namespace")
+                .help("Specify namespace")
                 .required(true)
                 .takes_value(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify project id")
+                .help("Specify project id")
                 .takes_value(true),
             Arg::new("snapshot")
                 .short('s')
-                .about("Specify manifest snapshot per project id returned"),
+                .help("Specify manifest snapshot per project id returned"),
         ])
 }
 
@@ -163,7 +163,7 @@ pub fn project() -> Cmd {
         .about("list project given namespace id")
         .args(vec![Arg::new("namespace")
             .short('n')
-            .about("Specify namespace id")
+            .help("Specify namespace id")
             .required(true)
             .takes_value(true)])
 }

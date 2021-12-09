@@ -107,6 +107,28 @@ impl BuildMetadata {
     }
 }
 
+pub struct BuildCacheMetadata {
+    pub timestamp: DateTime<Utc>,
+}
+
+impl BuildCacheMetadata {
+    pub fn new() -> Self {
+        BuildCacheMetadata {
+            timestamp: Utc::now(),
+        }
+    }
+
+    pub fn get_timestamp(&self) -> DateTime<Utc> {
+        self.timestamp.to_owned()
+    }
+}
+
+impl Default for BuildCacheMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Latest build state per manifest id
 #[derive(Default, Deserialize, Serialize)]
 pub struct BuildSnapshot {
@@ -214,16 +236,19 @@ impl Build {
         &self.build_context.restore_directory
     }
 
-    pub fn get_build_meta(&self) -> (&String, &String, u64, u64) {
+    pub fn get_build_meta(&self) -> (&String, &String, u64, u64, &String) {
         let namespace = &self.namespace;
         let id = &self.id;
         let manifest_version = self.manifest_version;
         let build_version = self.build_version;
-        (namespace, id, manifest_version, build_version)
-    }
-
-    pub fn get_target_platform(&self) -> &String {
-        &self.target_platform
+        let target_platform = &self.target_platform;
+        (
+            namespace,
+            id,
+            manifest_version,
+            build_version,
+            target_platform,
+        )
     }
 
     pub fn get_build_key_tuple(&self) -> (String, String, u64) {
@@ -231,6 +256,14 @@ impl Build {
             self.namespace.to_owned(),
             self.id.to_owned(),
             self.build_version,
+        )
+    }
+
+    pub fn get_build_cache_key_tuple(&self) -> (String, String, String) {
+        (
+            self.namespace.to_owned(),
+            self.id.to_owned(),
+            self.target_platform.to_owned(),
         )
     }
 
@@ -273,12 +306,14 @@ impl Build {
     }
 
     pub async fn pull_manifest(&mut self) -> Result<Option<BuildStatus>> {
-        let (namespace, id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, id, manifest_version, build_version, target_platform) =
+            self.get_build_meta();
         info!(
             namespace = namespace.as_str(),
             id = id.as_str(),
             manifest_version = manifest_version,
             build_version = build_version,
+            target_platform = target_platform.as_str(),
             "pull manifest"
         );
         let request = self.build_get_manifest_request();
@@ -294,12 +329,14 @@ impl Build {
     }
 
     pub fn validate_manifest(&mut self) -> Result<Option<BuildStatus>> {
-        let (namespace, id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, id, manifest_version, build_version, target_platform) =
+            self.get_build_meta();
         info!(
             namespace = namespace.as_str(),
             id = id.as_str(),
             manifest_version = manifest_version,
             build_version = build_version,
+            target_platform = target_platform.as_str(),
             "validate manifest"
         );
         self.app.as_ref().expect("app not initialized").validate()?;
@@ -307,45 +344,77 @@ impl Build {
     }
 
     pub async fn create_build_workspace(&mut self) -> Result<Option<BuildStatus>> {
-        let (namespace, id, manifest_version, build_version) = self.get_build_meta();
-        info!(
-            namespace = namespace.as_str(),
-            id = id.as_str(),
-            manifest_version = manifest_version,
-            build_version = build_version,
-            "create build workspace"
-        );
+        let (namespace, id, manifest_version, build_version, target_platform) =
+            self.get_build_meta();
         let workspace = self.get_workspace().as_str();
         let restore_directory = self.get_restore_directory().as_str();
-        let namespace = self.namespace.as_str();
+        let namespace = namespace.as_str();
+        let id = id.as_str();
+        let target_platform = target_platform.as_str();
+        info!(
+            namespace = namespace,
+            id = id,
+            manifest_version = manifest_version,
+            build_version = build_version,
+            target_platform = target_platform,
+            "create build workspace"
+        );
         // try restore app build workspace
         let app_workspace = app_workspace(workspace, namespace, id, build_version);
         create_directory(app_workspace.as_str()).await?;
-        let target_platform = self.target_platform.as_str();
         let app_restore_directory =
             app_restore_directory(restore_directory, namespace, id, target_platform);
+        // create restore directory if not exists
+        create_directory(app_restore_directory.as_str()).await?;
         let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
-        if !copy_directory(app_restore_path.clone(), app_workspace.clone()).await? {
-            // cargo init
-            let app_path = sub_path(app_workspace.as_str(), PATH_APP);
-            create_directory(app_path.as_str()).await?;
-            cargo_init(app_path.as_str()).await?;
+        let app_restore_lock_path = sub_path(app_restore_directory.as_str(), PATH_APP_LOCK);
+        let mut app_restore_lock_file = open_lock_file(app_restore_lock_path.as_str())?;
+        if app_restore_lock_file.try_lock()? {
+            // try restore from compiled app
+            if copy_directory(app_restore_path.clone(), app_workspace.clone()).await? {
+                app_restore_lock_file.unlock()?;
+                info!(
+                    namespace = namespace,
+                    id = id,
+                    manifest_version = manifest_version,
+                    build_version = build_version,
+                    "restore app succeed"
+                );
+                return Ok(Some(BuildStatus::Generate));
+            }
+            app_restore_lock_file.unlock()?;
         }
+        info!(
+            namespace = namespace,
+            id = id,
+            manifest_version = manifest_version,
+            build_version = build_version,
+            "can not restore app, cargo init ..."
+        );
+        // can not restore from compiled app, cargo init app
+        // cargo init
+        let app_path = sub_path(app_workspace.as_str(), PATH_APP);
+        create_directory(app_path.as_str()).await?;
+        cargo_init(app_path.as_str()).await?;
         Ok(Some(BuildStatus::Generate))
     }
 
     pub async fn generate_app(&mut self) -> Result<Option<BuildStatus>> {
-        let (namespace, id, manifest_version, build_version) = self.get_build_meta();
-        info!(
-            namespace = namespace.as_str(),
-            id = id.as_str(),
-            manifest_version = manifest_version,
-            build_version = build_version,
-            "generate app"
-        );
+        let (namespace, id, manifest_version, build_version, target_platform) =
+            self.get_build_meta();
         // update dependency Cargo.toml
         let workspace = self.get_workspace().as_str();
-        let namespace = self.namespace.as_str();
+        let namespace = namespace.as_str();
+        let id = id.as_str();
+        let target_platform = target_platform.as_str();
+        info!(
+            namespace = namespace,
+            id = id,
+            manifest_version = manifest_version,
+            build_version = build_version,
+            target_platform = target_platform,
+            "generate app"
+        );
         let app_workspace = app_workspace(workspace, namespace, id, build_version);
         let toml_path = sub_path(app_workspace.as_str(), PATH_APP_TOML_MANIFEST);
         let mut toml_manifest: TomlManifest = parse_toml(toml_path.as_str()).await?;
@@ -366,21 +435,24 @@ impl Build {
     }
 
     pub async fn build_app(&mut self) -> Result<Option<BuildStatus>> {
-        let (namespace, id, manifest_version, build_version) = self.get_build_meta();
-        info!(
-            namespace = namespace.as_str(),
-            id = id.as_str(),
-            manifest_version = manifest_version,
-            build_version = build_version,
-            "build app"
-        );
+        let (namespace, id, manifest_version, build_version, target_platform) =
+            self.get_build_meta();
         // local build context
         let workspace = self.get_workspace().as_str();
         let log_directory = self.get_log_directory().as_str();
-        let namespace = self.namespace.as_str();
+        let namespace = namespace.as_str();
+        let id = id.as_str();
+        let target_platform = target_platform.as_str();
+        info!(
+            namespace = namespace,
+            id = id,
+            manifest_version = manifest_version,
+            build_version = build_version,
+            target_platform = target_platform,
+            "build app"
+        );
         // cargo build and stream log to file
         let app_workspace = app_workspace(workspace, namespace, id, build_version);
-        let target_platform = self.target_platform.as_str();
         let cargo_workdir = sub_path(app_workspace.as_str(), PATH_APP);
         // prepare log directory
         let log_directory = app_build_log_directory(log_directory, namespace, id, build_version);
@@ -392,20 +464,23 @@ impl Build {
 
     // publish app binary
     pub async fn publish_app(&mut self) -> Result<Option<BuildStatus>> {
-        let (namespace, id, manifest_version, build_version) = self.get_build_meta();
-        info!(
-            namespace = namespace.as_str(),
-            id = id.as_str(),
-            manifest_version = manifest_version,
-            build_version = build_version,
-            "publish app binary"
-        );
+        let (namespace, id, manifest_version, build_version, target_platform) =
+            self.get_build_meta();
         // publish app binaries
         let workspace = self.get_workspace().as_str();
-        let namespace = self.namespace.as_str();
+        let namespace = namespace.as_str();
+        let id = id.as_str();
+        let target_platform = target_platform.as_str();
+        info!(
+            namespace = namespace,
+            id = id,
+            manifest_version = manifest_version,
+            build_version = build_version,
+            target_platform = target_platform,
+            "publish app binary"
+        );
         let app_workspace = app_workspace(workspace, namespace, id, build_version);
         let target_path = sub_path(app_workspace.as_str(), PATH_APP_TARGET);
-        let target_platform = self.target_platform.as_str();
         let target_platform_release_binary =
             format!("{}/{}", target_platform, PATH_APP_RELEASE_BINARY);
         let release_path = sub_path(
@@ -420,35 +495,46 @@ impl Build {
 
     // store cargo project
     pub async fn store_app(&mut self) -> Result<Option<BuildStatus>> {
-        let (namespace, id, manifest_version, build_version) = self.get_build_meta();
-        info!(
-            namespace = namespace.as_str(),
-            id = id.as_str(),
-            manifest_version = manifest_version,
-            build_version = build_version,
-            "store app"
-        );
+        let (namespace, id, manifest_version, build_version, target_platform) =
+            self.get_build_meta();
         let workspace = self.get_workspace().as_str();
         let restore_directory = self.get_restore_directory().as_str();
-        let namespace = self.namespace.as_str();
+        let namespace = namespace.as_str();
+        let id = id.as_str();
+        let target_platform = target_platform.as_str();
+        info!(
+            namespace = namespace,
+            id = id,
+            manifest_version = manifest_version,
+            build_version = build_version,
+            target_platform = target_platform,
+            "store app"
+        );
         let app_directory = app_workspace(workspace, namespace, id, build_version);
         let app_path = sub_path(app_directory.as_str(), PATH_APP);
-        let target_platform = self.target_platform.as_str();
         let app_restore_directory =
             app_restore_directory(restore_directory, namespace, id, target_platform);
         create_directory(app_restore_directory.as_str()).await?;
         let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
-        let app_lock_path = sub_path(app_restore_directory.as_str(), PATH_APP_LOCK);
-        let mut app_lock_file = open_lock_file(app_lock_path.as_str())?;
+        let app_restore_lock_path = sub_path(app_restore_directory.as_str(), PATH_APP_LOCK);
+        let mut app_restore_lock_file = open_lock_file(app_restore_lock_path.as_str())?;
         // lock file before store compiled app - avoid corruption due to race
-        if !app_lock_file.try_lock()? {
-            warn!("lock file '{}' failed, skip app store ...", app_lock_path);
+        if !app_restore_lock_file.try_lock()? {
+            warn!(
+                namespace = namespace,
+                id = id,
+                manifest_version = manifest_version,
+                build_version = build_version,
+                target_platform = target_platform,
+                "lock file '{}' failed, skip app store ...",
+                app_restore_lock_path
+            );
             return Ok(Some(BuildStatus::Succeed));
         }
         // do store compiled app
         let r = Self::do_store_app(app_path, app_restore_path).await;
         // unlock file regardless of store succeed or fail
-        app_lock_file.unlock()?;
+        app_restore_lock_file.unlock()?;
         match r {
             Ok(_) => Ok(Some(BuildStatus::Succeed)),
             Err(err) => Err(err),
@@ -463,14 +549,34 @@ impl Build {
     }
 
     pub fn succeed(&mut self) -> Result<Option<BuildStatus>> {
-        let (namespace, id, manifest_version, build_version) = self.get_build_meta();
+        let (namespace, id, manifest_version, build_version, target_platform) =
+            self.get_build_meta();
         info!(
             namespace = namespace.as_str(),
             id = id.as_str(),
             manifest_version = manifest_version,
             build_version = build_version,
+            target_platform = target_platform.as_str(),
             "build succeed"
         );
         Ok(None)
+    }
+
+    pub async fn delete_build_cache(
+        restore_directory: &str,
+        namespace: &str,
+        id: &str,
+        target_platform: &str,
+    ) -> Result<()> {
+        let app_restore_directory =
+            app_restore_directory(restore_directory, namespace, id, target_platform);
+        let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
+        let app_restore_lock_path = sub_path(app_restore_directory.as_str(), PATH_APP_LOCK);
+        let mut app_restore_lock_file = open_lock_file(app_restore_lock_path.as_str())?;
+        if app_restore_lock_file.try_lock()? {
+            remove_directory(app_restore_path.as_str()).await?;
+            app_restore_lock_file.unlock()?;
+        }
+        Ok(())
     }
 }
