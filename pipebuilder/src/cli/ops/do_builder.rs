@@ -1,7 +1,7 @@
 use pipebuilder_common::{
     api::{
         client::ApiClient,
-        models::{BuildMetadataKey, ScanBuildRequest},
+        models::{BuildCacheMetadata, BuildMetadataKey, ScanBuildCacheRequest, ScanBuildRequest},
     },
     Result,
 };
@@ -14,4 +14,14 @@ pub(crate) async fn scan_build(
         builder_id: builder_id.to_owned(),
     };
     client.scan_build(&request).await
+}
+
+pub(crate) async fn scan_build_cache(
+    client: &ApiClient,
+    builder_id: &str,
+) -> Result<Vec<BuildCacheMetadata>> {
+    let request = ScanBuildCacheRequest {
+        builder_id: builder_id.to_owned(),
+    };
+    client.scan_build_cache(&request).await
 }

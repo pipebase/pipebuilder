@@ -15,17 +15,17 @@ pub fn build() -> Cmd {
         .args(vec![
             Arg::new("namespace")
                 .short('n')
-                .about("Specify namespace")
+                .help("Specify namespace")
                 .takes_value(true)
                 .required(true),
             Arg::new("id")
                 .short('i')
-                .about("Specify project id")
+                .help("Specify project id")
                 .takes_value(true)
                 .required(true),
             Arg::new("version")
                 .short('v')
-                .about("Specify app build version")
+                .help("Specify app build version")
                 .takes_value(true)
                 .required(true),
         ])

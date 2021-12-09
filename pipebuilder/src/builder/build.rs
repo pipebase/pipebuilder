@@ -1,16 +1,17 @@
 use chrono::Utc;
 use flurry::HashMap;
 use pipebuilder_common::{
-    app_workspace,
+    app_workspace, datetime_utc_to_prost_timestamp,
     grpc::{
         build::{
-            builder_server::Builder, BuildMetadataKey, BuildResponse, CancelBuildResponse,
-            GetBuildLogResponse, ScanBuildResponse,
+            builder_server::Builder, BuildCacheMetadata as RpcBuildCacheMetadata, BuildMetadataKey,
+            BuildResponse, CancelBuildResponse, DeleteBuildCacheResponse, GetBuildLogResponse,
+            ScanBuildCacheResponse, ScanBuildResponse,
         },
         repository::repository_client::RepositoryClient,
     },
-    remove_directory, sub_path, Build, BuildMetadata, BuildStatus, LocalBuildContext, Register,
-    PATH_APP,
+    remove_directory, sub_path, Build, BuildCacheMetadata, BuildMetadata, BuildStatus,
+    LocalBuildContext, Register, PATH_APP,
 };
 use std::sync::Arc;
 use tonic::{transport::Channel, Response};
@@ -21,8 +22,10 @@ pub struct BuilderService {
     register: Register,
     repository_client: RepositoryClient<Channel>,
     context: LocalBuildContext,
-    // builds in progress, namespace/id/version -> join handle
+    // builds in progress, (namespace, id, version) -> build thread join handle
     builds: Arc<HashMap<(String, String, u64), tokio::task::JoinHandle<()>>>,
+    // pre-build caches, (namespace, id, target_platform)
+    caches: Arc<HashMap<(String, String, String), BuildCacheMetadata>>,
 }
 
 impl BuilderService {
@@ -38,6 +41,7 @@ impl BuilderService {
             repository_client,
             context,
             builds: Arc::new(HashMap::new()),
+            caches: Arc::new(HashMap::new()),
         }
     }
 }
@@ -104,7 +108,8 @@ impl Builder for BuilderService {
         let lease_id = self.lease_id;
         let register = self.register.to_owned();
         let builds = self.builds.clone();
-        start_build(lease_id, register, builds, build);
+        let caches = self.caches.clone();
+        start_build(lease_id, register, builds, build, caches);
         Ok(Response::new(BuildResponse {
             version: build_version,
         }))
@@ -203,10 +208,80 @@ impl Builder for BuilderService {
         match Build::read_log(log_directory, namespace.as_str(), id.as_str(), version).await {
             Ok(buffer) => Ok(Response::new(GetBuildLogResponse { buffer })),
             Err(err) => Err(tonic::Status::not_found(format!(
-                "build log for (namespace = {}, id = {}, build_version = {}) not found, error: '{}'",
-                namespace, id, version, err
+                "build log not found, error: '{}'",
+                err
             ))),
         }
+    }
+
+    async fn delete_build_cache(
+        &self,
+        request: tonic::Request<pipebuilder_common::grpc::build::DeleteBuildCacheRequest>,
+    ) -> Result<
+        tonic::Response<pipebuilder_common::grpc::build::DeleteBuildCacheResponse>,
+        tonic::Status,
+    > {
+        let request = request.into_inner();
+        let namespace = request.namespace;
+        let id = request.id;
+        let target_platform = request.target_platform;
+        let restore_directory = self.context.restore_directory.as_str();
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            target_platform = target_platform.as_str(),
+            "delete build cache"
+        );
+        match Build::delete_build_cache(
+            restore_directory,
+            namespace.as_str(),
+            id.as_str(),
+            target_platform.as_str(),
+        )
+        .await
+        {
+            Ok(_) => {
+                // cleanup build cache key set
+                let caches = self.caches.pin();
+                caches.remove(&(namespace, id, target_platform));
+                Ok(Response::new(DeleteBuildCacheResponse {}))
+            }
+            Err(err) => {
+                error!(
+                    namespace = namespace.as_str(),
+                    id = id.as_str(),
+                    target_platform = target_platform.as_str(),
+                    "delete build cache failed, error: '{:#?}'",
+                    err
+                );
+                Err(tonic::Status::internal(format!(
+                    "delete build cache failed, error: '{:#?}'",
+                    err
+                )))
+            }
+        }
+    }
+
+    async fn scan_build_cache(
+        &self,
+        _request: tonic::Request<pipebuilder_common::grpc::build::ScanBuildCacheRequest>,
+    ) -> Result<
+        tonic::Response<pipebuilder_common::grpc::build::ScanBuildCacheResponse>,
+        tonic::Status,
+    > {
+        let caches = self.caches.pin();
+        let caches = caches
+            .into_iter()
+            .map(
+                |((namespace, id, target_platform), metadata)| RpcBuildCacheMetadata {
+                    namespace: namespace.to_owned(),
+                    id: id.to_owned(),
+                    target_platform: target_platform.to_owned(),
+                    timestamp: Some(datetime_utc_to_prost_timestamp(metadata.get_timestamp())),
+                },
+            )
+            .collect::<Vec<RpcBuildCacheMetadata>>();
+        Ok(Response::new(ScanBuildCacheResponse { caches }))
     }
 }
 
@@ -215,6 +290,7 @@ fn start_build(
     mut register: Register,
     builds: Arc<HashMap<(String, String, u64), tokio::task::JoinHandle<()>>>,
     mut build: Build,
+    caches: Arc<HashMap<(String, String, String), BuildCacheMetadata>>,
 ) {
     let builds_clone = builds.clone();
     let key_tuple = build.get_build_key_tuple();
@@ -273,9 +349,17 @@ fn start_build(
                 None => break,
             }
         }
-        let key_tuple = build.get_build_key_tuple();
+        let build_key_tuple = build.get_build_key_tuple();
         // remove local build
-        builds_clone.pin().remove(&key_tuple);
+        builds_clone.pin().remove(&build_key_tuple);
+        // update build cache key set if build succeed
+        if matches!(status, BuildStatus::Succeed) {
+            let build_cache_key_tuple = build.get_build_cache_key_tuple();
+            let build_cache_metadata = BuildCacheMetadata::new();
+            caches
+                .pin()
+                .insert(build_cache_key_tuple, build_cache_metadata);
+        }
     });
     // register local build
     builds.pin().insert(key_tuple, jh);

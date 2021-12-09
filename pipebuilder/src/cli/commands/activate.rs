@@ -15,7 +15,7 @@ pub fn builder() -> Cmd {
         .about("Activate builder given node id")
         .args(vec![Arg::new("id")
             .short('i')
-            .about("Specify builder id")
+            .help("Specify builder id")
             .takes_value(true)
             .required(true)])
 }

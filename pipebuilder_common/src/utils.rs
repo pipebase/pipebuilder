@@ -5,6 +5,7 @@ use crate::{
     RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
     RESOURCE_NAMESPACE, RESOURCE_NODE, RESOURCE_PROJECT,
 };
+use chrono::{DateTime, TimeZone, Utc};
 use etcd_client::{Event, EventType};
 use filetime::FileTime;
 use fnv::FnvHasher;
@@ -549,6 +550,19 @@ where
     let toml_string = toml::to_string(object)?;
     fs::write(path, toml_string).await?;
     Ok(())
+}
+
+// prost type conversion
+pub fn prost_timestamp_to_datetime_utc(timestamp: prost_types::Timestamp) -> DateTime<Utc> {
+    let secs = timestamp.seconds;
+    let nsecs = timestamp.nanos as u32;
+    Utc.timestamp(secs, nsecs)
+}
+
+pub fn datetime_utc_to_prost_timestamp(datetime: DateTime<Utc>) -> prost_types::Timestamp {
+    let seconds = datetime.timestamp();
+    let nanos = datetime.timestamp_subsec_nanos() as i32;
+    prost_types::Timestamp { seconds, nanos }
 }
 
 #[cfg(test)]

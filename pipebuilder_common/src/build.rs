@@ -107,6 +107,28 @@ impl BuildMetadata {
     }
 }
 
+pub struct BuildCacheMetadata {
+    pub timestamp: DateTime<Utc>,
+}
+
+impl BuildCacheMetadata {
+    pub fn new() -> Self {
+        BuildCacheMetadata {
+            timestamp: Utc::now(),
+        }
+    }
+
+    pub fn get_timestamp(&self) -> DateTime<Utc> {
+        self.timestamp.to_owned()
+    }
+}
+
+impl Default for BuildCacheMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Latest build state per manifest id
 #[derive(Default, Deserialize, Serialize)]
 pub struct BuildSnapshot {
@@ -234,6 +256,14 @@ impl Build {
             self.namespace.to_owned(),
             self.id.to_owned(),
             self.build_version,
+        )
+    }
+
+    pub fn get_build_cache_key_tuple(&self) -> (String, String, String) {
+        (
+            self.namespace.to_owned(),
+            self.id.to_owned(),
+            self.target_platform.to_owned(),
         )
     }
 
@@ -530,5 +560,23 @@ impl Build {
             "build succeed"
         );
         Ok(None)
+    }
+
+    pub async fn delete_build_cache(
+        restore_directory: &str,
+        namespace: &str,
+        id: &str,
+        target_platform: &str,
+    ) -> Result<()> {
+        let app_restore_directory =
+            app_restore_directory(restore_directory, namespace, id, target_platform);
+        let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
+        let app_restore_lock_path = sub_path(app_restore_directory.as_str(), PATH_APP_LOCK);
+        let mut app_restore_lock_file = open_lock_file(app_restore_lock_path.as_str())?;
+        if app_restore_lock_file.try_lock()? {
+            remove_directory(app_restore_path.as_str()).await?;
+            app_restore_lock_file.unlock()?;
+        }
+        Ok(())
     }
 }

@@ -1,22 +1,24 @@
 use super::{
     constants::{
-        ACTIVATE_NODE, APP, APP_METADATA, BUILD, BUILD_LOG, BUILD_METADATA, BUILD_SNAPSHOT,
-        CANCEL_BUILD, DEACTIVATE_NODE, MANIFEST, MANIFEST_METADATA, MANIFEST_SNAPSHOT, NAMESPACE,
-        NODE_STATE, PROJECT, SCAN_BUILD, SHUTDOWN, SHUTDOWN_NODE,
+        ACTIVATE_NODE, APP, APP_METADATA, BUILD, BUILD_CACHE, BUILD_LOG, BUILD_METADATA,
+        BUILD_SNAPSHOT, CANCEL_BUILD, DEACTIVATE_NODE, MANIFEST, MANIFEST_METADATA,
+        MANIFEST_SNAPSHOT, NAMESPACE, NODE_STATE, PROJECT, SCAN_BUILD, SCAN_BUILD_CACHE, SHUTDOWN,
+        SHUTDOWN_NODE,
     },
     models::{
-        ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildMetadata, BuildMetadataKey,
-        BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest, CancelBuildResponse,
-        DeactivateNodeRequest, DeactivateNodeResponse, DeleteAppRequest, DeleteBuildRequest,
-        DeleteBuildSnapshotRequest, DeleteManifestRequest, DeleteManifestSnapshotRequest,
-        DeleteNamespaceRequest, DeleteProjectRequest, Failure, GetAppRequest, GetAppResponse,
-        GetBuildLogRequest, GetBuildLogResponse, GetBuildRequest, GetManifestRequest,
-        GetManifestResponse, ListAppMetadataRequest, ListBuildRequest, ListBuildSnapshotRequest,
+        ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildCacheMetadata, BuildMetadata,
+        BuildMetadataKey, BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest,
+        CancelBuildResponse, DeactivateNodeRequest, DeactivateNodeResponse, DeleteAppRequest,
+        DeleteBuildCacheRequest, DeleteBuildRequest, DeleteBuildSnapshotRequest,
+        DeleteManifestRequest, DeleteManifestSnapshotRequest, DeleteNamespaceRequest,
+        DeleteProjectRequest, Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest,
+        GetBuildLogResponse, GetBuildRequest, GetManifestRequest, GetManifestResponse,
+        ListAppMetadataRequest, ListBuildRequest, ListBuildSnapshotRequest,
         ListManifestMetadataRequest, ListManifestSnapshotRequest, ListNamespaceRequest,
         ListNodeStateRequest, ListProjectRequest, ManifestMetadata, ManifestSnapshot, Namespace,
-        NodeState, PostManifestRequest, PostManifestResponse, Project, ScanBuildRequest,
-        ShutdownNodeRequest, ShutdownNodeResponse, ShutdownRequest, ShutdownResponse,
-        UpdateNamespaceRequest, UpdateProjectRequest,
+        NodeState, PostManifestRequest, PostManifestResponse, Project, ScanBuildCacheRequest,
+        ScanBuildRequest, ShutdownNodeRequest, ShutdownNodeResponse, ShutdownRequest,
+        ShutdownResponse, UpdateNamespaceRequest, UpdateProjectRequest,
     },
 };
 use crate::{api_client_error, api_server_error, Result};
@@ -255,6 +257,21 @@ impl ApiClient {
         let response = self.query(SCAN_BUILD, request).await?;
         let response = Self::get_response_body::<Vec<BuildMetadataKey>>(response).await?;
         Ok(response)
+    }
+
+    pub async fn scan_build_cache(
+        &self,
+        request: &ScanBuildCacheRequest,
+    ) -> Result<Vec<BuildCacheMetadata>> {
+        let response = self.query(SCAN_BUILD_CACHE, request).await?;
+        let response = Self::get_response_body::<Vec<BuildCacheMetadata>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn delete_build_cache(&self, request: &DeleteBuildCacheRequest) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(BUILD_CACHE, request).await?;
+        Ok(())
     }
 
     pub async fn activate_node(

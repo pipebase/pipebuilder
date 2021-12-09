@@ -42,7 +42,9 @@ pub mod filters {
             .or(v1_build_cancel(register.clone(), lease_id))
             .or(v1_build_log_get(register.clone(), lease_id))
             .or(v1_build_delete(register.clone(), lease_id))
-            .or(v1_build_scan(register, lease_id))
+            .or(v1_build_scan(register.clone(), lease_id))
+            .or(v1_build_cache_scan(register.clone(), lease_id))
+            .or(v1_build_cache_delete(register, lease_id))
     }
 
     // manifest api
@@ -261,6 +263,30 @@ pub mod filters {
             .and_then(handlers::scan_build)
     }
 
+    pub fn v1_build_cache_scan(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "build-cache" / "scan")
+            .and(warp::get())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(warp::query::<models::ScanBuildCacheRequest>())
+            .and_then(handlers::scan_build_cache)
+    }
+
+    pub fn v1_build_cache_delete(
+        register: Register,
+        lease_id: i64,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("api" / "v1" / "build-cache")
+            .and(warp::delete())
+            .and(with_register(register))
+            .and(with_lease_id(lease_id))
+            .and(json_request::<models::DeleteBuildCacheRequest>())
+            .and_then(handlers::delete_build_cache)
+    }
+
     pub fn v1_node_activate(
         register: Register,
         lease_id: i64,
@@ -476,7 +502,8 @@ mod handlers {
         grpc::{
             build::{
                 builder_client::BuilderClient, BuildRequest, CancelBuildRequest,
-                GetBuildLogRequest, ScanBuildRequest,
+                DeleteBuildCacheRequest, GetBuildLogRequest, ScanBuildCacheRequest,
+                ScanBuildRequest,
             },
             node::{
                 node_client::NodeClient, node_server::Node, ActivateRequest, DeactivateRequest,
@@ -1193,6 +1220,98 @@ mod handlers {
             .map(|b| b.into())
             .collect::<Vec<models::BuildMetadataKey>>();
         Ok(builds)
+    }
+
+    pub async fn scan_build_cache(
+        mut register: Register,
+        lease_id: i64,
+        request: models::ScanBuildCacheRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        let builder_id = request.builder_id.as_str();
+        let node_state =
+            match get_internal_node_state(&mut register, lease_id, &NodeRole::Builder, builder_id)
+                .await
+            {
+                Ok(node_state) => node_state,
+                Err(err) => return Ok(http_internal_error(err.into())),
+            };
+        // find builder address
+        let address = match node_state {
+            Some(node_state) => node_state.external_address,
+            None => {
+                return Ok(http_not_found(Failure::new(format!(
+                    "builder '{}' not found",
+                    builder_id
+                ))))
+            }
+        };
+        let mut client = match builder_client(address.as_str()).await {
+            Ok(client) => client,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match do_scan_build_cache(&mut client, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_scan_build_cache(
+        client: &mut BuilderClient<Channel>,
+        request: models::ScanBuildCacheRequest,
+    ) -> pipebuilder_common::Result<Vec<models::BuildCacheMetadata>> {
+        let request: ScanBuildCacheRequest = request.into();
+        let response = client.scan_build_cache(request).await?;
+        let response = response.into_inner();
+        let caches = response.caches;
+        let caches = caches
+            .into_iter()
+            .map(|c| c.into())
+            .collect::<Vec<models::BuildCacheMetadata>>();
+        Ok(caches)
+    }
+
+    pub async fn delete_build_cache(
+        mut register: Register,
+        lease_id: i64,
+        request: models::DeleteBuildCacheRequest,
+    ) -> Result<impl warp::Reply, Infallible> {
+        // validate request
+        let builder_id = request.builder_id.as_str();
+        let node_state =
+            match get_internal_node_state(&mut register, lease_id, &NodeRole::Builder, builder_id)
+                .await
+            {
+                Ok(node_state) => node_state,
+                Err(err) => return Ok(http_internal_error(err.into())),
+            };
+        // find builder address
+        let address = match node_state {
+            Some(node_state) => node_state.external_address,
+            None => {
+                return Ok(http_not_found(Failure::new(format!(
+                    "builder '{}' not found",
+                    builder_id
+                ))))
+            }
+        };
+        let mut client = match builder_client(address.as_str()).await {
+            Ok(client) => client,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        match do_delete_build_cache(&mut client, request).await {
+            Ok(response) => Ok(ok(&response)),
+            Err(err) => Ok(http_internal_error(err.into())),
+        }
+    }
+
+    async fn do_delete_build_cache(
+        client: &mut BuilderClient<Channel>,
+        request: models::DeleteBuildCacheRequest,
+    ) -> pipebuilder_common::Result<models::DeleteBuildCacheResponse> {
+        let request: DeleteBuildCacheRequest = request.into();
+        let response = client.delete_build_cache(request).await?;
+        Ok(response.into_inner().into())
     }
 
     pub async fn activate_node(

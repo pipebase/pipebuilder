@@ -1,6 +1,8 @@
 syntax = "proto3";
 package build;
 
+import "google/protobuf/timestamp.proto";
+
 message BuildRequest {
     // project namespace
     string namespace = 1;
@@ -57,9 +59,39 @@ message GetBuildLogResponse {
     bytes buffer = 1;
 }
 
+message DeleteBuildCacheRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // target platform
+    string target_platform = 4;
+}
+
+message DeleteBuildCacheResponse {}
+
+message ScanBuildCacheRequest {}
+
+message BuildCacheMetadata {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // target platform
+    string target_platform = 3;
+    // cache hit timestamp
+    google.protobuf.Timestamp timestamp = 4;
+}
+
+message ScanBuildCacheResponse {
+    repeated BuildCacheMetadata caches = 1;
+}
+
 service Builder {
     rpc Build(BuildRequest) returns (BuildResponse) {}
     rpc CancelBuild(CancelBuildRequest) returns (CancelBuildResponse) {}
     rpc GetBuildLog(GetBuildLogRequest) returns (GetBuildLogResponse) {}
     rpc ScanBuild(ScanBuildRequest) returns (ScanBuildResponse) {}
+    rpc DeleteBuildCache(DeleteBuildCacheRequest) returns (DeleteBuildCacheResponse) {}
+    rpc ScanBuildCache(ScanBuildCacheRequest) returns (ScanBuildCacheResponse) {}
 }
