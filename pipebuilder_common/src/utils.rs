@@ -84,6 +84,14 @@ where
     Ok(())
 }
 
+pub async fn reset_directory<P>(path: &P) -> Result<()>
+where
+    P: AsRef<std::path::Path>,
+{
+    remove_directory(path).await?;
+    create_directory(path).await
+}
+
 pub async fn parse_config<C>(file: File) -> Result<C>
 where
     C: DeserializeOwned,
