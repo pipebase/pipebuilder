@@ -7,6 +7,8 @@ pub struct BuilderConfig {
     pub workspace: String,
     pub restore_directory: String,
     pub log_directory: String,
+    // reset directory when bootstrap, default as true if not provided
+    pub reset: Option<bool>,
 }
 
 #[derive(Deserialize)]

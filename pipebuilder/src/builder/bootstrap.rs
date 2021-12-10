@@ -1,8 +1,10 @@
 use crate::{build::BuilderService, config::BuilderConfig};
 use pipebuilder_common::{
-    grpc::repository::repository_client::RepositoryClient, LocalBuildContext, Register, Result,
+    grpc::repository::repository_client::RepositoryClient, reset_directory, LocalBuildContext,
+    Register, Result,
 };
 use tonic::transport::Channel;
+use tracing::info;
 
 fn build_builder_service(
     lease_id: i64,
@@ -30,7 +32,15 @@ pub async fn bootstrap(
     let workspace = config.workspace;
     let restore_directory = config.restore_directory;
     let log_directory = config.log_directory;
-    // TODO: cleanup workspace, restore directory and log directory
+    let reset = config.reset.unwrap_or(true);
+    if reset {
+        info!(path = workspace.as_str(), "reset workspace");
+        reset_directory(&workspace).await?;
+        info!(path = restore_directory.as_str(), "reset restore directory");
+        reset_directory(&restore_directory).await?;
+        info!(path = log_directory.as_str(), "reset log directory");
+        reset_directory(&log_directory).await?;
+    }
     let build_context = LocalBuildContext::new(
         node_id,
         external_address,

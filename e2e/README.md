@@ -18,7 +18,7 @@ docker-compose -f e2e/etcd.yml up -d
 run `repository`, `builder`, `scheduler`, `api` services
 ```sh
 # at project root
-RUST_LOG=info PIPEBUILDER_CONFIG_FILE=e2e/resources/SERVICE.yml cargo run --bin SERVICE
+RUST_LOG=info PIPEBUILDER_LOG_FORMATTER=full PIPEBUILDER_CONFIG_FILE=e2e/resources/SERVICE.yml cargo run --bin SERVICE
 ```
 ## Test Sample App
 go to test directory
