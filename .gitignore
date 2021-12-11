@@ -14,5 +14,3 @@ e2e/data
 # data volume for apps
 pipebuilder/data/*
 
-# protobuf
-pipebuilder_common/src/grpc/google.protobuf.rs
