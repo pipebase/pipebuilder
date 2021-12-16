@@ -13,7 +13,7 @@ mod tests {
     const TEST_PROJECT: &str = "timer";
     const TEST_BUILD_COUNT: u64 = 3;
     const TEST_BUILD_WAIT_MILLIS: u64 = 30000;
-    const TEST_BUILD_WAIT_RETRY: u64 = 3;
+    const TEST_BUILD_WAIT_RETRY: u64 = 5;
     const TEST_BUILDER_ID: &str = "builder0";
     const TEST_TARGET_PLATFORM: &str = "x86_64-unknown-linux-gnu";
 
