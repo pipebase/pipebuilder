@@ -1,20 +1,13 @@
 // registry implemented with [etcd-client](https://crates.io/crates/etcd-client)
 use crate::{
-    app_metadata_namespace, app_metadata_namespace_id, app_metadata_namespace_id_version,
-    build_metadata_namespace_id, build_metadata_namespace_id_version, build_snapshot_namespace,
-    build_snapshot_namespace_id, manifest_metadata_namespace, manifest_metadata_namespace_id,
-    manifest_metadata_namespace_id_version, manifest_snapshot_namespace,
-    manifest_snapshot_namespace_id, namespace_key, node_key, node_role_prefix_key,
-    project_namespace, project_namespace_id, read_file, root_resource, version_build_namespace,
-    AppMetadata, BuildMetadata, BuildSnapshot, ManifestMetadata, ManifestSnapshot, Namespace,
-    NodeRole, NodeState, Project, Result, RESOURCE_NAMESPACE, RESOURCE_NODE_BUILDER,
+    read_file, BlobResource, Resource, ResourceKeyBuilder, ResourceType, Result, Snapshot,
 };
 use etcd_client::{
     Certificate, Client, ConnectOptions, DeleteOptions, DeleteResponse, GetOptions, GetResponse,
     Identity, KeyValue, LeaseGrantResponse, LockOptions, LockResponse, PutOptions, PutResponse,
     TlsOptions, WatchOptions, WatchStream, Watcher,
 };
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tracing::info;
 
 use crate::Period;
@@ -176,13 +169,13 @@ impl Register {
         Ok(resp)
     }
 
-    async fn list_kvs<K, V>(&mut self, prefix: K) -> Result<Vec<(String, V)>>
+    async fn list_json_kvs<K, V>(&mut self, prefix: K) -> Result<Vec<(String, V)>>
     where
         K: Into<Vec<u8>>,
         V: DeserializeOwned,
     {
         let resp = self.list(prefix).await?;
-        let kvs = Self::deserialize_kvs::<V>(resp.kvs())?;
+        let kvs = Self::deserialize_json_kvs::<V>(resp.kvs())?;
         Ok(kvs)
     }
 
@@ -271,50 +264,6 @@ impl Register {
         Ok(())
     }
 
-    pub async fn put_node_state(
-        &mut self,
-        role: &NodeRole,
-        state: &NodeState,
-        lease_id: i64,
-    ) -> Result<PutResponse> {
-        let id = &state.id;
-        let value = serde_json::to_vec(state)?;
-        let opts = PutOptions::new().with_lease(lease_id);
-        let key = node_key(role, id);
-        let resp = self.put(key, value, opts.into()).await?;
-        Ok(resp)
-    }
-
-    pub async fn list_node_state(
-        &mut self,
-        role: Option<&NodeRole>,
-    ) -> Result<Vec<(String, NodeState)>> {
-        let prefix = node_role_prefix_key(role);
-        let node_states = self.list_kvs::<&str, NodeState>(prefix.as_str()).await?;
-        Ok(node_states)
-    }
-
-    async fn do_get_node_state(&mut self, role: &NodeRole, id: &str) -> Result<Option<NodeState>> {
-        let key = node_key(role, id);
-        let node_state = self.get_json_value::<String, NodeState>(key, None).await?;
-        Ok(node_state)
-    }
-
-    pub async fn get_node_state(
-        &mut self,
-        lease_id: i64,
-        role: &NodeRole,
-        id: &str,
-    ) -> Result<Option<NodeState>> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = node_key(role, id);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self.do_get_node_state(role, id).await?;
-        self.unlock(lock_name.as_str(), key).await?;
-        Ok(resp)
-    }
-
     pub async fn watch(
         &mut self,
         key: &str,
@@ -329,9 +278,11 @@ impl Register {
         self.watch(prefix, opts.into()).await
     }
 
-    pub async fn watch_builders(&mut self) -> Result<(Watcher, WatchStream)> {
-        let prefix = root_resource(RESOURCE_NODE_BUILDER);
-        self.watch_prefix(prefix.as_str()).await
+    pub async fn watch_nodes(&mut self) -> Result<(Watcher, WatchStream)> {
+        let prefix_key = ResourceKeyBuilder::new()
+            .resource(ResourceType::Node)
+            .build();
+        self.watch_prefix(prefix_key.as_str()).await
     }
 
     pub async fn lock(&mut self, name: &str, options: Option<LockOptions>) -> Result<LockResponse> {
@@ -346,574 +297,327 @@ impl Register {
         Ok(())
     }
 
-    async fn do_incr_build_snapshot(
+    async fn do_update_snapshot_resource<S>(
         &mut self,
         namespace: &str,
         id: &str,
-    ) -> Result<(PutResponse, BuildSnapshot)> {
+    ) -> Result<(PutResponse, S)>
+    where
+        S: Resource + Snapshot + Serialize + DeserializeOwned,
+    {
         // get current snapshot and incr version
-        let new_snapshot = match self.do_get_build_snapshot(namespace, id).await? {
+        let new_snapshot = match self.do_get_resource::<S>(Some(namespace), id, None).await? {
             Some(mut snapshot) => {
-                snapshot.latest_version += 1;
+                snapshot.incr_version();
                 snapshot
             }
-            None => BuildSnapshot::default(),
+            None => S::default(),
         };
-        let key = build_snapshot_namespace_id(namespace, id);
+        let key = ResourceKeyBuilder::new()
+            .resource(S::ty())
+            .namespace(namespace)
+            .id(id)
+            .build();
         let value = serde_json::to_vec(&new_snapshot)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, new_snapshot))
     }
 
-    async fn do_get_build_snapshot(
+    async fn do_get_resource<R>(
         &mut self,
-        namespace: &str,
+        namespace: Option<&str>,
         id: &str,
-    ) -> Result<Option<BuildSnapshot>> {
-        let key = build_snapshot_namespace_id(namespace, id);
-        let snapshot = self
-            .get_json_value::<String, BuildSnapshot>(key, None)
-            .await?;
-        Ok(snapshot)
+        version: Option<u64>,
+    ) -> Result<Option<R>>
+    where
+        R: Resource + DeserializeOwned,
+    {
+        let builder = ResourceKeyBuilder::new().resource(R::ty()).id(id);
+        let builder = match namespace {
+            Some(namespace) => builder.namespace(namespace),
+            None => builder,
+        };
+        let key = match version {
+            Some(version) => builder.version(version).build(),
+            None => builder.build(),
+        };
+        let resource = self.get_json_value::<String, R>(key, None).await?;
+        Ok(resource)
     }
 
-    pub async fn incr_build_snapshot(
+    pub async fn get_resource<R>(
         &mut self,
-        namespace: &str,
+        namespace: Option<&str>,
         id: &str,
+        version: Option<u64>,
         lease_id: i64,
-    ) -> Result<(PutResponse, BuildSnapshot)> {
+    ) -> Result<Option<R>>
+    where
+        R: Resource + DeserializeOwned,
+    {
+        let builder = ResourceKeyBuilder::new()
+            .lock(true)
+            .resource(R::ty())
+            .id(id);
+        let builder = match namespace {
+            Some(namespace) => builder.namespace(namespace),
+            None => builder,
+        };
+        let lock_name = match version {
+            Some(version) => builder.version(version).build(),
+            None => builder.build(),
+        };
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = build_snapshot_namespace_id(namespace, id);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
-        let resp = self.do_incr_build_snapshot(namespace, id).await;
-        self.unlock(lock_name.as_str(), key).await?;
-        resp
-    }
-
-    pub async fn do_get_build_metadata(
-        &mut self,
-        namespace: &str,
-        id: &str,
-        version: u64,
-    ) -> Result<Option<BuildMetadata>> {
-        let key = build_metadata_namespace_id_version(namespace, id, version);
-        let state = self
-            .get_json_value::<String, BuildMetadata>(key, None)
-            .await?;
-        Ok(state)
-    }
-
-    pub async fn get_build_metadata(
-        &mut self,
-        lease_id: i64,
-        namespace: &str,
-        id: &str,
-        version: u64,
-    ) -> Result<Option<BuildMetadata>> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = build_metadata_namespace_id_version(namespace, id, version);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self.do_get_build_metadata(namespace, id, version).await?;
+        let resp = self.do_get_resource::<R>(namespace, id, version).await?;
         self.unlock(lock_name.as_str(), key).await?;
         Ok(resp)
     }
 
-    pub async fn list_build_metadata(
+    pub async fn update_snapshot_resource<S>(
         &mut self,
         namespace: &str,
-        id: Option<String>,
-    ) -> Result<Vec<(String, BuildMetadata)>> {
+        id: &str,
+        lease_id: i64,
+    ) -> Result<(PutResponse, S)>
+    where
+        S: Resource + Snapshot + Serialize + DeserializeOwned,
+    {
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_name = ResourceKeyBuilder::new()
+            .lock(true)
+            .resource(S::ty())
+            .namespace(namespace)
+            .id(id)
+            .build();
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_update_snapshot_resource::<S>(namespace, id).await;
+        self.unlock(lock_name.as_str(), key).await?;
+        resp
+    }
+
+    // list resource metadata or snapshot given resource type namespace, id
+    pub async fn list_resource<R>(
+        &mut self,
+        namespace: Option<&str>,
+        id: Option<&str>,
+    ) -> Result<Vec<(String, R)>>
+    where
+        R: Resource + DeserializeOwned,
+    {
+        let builder = ResourceKeyBuilder::new().resource(R::ty());
+        let builder = match namespace {
+            Some(namespace) => builder.namespace(namespace),
+            None => builder,
+        };
         let prefix = match id {
-            Some(id) => build_metadata_namespace_id(namespace, id.as_str()),
-            None => version_build_namespace(namespace),
+            Some(id) => builder.id(id).build(),
+            None => builder.build(),
         };
-        let version_builds = self
-            .list_kvs::<&str, BuildMetadata>(prefix.as_str())
-            .await?;
-        Ok(version_builds)
+        let builds = self.list_json_kvs::<&str, R>(prefix.as_str()).await?;
+        Ok(builds)
     }
 
-    pub async fn do_put_build_metadata(
+    async fn do_put_resource<R>(
         &mut self,
-        namespace: &str,
+        namespace: Option<&str>,
         id: &str,
-        version: u64,
-        state: BuildMetadata,
-    ) -> Result<(PutResponse, BuildMetadata)> {
-        let key = build_metadata_namespace_id_version(namespace, id, version);
-        let value = serde_json::to_vec(&state)?;
-        let resp = self.put(key, value, None).await?;
-        Ok((resp, state))
-    }
-
-    pub async fn put_build_metadata(
-        &mut self,
-        lease_id: i64,
-        namespace: &str,
-        id: &str,
-        version: u64,
-        state: BuildMetadata,
-    ) -> Result<(PutResponse, BuildMetadata)> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = build_metadata_namespace_id_version(namespace, id, version);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self
-            .do_put_build_metadata(namespace, id, version, state)
-            .await;
-        self.unlock(lock_name.as_str(), key).await?;
-        resp
-    }
-
-    async fn do_incr_manifest_snapshot(
-        &mut self,
-        namespace: &str,
-        id: &str,
-    ) -> Result<(PutResponse, ManifestSnapshot)> {
-        let new_snapshot = match self.do_get_manifest_snapshot(namespace, id).await? {
-            Some(mut snapshot) => {
-                snapshot.latest_version += 1;
-                snapshot
-            }
-            None => ManifestSnapshot::new(),
+        version: Option<u64>,
+        resource: R,
+    ) -> Result<(PutResponse, R)>
+    where
+        R: Resource + Serialize,
+    {
+        let builder = ResourceKeyBuilder::new().resource(R::ty()).id(id);
+        let builder = match namespace {
+            Some(namespace) => builder.namespace(namespace),
+            None => builder,
         };
-        let key = manifest_snapshot_namespace_id(namespace, id);
-        let value = serde_json::to_vec(&new_snapshot)?;
+        let key = match version {
+            Some(version) => builder.version(version).build(),
+            None => builder.build(),
+        };
+        let value = serde_json::to_vec(&resource)?;
         let resp = self.put(key, value, None).await?;
-        Ok((resp, new_snapshot))
+        Ok((resp, resource))
     }
 
-    pub async fn incr_manifest_snapshot(
+    pub async fn put_resource<R>(
         &mut self,
-        lease_id: i64,
-        namespace: &str,
+        namespace: Option<&str>,
         id: &str,
-    ) -> Result<(PutResponse, ManifestSnapshot)> {
+        version: Option<u64>,
+        resource: R,
+        lease_id: i64,
+    ) -> Result<(PutResponse, R)>
+    where
+        R: Resource + Serialize,
+    {
+        let builder = ResourceKeyBuilder::new()
+            .lock(true)
+            .resource(R::ty())
+            .id(id);
+        let builder = match namespace {
+            Some(namespace) => builder.namespace(namespace),
+            None => builder,
+        };
+        let lock_name = match version {
+            Some(version) => builder.version(version).build(),
+            None => builder.build(),
+        };
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = manifest_snapshot_namespace_id(namespace, id);
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
-        let resp = self.do_incr_manifest_snapshot(namespace, id).await;
+        let resp = self.do_put_resource(namespace, id, version, resource).await;
         self.unlock(lock_name.as_str(), key).await?;
         resp
     }
 
-    async fn do_get_manifest_snapshot(
-        &mut self,
-        namespace: &str,
-        id: &str,
-    ) -> Result<Option<ManifestSnapshot>> {
-        let key = manifest_snapshot_namespace_id(namespace, id);
-        let snapshot = self
-            .get_json_value::<String, ManifestSnapshot>(key, None)
-            .await?;
-        Ok(snapshot)
-    }
-
-    pub async fn get_manifest_snapshot(
-        &mut self,
-        lease_id: i64,
-        namespace: &str,
-        id: &str,
-    ) -> Result<Option<ManifestSnapshot>> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = manifest_snapshot_namespace_id(namespace, id);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self.do_get_manifest_snapshot(namespace, id).await;
-        self.unlock(lock_name.as_str(), key).await?;
-        resp
-    }
-
-    // list manifest snapshot in namespace
-    pub async fn list_manifest_snapshot(
-        &mut self,
-        namespace: &str,
-    ) -> Result<Vec<(String, ManifestSnapshot)>> {
-        let prefix = manifest_snapshot_namespace(namespace);
-        let manifest_snapshots = self
-            .list_kvs::<&str, ManifestSnapshot>(prefix.as_str())
-            .await?;
-        Ok(manifest_snapshots)
-    }
-
-    // list build snapshot in namespace
-    pub async fn list_build_snapshot(
-        &mut self,
-        namespace: &str,
-    ) -> Result<Vec<(String, BuildSnapshot)>> {
-        let prefix = build_snapshot_namespace(namespace);
-        let build_snapshots = self
-            .list_kvs::<&str, BuildSnapshot>(prefix.as_str())
-            .await?;
-        Ok(build_snapshots)
-    }
-
-    async fn do_get_app_metadata(
-        &mut self,
-        namespace: &str,
-        id: &str,
-        version: u64,
-    ) -> Result<Option<AppMetadata>> {
-        let key = app_metadata_namespace_id_version(namespace, id, version);
-        let metadata = self
-            .get_json_value::<String, AppMetadata>(key, None)
-            .await?;
-        Ok(metadata)
-    }
-
-    pub async fn get_app_metadata(
-        &mut self,
-        lease_id: i64,
-        namespace: &str,
-        id: &str,
-        version: u64,
-    ) -> Result<Option<AppMetadata>> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = app_metadata_namespace_id_version(namespace, id, version);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self.do_get_app_metadata(namespace, id, version).await;
-        self.unlock(lock_name.as_str(), key).await?;
-        resp
-    }
-
-    async fn do_update_app_metadata(
+    async fn do_update_blob_resource<R>(
         &mut self,
         namespace: &str,
         id: &str,
         version: u64,
         size: usize,
-    ) -> Result<(PutResponse, AppMetadata)> {
-        let new_metadata = match self.do_get_app_metadata(namespace, id, version).await? {
-            Some(mut metadata) => {
-                metadata.pulls += 1;
-                metadata
-            }
-            None => AppMetadata::new(size),
-        };
-        let key = app_metadata_namespace_id_version(namespace, id, version);
-        let value = serde_json::to_vec(&new_metadata)?;
-        let resp = self.put(key, value, None).await?;
-        Ok((resp, new_metadata))
-    }
-
-    pub async fn update_app_metadata(
-        &mut self,
-        lease_id: i64,
-        namespace: &str,
-        id: &str,
-        version: u64,
-        size: usize,
-    ) -> Result<(PutResponse, AppMetadata)> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = app_metadata_namespace_id_version(namespace, id, version);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self
-            .do_update_app_metadata(namespace, id, version, size)
-            .await;
-        self.unlock(lock_name.as_str(), key).await?;
-        resp
-    }
-
-    pub async fn list_app_metadata(
-        &mut self,
-        namespace: &str,
-        id: Option<String>,
-    ) -> Result<Vec<(String, AppMetadata)>> {
-        let prefix = match id {
-            Some(id) => app_metadata_namespace_id(namespace, id.as_str()),
-            None => app_metadata_namespace(namespace),
-        };
-        let resp = self.list_kvs::<&str, AppMetadata>(prefix.as_str()).await?;
-        Ok(resp)
-    }
-
-    async fn do_get_manifest_metadata(
-        &mut self,
-        namespace: &str,
-        id: &str,
-        version: u64,
-    ) -> Result<Option<ManifestMetadata>> {
-        let key = manifest_metadata_namespace_id_version(namespace, id, version);
-        let metadata = self
-            .get_json_value::<String, ManifestMetadata>(key, None)
-            .await?;
-        Ok(metadata)
-    }
-
-    pub async fn get_manifest_metadata(
-        &mut self,
-        lease_id: i64,
-        namespace: &str,
-        id: &str,
-        version: u64,
-    ) -> Result<Option<ManifestMetadata>> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = manifest_metadata_namespace_id_version(namespace, id, version);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self.do_get_manifest_metadata(namespace, id, version).await;
-        self.unlock(lock_name.as_str(), key).await?;
-        resp
-    }
-
-    async fn do_update_manifest_metadata(
-        &mut self,
-        namespace: &str,
-        id: &str,
-        version: u64,
-        size: usize,
-    ) -> Result<(PutResponse, ManifestMetadata)> {
+    ) -> Result<(PutResponse, R)>
+    where
+        R: Resource + BlobResource + Serialize + DeserializeOwned,
+    {
         let new_metadata = match self
-            .do_get_manifest_metadata(namespace, id, version)
+            .do_get_resource::<R>(Some(namespace), id, Some(version))
             .await?
         {
             Some(mut metadata) => {
-                metadata.pulls += 1;
+                metadata.incr_usage();
                 metadata
             }
-            None => ManifestMetadata::new(size),
+            None => R::new(size),
         };
-        let key = manifest_metadata_namespace_id_version(namespace, id, version);
+        let key = ResourceKeyBuilder::new()
+            .resource(R::ty())
+            .namespace(namespace)
+            .id(id)
+            .version(version)
+            .build();
         let value = serde_json::to_vec(&new_metadata)?;
         let resp = self.put(key, value, None).await?;
         Ok((resp, new_metadata))
     }
 
-    pub async fn update_manifest_metadata(
+    pub async fn update_blob_resource<R>(
         &mut self,
-        lease_id: i64,
         namespace: &str,
         id: &str,
         version: u64,
         size: usize,
-    ) -> Result<(PutResponse, ManifestMetadata)> {
+        lease_id: i64,
+    ) -> Result<(PutResponse, R)>
+    where
+        R: Resource + BlobResource + Serialize + DeserializeOwned,
+    {
         let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = manifest_metadata_namespace_id_version(namespace, id, version);
+        let lock_name = ResourceKeyBuilder::new()
+            .lock(true)
+            .resource(R::ty())
+            .namespace(namespace)
+            .id(id)
+            .version(version)
+            .build();
         let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
         let key = lock_resp.key();
         let resp = self
-            .do_update_manifest_metadata(namespace, id, version, size)
+            .do_update_blob_resource::<R>(namespace, id, version, size)
             .await;
         self.unlock(lock_name.as_str(), key).await?;
         resp
     }
 
-    pub async fn list_manifest_metadata(
+    async fn do_update_default_resource<R>(
         &mut self,
-        namespace: &str,
-        id: Option<String>,
-    ) -> Result<Vec<(String, ManifestMetadata)>> {
+        namespace: Option<&str>,
+        id: &str,
+    ) -> Result<(PutResponse, R)>
+    where
+        R: Resource + Default + Serialize + DeserializeOwned,
+    {
+        let resource = match self.do_get_resource::<R>(namespace, id, None).await? {
+            Some(resource) => resource,
+            None => R::default(),
+        };
+        let builder = ResourceKeyBuilder::new().resource(R::ty()).id(id);
+        let key = match namespace {
+            Some(namespace) => builder.namespace(namespace).build(),
+            None => builder.build(),
+        };
+        let value = serde_json::to_vec(&resource)?;
+        let resp = self.put(key, value, None).await?;
+        Ok((resp, resource))
+    }
+
+    pub async fn update_default_resource<R>(
+        &mut self,
+        namespace: Option<&str>,
+        id: &str,
+        lease_id: i64,
+    ) -> Result<(PutResponse, R)>
+    where
+        R: Resource + Default + Serialize + DeserializeOwned,
+    {
+        let builder = ResourceKeyBuilder::new()
+            .lock(true)
+            .resource(R::ty())
+            .id(id);
+        let lock_name = match namespace {
+            Some(namespace) => builder.namespace(namespace).build(),
+            None => builder.build(),
+        };
+        let lock_options = LockOptions::new().with_lease(lease_id);
+        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
+        let key = lock_resp.key();
+        let resp = self.do_update_default_resource::<R>(namespace, id).await;
+        self.unlock(lock_name.as_str(), key).await?;
+        resp
+    }
+
+    pub async fn delete_resource<R>(
+        &mut self,
+        namespace: Option<&str>,
+        id: &str,
+        version: Option<u64>,
+    ) -> Result<()>
+    where
+        R: Resource,
+    {
+        let builder = ResourceKeyBuilder::new().resource(R::ty()).id(id);
+        let builder = match namespace {
+            Some(namespace) => builder.namespace(namespace),
+            None => builder,
+        };
+        let key = match version {
+            Some(version) => builder.version(version).build(),
+            None => builder.build(),
+        };
+        let _ = self.delete(key, None).await?;
+        Ok(())
+    }
+
+    pub async fn is_resource_exist<R>(&mut self, namespace: &str, id: Option<&str>) -> Result<bool>
+    where
+        R: Resource,
+    {
+        let builder = ResourceKeyBuilder::new()
+            .resource(R::ty())
+            .namespace(namespace);
         let prefix = match id {
-            Some(id) => manifest_metadata_namespace_id(namespace, id.as_str()),
-            None => manifest_metadata_namespace(namespace),
+            Some(id) => builder.id(id).build(),
+            None => builder.build(),
         };
-        let resp = self
-            .list_kvs::<&str, ManifestMetadata>(prefix.as_str())
-            .await?;
-        Ok(resp)
-    }
-
-    async fn do_get_namespace(&mut self, id: &str) -> Result<Option<Namespace>> {
-        let key = namespace_key(id);
-        let namespace = self.get_json_value::<String, Namespace>(key, None).await?;
-        Ok(namespace)
-    }
-
-    pub async fn get_namespace(&mut self, lease_id: i64, id: &str) -> Result<Option<Namespace>> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = namespace_key(id);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self.do_get_namespace(id).await;
-        self.unlock(lock_name.as_str(), key).await?;
-        resp
-    }
-
-    async fn do_update_namespace(&mut self, id: &str) -> Result<(PutResponse, Namespace)> {
-        let namespace = match self.do_get_namespace(id).await? {
-            Some(namespace) => namespace,
-            None => Namespace::new(),
-        };
-        let key = namespace_key(id);
-        let value = serde_json::to_vec(&namespace)?;
-        let resp = self.put(key, value, None).await?;
-        Ok((resp, namespace))
-    }
-
-    pub async fn update_namespace(
-        &mut self,
-        lease_id: i64,
-        id: &str,
-    ) -> Result<(PutResponse, Namespace)> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = namespace_key(id);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self.do_update_namespace(id).await;
-        self.unlock(lock_name.as_str(), key).await?;
-        resp
-    }
-
-    pub async fn list_namespace(&mut self) -> Result<Vec<(String, Namespace)>> {
-        let prefix = root_resource(RESOURCE_NAMESPACE);
-        let resp = self.list_kvs::<&str, Namespace>(prefix.as_str()).await?;
-        Ok(resp)
-    }
-
-    async fn do_get_project(&mut self, namespace: &str, id: &str) -> Result<Option<Project>> {
-        let key = project_namespace_id(namespace, id);
-        let project = self.get_json_value::<String, Project>(key, None).await?;
-        Ok(project)
-    }
-
-    pub async fn get_project(
-        &mut self,
-        lease_id: i64,
-        namespace: &str,
-        id: &str,
-    ) -> Result<Option<Project>> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = project_namespace_id(namespace, id);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self.do_get_project(namespace, id).await;
-        self.unlock(lock_name.as_str(), key).await?;
-        resp
-    }
-
-    async fn do_update_project(
-        &mut self,
-        namespace: &str,
-        id: &str,
-    ) -> Result<(PutResponse, Project)> {
-        let project = match self.do_get_project(namespace, id).await? {
-            Some(project) => project,
-            None => Project::new(),
-        };
-        let key = project_namespace_id(namespace, id);
-        let value = serde_json::to_vec(&project)?;
-        let resp = self.put(key, value, None).await?;
-        Ok((resp, project))
-    }
-
-    pub async fn update_project(
-        &mut self,
-        lease_id: i64,
-        namespace: &str,
-        id: &str,
-    ) -> Result<(PutResponse, Project)> {
-        let lock_options = LockOptions::new().with_lease(lease_id);
-        let lock_name = project_namespace_id(namespace, id);
-        let lock_resp = self.lock(lock_name.as_str(), lock_options.into()).await?;
-        let key = lock_resp.key();
-        let resp = self.do_update_project(namespace, id).await;
-        self.unlock(lock_name.as_str(), key).await?;
-        resp
-    }
-
-    pub async fn list_project(&mut self, namespace: &str) -> Result<Vec<(String, Project)>> {
-        let prefix = project_namespace(namespace);
-        let resp = self.list_kvs::<&str, Project>(prefix.as_str()).await?;
-        Ok(resp)
-    }
-
-    pub async fn delete_build_metadata(
-        &mut self,
-        namespace: &str,
-        id: &str,
-        version: u64,
-    ) -> Result<()> {
-        let key = build_metadata_namespace_id_version(namespace, id, version);
-        let _ = self.delete(key, None).await?;
-        Ok(())
-    }
-
-    pub async fn delete_build_snapshot(&mut self, namespace: &str, id: &str) -> Result<()> {
-        let key = build_snapshot_namespace_id(namespace, id);
-        let _ = self.delete(key, None).await?;
-        Ok(())
-    }
-
-    pub async fn delete_app_metadata(
-        &mut self,
-        namespace: &str,
-        id: &str,
-        version: u64,
-    ) -> Result<()> {
-        let key = app_metadata_namespace_id_version(namespace, id, version);
-        let _ = self.delete(key, None).await?;
-        Ok(())
-    }
-
-    pub async fn delete_manifest_metadata(
-        &mut self,
-        namespace: &str,
-        id: &str,
-        version: u64,
-    ) -> Result<()> {
-        let key = manifest_metadata_namespace_id_version(namespace, id, version);
-        let _ = self.delete(key, None).await?;
-        Ok(())
-    }
-
-    pub async fn delete_manifest_snapshot(&mut self, namespace: &str, id: &str) -> Result<()> {
-        let key = manifest_snapshot_namespace_id(namespace, id);
-        let _ = self.delete(key, None).await?;
-        Ok(())
-    }
-
-    pub async fn delete_project(&mut self, namespace: &str, id: &str) -> Result<()> {
-        let key = project_namespace_id(namespace, id);
-        let _ = self.delete(key, None).await?;
-        Ok(())
-    }
-
-    pub async fn delete_namespace(&mut self, id: &str) -> Result<()> {
-        let key = namespace_key(id);
-        let _ = self.delete(key, None).await?;
-        Ok(())
-    }
-
-    pub async fn is_version_build_prefix_exist(
-        &mut self,
-        namespace: &str,
-        id: &str,
-    ) -> Result<bool> {
-        let prefix = build_metadata_namespace_id(namespace, id);
         self.is_prefix_exist(prefix).await
     }
 
-    pub async fn is_build_snapshot_exist(&mut self, namespace: &str, id: &str) -> Result<bool> {
-        let key = build_snapshot_namespace_id(namespace, id);
-        self.is_exist(key).await
-    }
-
-    pub async fn is_manifest_snapshot_exist(&mut self, namespace: &str, id: &str) -> Result<bool> {
-        let key = manifest_snapshot_namespace_id(namespace, id);
-        self.is_exist(key).await
-    }
-
-    pub async fn is_app_metadata_prefix_exist(
-        &mut self,
-        namespace: &str,
-        id: &str,
-    ) -> Result<bool> {
-        let prefix = app_metadata_namespace_id(namespace, id);
-        self.is_prefix_exist(prefix).await
-    }
-
-    pub async fn is_project_prefix_exist(&mut self, namespace: &str) -> Result<bool> {
-        let prefix = project_namespace(namespace);
-        self.is_prefix_exist(prefix).await
-    }
-
-    fn deserialize_kvs<T>(kvs: &[KeyValue]) -> Result<Vec<(String, T)>>
+    fn deserialize_json_kvs<T>(kvs: &[KeyValue]) -> Result<Vec<(String, T)>>
     where
         T: DeserializeOwned,
     {

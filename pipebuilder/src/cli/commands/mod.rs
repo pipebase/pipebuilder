@@ -38,11 +38,9 @@ pub async fn exec(
     args: &clap::ArgMatches,
 ) -> Result<()> {
     match (action, resource) {
-        ("activate", "builder") => activate::exec_builder(client, args).await,
-        ("deactivate", "builder") => deactivate::exec_builder(client, args).await,
-        ("shutdown", "builder") => shutdown::exec_builder(client, args).await,
-        ("shutdown", "repository") => shutdown::exec_repository(client, args).await,
-        ("shutdown", "scheduler") => shutdown::exec_scheduler(client, args).await,
+        ("activate", "node") => activate::exec_node(client, args).await,
+        ("deactivate", "node") => deactivate::exec_node(client, args).await,
+        ("shutdown", "node") => shutdown::exec_node(client, args).await,
         ("get", "build") => get::exec_build(client, args).await,
         ("pull", "app") => pull::exec_app(client, args).await,
         ("pull", "manifest") => pull::exec_manifest(client, args).await,

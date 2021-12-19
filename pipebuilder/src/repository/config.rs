@@ -5,6 +5,8 @@ use serde::Deserialize;
 pub struct RepositoryConfig {
     pub manifest: String,
     pub app: String,
+    pub catalog_schema: String,
+    pub catalogs: String,
 }
 
 #[derive(Deserialize)]

@@ -10,8 +10,8 @@ use pipebuilder_common::{
         },
         repository::repository_client::RepositoryClient,
     },
-    remove_directory, sub_path, Build, BuildCacheMetadata, BuildMetadata, BuildStatus,
-    LocalBuildContext, Register, PATH_APP,
+    remove_directory, sub_path, Build, BuildCacheMetadata, BuildMetadata, BuildSnapshot,
+    BuildStatus, LocalBuildContext, Register, PATH_APP,
 };
 use std::sync::Arc;
 use tonic::{transport::Channel, Response};
@@ -68,7 +68,7 @@ impl Builder for BuilderService {
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         let snapshot = match register
-            .incr_build_snapshot(namespace.as_str(), id.as_str(), lease_id)
+            .update_snapshot_resource::<BuildSnapshot>(namespace.as_str(), id.as_str(), lease_id)
             .await
         {
             Ok((_, snapshot)) => snapshot,
@@ -376,7 +376,7 @@ async fn update(
     let (namespace, id, _, build_version, target_platform) = build.get_build_meta();
     let (builder_id, builder_address) = build.get_builder_meta();
     let now = Utc::now();
-    let version_build = BuildMetadata::new(
+    let build_metadata = BuildMetadata::new(
         target_platform.to_owned(),
         status,
         now,
@@ -385,12 +385,12 @@ async fn update(
         message,
     );
     register
-        .put_build_metadata(
-            lease_id,
-            namespace.as_str(),
+        .put_resource(
+            Some(namespace.as_str()),
             id.as_str(),
-            build_version,
-            version_build,
+            Some(build_version),
+            build_metadata,
+            lease_id,
         )
         .await?;
     Ok(())
@@ -428,8 +428,8 @@ async fn cancel_build(
     id: &str,
     version: u64,
 ) -> pipebuilder_common::Result<()> {
-    let mut version_build = match register
-        .get_build_metadata(lease_id, namespace, id, version)
+    let mut build_metadata = match register
+        .get_resource::<BuildMetadata>(Some(namespace), id, Some(version), lease_id)
         .await?
     {
         Some(version_build) => version_build,
@@ -443,9 +443,9 @@ async fn cancel_build(
             return Ok(());
         }
     };
-    version_build.status = BuildStatus::Cancel;
+    build_metadata.status = BuildStatus::Cancel;
     register
-        .put_build_metadata(lease_id, namespace, id, version, version_build)
+        .put_resource(Some(namespace), id, Some(version), build_metadata, lease_id)
         .await?;
     Ok(())
 }

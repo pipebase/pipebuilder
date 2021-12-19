@@ -12,6 +12,7 @@ use crate::{
         copy_directory, create_directory, move_directory, parse_toml, remove_directory, sub_path,
         write_file, write_toml, TomlManifest,
     },
+    Resource, ResourceType, Snapshot,
 };
 use chrono::{DateTime, Utc};
 use pipegen::models::App;
@@ -107,6 +108,12 @@ impl BuildMetadata {
     }
 }
 
+impl Resource for BuildMetadata {
+    fn ty() -> ResourceType {
+        ResourceType::BuildMetadata
+    }
+}
+
 pub struct BuildCacheMetadata {
     pub timestamp: DateTime<Utc>,
 }
@@ -133,6 +140,18 @@ impl Default for BuildCacheMetadata {
 #[derive(Default, Deserialize, Serialize)]
 pub struct BuildSnapshot {
     pub latest_version: u64,
+}
+
+impl Snapshot for BuildSnapshot {
+    fn incr_version(&mut self) {
+        self.latest_version += 1
+    }
+}
+
+impl Resource for BuildSnapshot {
+    fn ty() -> ResourceType {
+        ResourceType::BuildSnapshot
+    }
 }
 
 // build context shared by all local builds

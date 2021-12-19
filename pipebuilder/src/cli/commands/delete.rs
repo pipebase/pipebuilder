@@ -182,7 +182,8 @@ pub fn build_cache() -> Cmd {
             Arg::new("target-platform")
                 .short('t')
                 .help("Specify target platform, checkout https://doc.rust-lang.org/nightly/rustc/platform-support.html")
-                .takes_value(true),
+                .takes_value(true)
+                .required(true),
         ])
 }
 

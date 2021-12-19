@@ -1,8 +1,7 @@
 use crate::{
     grpc::node::{self, node_server::Node},
-    Period, Register, DEFAULT_NODE_HEARTBEAT_PERIOD, ENV_PIPEBUILDER_EXTERNAL_ADDR,
-    ENV_PIPEBUILDER_NODE_ID, RESOURCE_NODE_API, RESOURCE_NODE_BUILDER, RESOURCE_NODE_REPOSITORY,
-    RESOURCE_NODE_SCHEDULER,
+    Period, Register, Resource, ResourceType, DEFAULT_NODE_HEARTBEAT_PERIOD,
+    ENV_PIPEBUILDER_EXTERNAL_ADDR, ENV_PIPEBUILDER_NODE_ID,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -16,7 +15,7 @@ use std::{
 use tokio::sync::oneshot::Sender;
 use tracing::{error, info};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum NodeRole {
     Api,
     Builder,
@@ -47,16 +46,6 @@ impl From<&str> for NodeRole {
             "scheduler" | "Scheduler" => NodeRole::Scheduler,
             _ => NodeRole::Undefined,
         }
-    }
-}
-
-pub fn node_role_prefix(role: &NodeRole) -> &'static str {
-    match role {
-        NodeRole::Api => RESOURCE_NODE_API,
-        NodeRole::Builder => RESOURCE_NODE_BUILDER,
-        NodeRole::Repository => RESOURCE_NODE_REPOSITORY,
-        NodeRole::Scheduler => RESOURCE_NODE_SCHEDULER,
-        NodeRole::Undefined => unreachable!(),
     }
 }
 
@@ -154,8 +143,6 @@ impl ToString for NodeOS {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct NodeState {
-    // node id
-    pub id: String,
     // node role
     pub role: NodeRole,
     // node arch
@@ -170,6 +157,12 @@ pub struct NodeState {
     pub status: NodeStatus,
     // timestamp
     pub timestamp: DateTime<Utc>,
+}
+
+impl Resource for NodeState {
+    fn ty() -> ResourceType {
+        ResourceType::Node
+    }
 }
 
 impl NodeState {
@@ -291,7 +284,6 @@ impl NodeService {
                 let status_code = status_code.load(Ordering::Acquire);
                 let status: NodeStatus = status_code.into();
                 let state = NodeState {
-                    id: id.clone(),
                     role: role.clone(),
                     arch: arch.clone(),
                     os: os.clone(),
@@ -300,7 +292,10 @@ impl NodeService {
                     status: status.clone(),
                     timestamp,
                 };
-                match register.put_node_state(&role, &state, lease_id).await {
+                match register
+                    .put_resource::<NodeState>(None, id.as_str(), None, state, lease_id)
+                    .await
+                {
                     Ok(_) => (),
                     Err(e) => {
                         error!(

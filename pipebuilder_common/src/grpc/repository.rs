@@ -31,7 +31,7 @@ pub struct PutManifestRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PutManifestResponse {
     /// manifest version
-    #[prost(uint64, tag = "2")]
+    #[prost(uint64, tag = "1")]
     pub version: u64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -97,6 +97,106 @@ pub struct DeleteAppRequest {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DeleteAppResponse {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PutCatalogSchemaRequest {
+    /// catalog schema namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// catalog schema id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
+    /// catalog schema context
+    #[prost(bytes = "vec", tag = "3")]
+    pub buffer: ::prost::alloc::vec::Vec<u8>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PutCatalogSchemaResponse {
+    /// catalog schema version
+    #[prost(uint64, tag = "1")]
+    pub version: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetCatalogSchemaRequest {
+    /// catalog schema namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// catalog schema id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
+    /// catalog schema version
+    #[prost(uint64, tag = "3")]
+    pub version: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetCatalogSchemaResponse {
+    /// catalog schema binaries
+    #[prost(bytes = "vec", tag = "1")]
+    pub buffer: ::prost::alloc::vec::Vec<u8>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteCatalogSchemaRequest {
+    /// catalog schema namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// catalog schema id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
+    /// catalog schema version
+    #[prost(uint64, tag = "3")]
+    pub version: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteCatalogSchemaResponse {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PutCatalogsRequest {
+    /// project namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// project id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
+    /// catalogs context
+    #[prost(bytes = "vec", tag = "3")]
+    pub buffer: ::prost::alloc::vec::Vec<u8>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PutCatalogsResponse {
+    /// catalogs version
+    #[prost(uint64, tag = "1")]
+    pub version: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetCatalogsRequest {
+    /// project namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// project id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
+    /// catalogs version
+    #[prost(uint64, tag = "3")]
+    pub version: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetCatalogsResponse {
+    /// catalogs context
+    #[prost(bytes = "vec", tag = "1")]
+    pub buffer: ::prost::alloc::vec::Vec<u8>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteCatalogsRequest {
+    /// project namespace
+    #[prost(string, tag = "1")]
+    pub namespace: ::prost::alloc::string::String,
+    /// project id
+    #[prost(string, tag = "2")]
+    pub id: ::prost::alloc::string::String,
+    /// catalogs version
+    #[prost(uint64, tag = "3")]
+    pub version: u64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteCatalogsResponse {}
 #[doc = r" Generated client implementations."]
 pub mod repository_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -242,6 +342,94 @@ pub mod repository_client {
             let path = http::uri::PathAndQuery::from_static("/repository.Repository/DeleteApp");
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn get_catalog_schema(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetCatalogSchemaRequest>,
+        ) -> Result<tonic::Response<super::GetCatalogSchemaResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path =
+                http::uri::PathAndQuery::from_static("/repository.Repository/GetCatalogSchema");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn put_catalog_schema(
+            &mut self,
+            request: impl tonic::IntoRequest<super::PutCatalogSchemaRequest>,
+        ) -> Result<tonic::Response<super::PutCatalogSchemaResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path =
+                http::uri::PathAndQuery::from_static("/repository.Repository/PutCatalogSchema");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn delete_catalog_schema(
+            &mut self,
+            request: impl tonic::IntoRequest<super::DeleteCatalogSchemaRequest>,
+        ) -> Result<tonic::Response<super::DeleteCatalogSchemaResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path =
+                http::uri::PathAndQuery::from_static("/repository.Repository/DeleteCatalogSchema");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn get_catalogs(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetCatalogsRequest>,
+        ) -> Result<tonic::Response<super::GetCatalogsResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/repository.Repository/GetCatalogs");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn put_catalogs(
+            &mut self,
+            request: impl tonic::IntoRequest<super::PutCatalogsRequest>,
+        ) -> Result<tonic::Response<super::PutCatalogsResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/repository.Repository/PutCatalogs");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn delete_catalogs(
+            &mut self,
+            request: impl tonic::IntoRequest<super::DeleteCatalogsRequest>,
+        ) -> Result<tonic::Response<super::DeleteCatalogsResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path =
+                http::uri::PathAndQuery::from_static("/repository.Repository/DeleteCatalogs");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
     }
 }
 #[doc = r" Generated server implementations."]
@@ -275,6 +463,30 @@ pub mod repository_server {
             &self,
             request: tonic::Request<super::DeleteAppRequest>,
         ) -> Result<tonic::Response<super::DeleteAppResponse>, tonic::Status>;
+        async fn get_catalog_schema(
+            &self,
+            request: tonic::Request<super::GetCatalogSchemaRequest>,
+        ) -> Result<tonic::Response<super::GetCatalogSchemaResponse>, tonic::Status>;
+        async fn put_catalog_schema(
+            &self,
+            request: tonic::Request<super::PutCatalogSchemaRequest>,
+        ) -> Result<tonic::Response<super::PutCatalogSchemaResponse>, tonic::Status>;
+        async fn delete_catalog_schema(
+            &self,
+            request: tonic::Request<super::DeleteCatalogSchemaRequest>,
+        ) -> Result<tonic::Response<super::DeleteCatalogSchemaResponse>, tonic::Status>;
+        async fn get_catalogs(
+            &self,
+            request: tonic::Request<super::GetCatalogsRequest>,
+        ) -> Result<tonic::Response<super::GetCatalogsResponse>, tonic::Status>;
+        async fn put_catalogs(
+            &self,
+            request: tonic::Request<super::PutCatalogsRequest>,
+        ) -> Result<tonic::Response<super::PutCatalogsResponse>, tonic::Status>;
+        async fn delete_catalogs(
+            &self,
+            request: tonic::Request<super::DeleteCatalogsRequest>,
+        ) -> Result<tonic::Response<super::DeleteCatalogsResponse>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct RepositoryServer<T: Repository> {
@@ -493,6 +705,201 @@ pub mod repository_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = DeleteAppSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/repository.Repository/GetCatalogSchema" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetCatalogSchemaSvc<T: Repository>(pub Arc<T>);
+                    impl<T: Repository> tonic::server::UnaryService<super::GetCatalogSchemaRequest>
+                        for GetCatalogSchemaSvc<T>
+                    {
+                        type Response = super::GetCatalogSchemaResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetCatalogSchemaRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).get_catalog_schema(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetCatalogSchemaSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/repository.Repository/PutCatalogSchema" => {
+                    #[allow(non_camel_case_types)]
+                    struct PutCatalogSchemaSvc<T: Repository>(pub Arc<T>);
+                    impl<T: Repository> tonic::server::UnaryService<super::PutCatalogSchemaRequest>
+                        for PutCatalogSchemaSvc<T>
+                    {
+                        type Response = super::PutCatalogSchemaResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::PutCatalogSchemaRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).put_catalog_schema(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = PutCatalogSchemaSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/repository.Repository/DeleteCatalogSchema" => {
+                    #[allow(non_camel_case_types)]
+                    struct DeleteCatalogSchemaSvc<T: Repository>(pub Arc<T>);
+                    impl<T: Repository>
+                        tonic::server::UnaryService<super::DeleteCatalogSchemaRequest>
+                        for DeleteCatalogSchemaSvc<T>
+                    {
+                        type Response = super::DeleteCatalogSchemaResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::DeleteCatalogSchemaRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).delete_catalog_schema(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = DeleteCatalogSchemaSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/repository.Repository/GetCatalogs" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetCatalogsSvc<T: Repository>(pub Arc<T>);
+                    impl<T: Repository> tonic::server::UnaryService<super::GetCatalogsRequest> for GetCatalogsSvc<T> {
+                        type Response = super::GetCatalogsResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetCatalogsRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).get_catalogs(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetCatalogsSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/repository.Repository/PutCatalogs" => {
+                    #[allow(non_camel_case_types)]
+                    struct PutCatalogsSvc<T: Repository>(pub Arc<T>);
+                    impl<T: Repository> tonic::server::UnaryService<super::PutCatalogsRequest> for PutCatalogsSvc<T> {
+                        type Response = super::PutCatalogsResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::PutCatalogsRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).put_catalogs(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = PutCatalogsSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/repository.Repository/DeleteCatalogs" => {
+                    #[allow(non_camel_case_types)]
+                    struct DeleteCatalogsSvc<T: Repository>(pub Arc<T>);
+                    impl<T: Repository> tonic::server::UnaryService<super::DeleteCatalogsRequest>
+                        for DeleteCatalogsSvc<T>
+                    {
+                        type Response = super::DeleteCatalogsResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::DeleteCatalogsRequest>,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).delete_catalogs(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = DeleteCatalogsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
                             accept_compression_encodings,

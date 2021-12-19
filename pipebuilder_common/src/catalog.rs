@@ -1,28 +1,80 @@
-use crate::{invalid_catalog_name, json_schema_error, Result};
+use crate::{
+    invalid_catalog_name, json_schema_error, BlobResource, Resource, ResourceType, Result, Snapshot,
+};
+use chrono::{DateTime, Utc};
 use jsonschema::JSONSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize)]
 pub struct CatalogSchemaMetadata {
-    pub namespace: String,
-    // schema id, note that catalog schema shared within namespace
-    // regardless of project
-    pub schema_id: String,
+    // pull count
+    pub pulls: u64,
+    // catalog schema file size in byte
+    pub size: usize,
+    // created timestamp
+    pub created: DateTime<Utc>,
 }
 
-impl CatalogSchemaMetadata {
-    pub fn get_path(&self) -> String {
-        format!("{}/{}.json", self.namespace, self.schema_id)
+impl BlobResource for CatalogSchemaMetadata {
+    fn incr_usage(&mut self) {
+        self.pulls += 1
+    }
+
+    fn new(size: usize) -> Self {
+        CatalogSchemaMetadata {
+            pulls: 0,
+            size,
+            created: Utc::now(),
+        }
+    }
+}
+
+impl Resource for CatalogSchemaMetadata {
+    fn ty() -> ResourceType {
+        ResourceType::CatalogSchemaMetadata
     }
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct CatalogSchemaSnapshot {
+    pub latest_version: u64,
+}
+
+impl CatalogSchemaSnapshot {
+    pub fn new() -> Self {
+        CatalogSchemaSnapshot { latest_version: 0 }
+    }
+}
+
+impl Default for CatalogSchemaSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Snapshot for CatalogSchemaSnapshot {
+    fn incr_version(&mut self) {
+        self.latest_version += 1
+    }
+}
+
+impl Resource for CatalogSchemaSnapshot {
+    fn ty() -> ResourceType {
+        ResourceType::CatalogSchemaSnapshot
+    }
+}
+
+// Pipe configuration
+#[derive(Serialize, Deserialize)]
 pub struct Catalog {
-    pub schema: CatalogSchemaMetadata,
-    // configuration filename
+    // schema info
+    pub schema_namespace: String,
+    pub schema_id: String,
+    pub schema_version: u64,
+    // catalog filename
     pub name: String,
-    // connfiguration context in yaml
+    // catalog context in yaml
     pub yml: String,
 }
 
@@ -34,8 +86,8 @@ impl Catalog {
         visitor.visit(self)
     }
 
-    pub fn get_schema(&self) -> &CatalogSchemaMetadata {
-        &self.schema
+    pub fn get_schema_info(&self) -> (&String, &String, u64) {
+        (&self.schema_namespace, &self.schema_id, self.schema_version)
     }
 
     pub fn get_name(&self) -> &String {
@@ -198,16 +250,73 @@ fn yml_to_json(yml: &str) -> Result<String> {
     Ok(json)
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct CatalogsMetadata {
+    // pull count
+    pub pulls: u64,
+    // catalogs file size in byte
+    pub size: usize,
+    // created timestamp
+    pub created: DateTime<Utc>,
+}
+
+impl BlobResource for CatalogsMetadata {
+    fn incr_usage(&mut self) {
+        self.pulls += 1
+    }
+
+    fn new(size: usize) -> Self {
+        CatalogsMetadata {
+            pulls: 0,
+            size,
+            created: Utc::now(),
+        }
+    }
+}
+
+impl Resource for CatalogsMetadata {
+    fn ty() -> ResourceType {
+        ResourceType::CatalogsMetadata
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CatalogsSnapshot {
+    pub latest_version: u64,
+}
+
+impl CatalogsSnapshot {
+    pub fn new() -> Self {
+        CatalogsSnapshot { latest_version: 0 }
+    }
+}
+
+impl Default for CatalogsSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Snapshot for CatalogsSnapshot {
+    fn incr_version(&mut self) {
+        self.latest_version += 1
+    }
+}
+
+impl Resource for CatalogsSnapshot {
+    fn ty() -> ResourceType {
+        ResourceType::CatalogsSnapshot
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        Catalog, CatalogNameValidator, CatalogSchemaMetadata, CatalogSchemaValidator,
-        ValidateCatalog,
-    };
+    use crate::{Catalog, CatalogNameValidator, CatalogSchemaValidator, ValidateCatalog};
 
     const TEST_NAMESPACE: &str = "test";
     const TEST_CATALOG_SCHEMA_SCHEMA_ID: &str = "test_schema";
+    const TEST_CATALOG_SCHEMA_VERSION: u64 = 0;
     const TEST_CATALOG_NAME: &str = "test_catalog";
     const TEST_CATALOG_YAML: &str = r#"
 ---
@@ -317,12 +426,10 @@ ticks: 10
     // sample validation for timer catalog
     #[test]
     fn test_valid_catalog() {
-        let test_catalog_schema = CatalogSchemaMetadata {
-            namespace: String::from(TEST_NAMESPACE),
-            schema_id: String::from(TEST_CATALOG_SCHEMA_SCHEMA_ID),
-        };
         let test_catalog = Catalog {
-            schema: test_catalog_schema,
+            schema_namespace: String::from(TEST_NAMESPACE),
+            schema_id: String::from(TEST_CATALOG_SCHEMA_SCHEMA_ID),
+            schema_version: TEST_CATALOG_SCHEMA_VERSION,
             name: String::from(TEST_CATALOG_NAME),
             yml: String::from(TEST_CATALOG_YAML),
         };

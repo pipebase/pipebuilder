@@ -42,9 +42,8 @@ pub async fn shutdown_ci(client: &ApiClient) -> Result<()> {
                 client.shutdown(&ShutdownRequest {}).await?;
             }
             _ => {
-                client
-                    .shutdown_node(&ShutdownNodeRequest { role, id })
-                    .await?;
+                // shutdown internal node, ex: builder
+                client.shutdown_node(&ShutdownNodeRequest { id }).await?;
             }
         };
     }

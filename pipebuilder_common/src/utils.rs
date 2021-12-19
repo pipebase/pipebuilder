@@ -1,9 +1,6 @@
 use crate::{
     errors::{cargo_error, Result},
     grpc::{build::builder_client::BuilderClient, node::node_client::NodeClient},
-    node_role_prefix, NodeRole, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA,
-    RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
-    RESOURCE_NAMESPACE, RESOURCE_NODE, RESOURCE_PROJECT,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use etcd_client::{Event, EventType};
@@ -314,127 +311,6 @@ where
         return Ok(Some((event.event_type(), key.to_owned(), value)));
     }
     Ok(None)
-}
-
-// key prefix functions
-pub fn root_resource(resource: &str) -> String {
-    format!("/{}", resource)
-}
-
-pub fn resource_id(resource: &str, id: &str) -> String {
-    format!("/{}/{}", resource, id)
-}
-
-pub fn resource_namespace(resource: &str, namespace: &str) -> String {
-    format!("/{}/{}", resource, namespace)
-}
-
-pub fn resource_namespace_id(resource: &str, namespace: &str, id: &str) -> String {
-    format!("/{}/{}/{}", resource, namespace, id)
-}
-
-pub fn resource_namespace_id_version(
-    resource: &str,
-    namespace: &str,
-    id: &str,
-    version: u64,
-) -> String {
-    format!("/{}/{}/{}/{}", resource, namespace, id, version)
-}
-
-pub fn namespace_key(id: &str) -> String {
-    resource_id(RESOURCE_NAMESPACE, id)
-}
-
-pub fn node_key(role: &NodeRole, id: &str) -> String {
-    let role_prefix = node_role_prefix(role);
-    resource_id(role_prefix, id)
-}
-
-pub fn node_role_prefix_key(role: Option<&NodeRole>) -> String {
-    let role_prefix = match role {
-        Some(role) => node_role_prefix(role),
-        None => RESOURCE_NODE,
-    };
-    root_resource(role_prefix)
-}
-
-pub fn app_metadata_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_APP_METADATA, namespace)
-}
-
-pub fn app_metadata_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
-    resource_namespace_id_version(RESOURCE_APP_METADATA, namespace, id, version)
-}
-
-pub fn build_snapshot_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_BUILD_SNAPSHOT, namespace)
-}
-
-pub fn manifest_metadata_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_MANIFEST_METADATA, namespace)
-}
-
-pub fn manifest_metadata_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
-    resource_namespace_id_version(RESOURCE_MANIFEST_METADATA, namespace, id, version)
-}
-
-pub fn manifest_snapshot_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_MANIFEST_SNAPSHOT, namespace)
-}
-
-pub fn project_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_PROJECT, namespace)
-}
-
-pub fn version_build_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_BUILD_METADATA, namespace)
-}
-
-pub fn app_metadata_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_APP_METADATA, namespace, id)
-}
-
-pub fn build_snapshot_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_BUILD_SNAPSHOT, namespace, id)
-}
-
-pub fn manifest_metadata_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_MANIFEST_METADATA, namespace, id)
-}
-
-pub fn manifest_snapshot_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_MANIFEST_SNAPSHOT, namespace, id)
-}
-
-pub fn project_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_PROJECT, namespace, id)
-}
-
-pub fn build_metadata_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_BUILD_METADATA, namespace, id)
-}
-
-pub fn build_metadata_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
-    resource_namespace_id_version(RESOURCE_BUILD_METADATA, namespace, id, version)
-}
-
-// remove '/resource/namespace/' and return id/<suffix> given a key
-pub fn remove_resource_namespace<'a>(key: &'a str, resource: &str, namespace: &str) -> &'a str {
-    let pattern = format!("{}/", resource_namespace(resource, namespace));
-    key.strip_prefix(pattern.as_str()).unwrap_or_else(|| {
-        panic!(
-            "key '{}' not start with '/{}/{}/'",
-            key, resource, namespace
-        )
-    })
-}
-
-// remove '/resource/' and return suffix
-pub fn remove_resource<'a>(key: &'a str, resource: &str) -> &'a str {
-    let pattern = format!("{}/", root_resource(resource));
-    key.strip_prefix(pattern.as_str())
-        .unwrap_or_else(|| panic!("key '{}' not start with '/{}/'", key, resource))
 }
 
 // rpc

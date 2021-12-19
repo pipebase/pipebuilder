@@ -11,3 +11,5 @@ base:
 repository:
   manifest: /opt/repository/manifests
   app: /opt/repository/apps
+  catalog_schema: /opt/repository/catalog_schema
+  catalogs: /opt/repository/catalogs

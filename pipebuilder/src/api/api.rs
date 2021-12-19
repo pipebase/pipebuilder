@@ -515,10 +515,9 @@ mod handlers {
             },
             schedule::{scheduler_client::SchedulerClient, ScheduleRequest, ScheduleResponse},
         },
-        remove_resource, remove_resource_namespace, NodeRole, NodeService,
-        NodeState as InternalNodeState, Register, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA,
-        RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
-        RESOURCE_NAMESPACE, RESOURCE_PROJECT,
+        remove_resource, remove_resource_namespace, AppMetadata, BuildMetadata, BuildSnapshot,
+        ManifestMetadata, ManifestSnapshot, Namespace, NodeRole, NodeService, NodeState, Project,
+        Register,
     };
     use serde::Serialize;
     use std::convert::Infallible;
@@ -685,16 +684,14 @@ mod handlers {
         request: models::ListManifestSnapshotRequest,
     ) -> pipebuilder_common::Result<Vec<models::ManifestSnapshot>> {
         let namespace = request.namespace;
-        let manifest_snapshots = register.list_manifest_snapshot(namespace.as_str()).await?;
+        let manifest_snapshots = register
+            .list_resource::<ManifestSnapshot>(Some(namespace.as_str()), None)
+            .await?;
         let snapshots: Vec<models::ManifestSnapshot> = manifest_snapshots
             .into_iter()
             .map(|(key, manifest_snapshot)| models::ManifestSnapshot {
-                id: remove_resource_namespace(
-                    key.as_str(),
-                    RESOURCE_MANIFEST_SNAPSHOT,
-                    namespace.as_str(),
-                )
-                .to_owned(),
+                id: remove_resource_namespace::<ManifestSnapshot>(key.as_str(), namespace.as_str())
+                    .to_owned(),
                 latest_version: manifest_snapshot.latest_version,
             })
             .collect();
@@ -723,7 +720,7 @@ mod handlers {
         let namespace = request.namespace;
         let id = request.id;
         register
-            .delete_manifest_snapshot(namespace.as_str(), id.as_str())
+            .delete_resource::<ManifestSnapshot>(Some(namespace.as_str()), id.as_str(), None)
             .await?;
         Ok(models::DeleteManifestSnapshotResponse {})
     }
@@ -748,16 +745,14 @@ mod handlers {
         request: models::ListBuildSnapshotRequest,
     ) -> pipebuilder_common::Result<Vec<models::BuildSnapshot>> {
         let namespace = request.namespace;
-        let build_snapshots = register.list_build_snapshot(namespace.as_str()).await?;
+        let build_snapshots = register
+            .list_resource::<BuildSnapshot>(Some(namespace.as_str()), None)
+            .await?;
         let snapshots: Vec<models::BuildSnapshot> = build_snapshots
             .into_iter()
             .map(|(key, build_snapshot)| models::BuildSnapshot {
-                id: remove_resource_namespace(
-                    key.as_str(),
-                    RESOURCE_BUILD_SNAPSHOT,
-                    namespace.as_str(),
-                )
-                .to_owned(),
+                id: remove_resource_namespace::<BuildSnapshot>(key.as_str(), namespace.as_str())
+                    .to_owned(),
                 latest_version: build_snapshot.latest_version,
             })
             .collect();
@@ -785,7 +780,7 @@ mod handlers {
         let namespace = request.namespace;
         let id = request.id;
         register
-            .delete_build_snapshot(namespace.as_str(), id.as_str())
+            .delete_resource::<BuildSnapshot>(Some(namespace.as_str()), id.as_str(), None)
             .await?;
         Ok(models::DeleteBuildSnapshotResponse {})
     }
@@ -821,7 +816,12 @@ mod handlers {
         let id = request.id;
         let version = request.version;
         let build_metadata = register
-            .get_build_metadata(lease_id, namespace.as_str(), id.as_str(), version)
+            .get_resource::<BuildMetadata>(
+                Some(namespace.as_str()),
+                id.as_str(),
+                Some(version),
+                lease_id,
+            )
             .await?;
         Ok(build_metadata.map(|b| models::BuildMetadata {
             id,
@@ -855,16 +855,15 @@ mod handlers {
         request: models::ListBuildRequest,
     ) -> pipebuilder_common::Result<Vec<models::BuildMetadata>> {
         let namespace = request.namespace;
-        let id = request.id;
-        let build_metadatas = register.list_build_metadata(namespace.as_str(), id).await?;
+        let id = request.id.as_deref();
+        let build_metadatas = register
+            .list_resource::<BuildMetadata>(Some(namespace.as_str()), id)
+            .await?;
         let build_metadatas = build_metadatas
             .into_iter()
             .map(|(key, build_metadata)| {
-                let id_version = remove_resource_namespace(
-                    key.as_str(),
-                    RESOURCE_BUILD_METADATA,
-                    namespace.as_str(),
-                );
+                let id_version =
+                    remove_resource_namespace::<BuildMetadata>(key.as_str(), namespace.as_str());
                 let id_version = id_version.split('/').collect::<Vec<&str>>();
                 let id = id_version.get(0).expect("id not found in key").to_string();
                 let version: u64 = id_version
@@ -966,7 +965,7 @@ mod handlers {
         let id = request.id.as_str();
         let version = request.version;
         let build_metadata = match register
-            .get_build_metadata(lease_id, namespace, id, version)
+            .get_resource::<BuildMetadata>(Some(namespace), id, Some(version), lease_id)
             .await
         {
             Ok(build_metadata) => build_metadata,
@@ -1001,7 +1000,7 @@ mod handlers {
         let id = request.id;
         let version = request.version;
         register
-            .delete_build_metadata(namespace.as_str(), id.as_str(), version)
+            .delete_resource::<BuildMetadata>(Some(namespace.as_str()), id.as_str(), Some(version))
             .await?;
         Ok(models::DeleteBuildResponse {})
     }
@@ -1164,11 +1163,29 @@ mod handlers {
         register: &mut Register,
         request: models::ListNodeStateRequest,
     ) -> pipebuilder_common::Result<Vec<models::NodeState>> {
-        let role = request.role;
-        let node_states = register.list_node_state(role.as_ref()).await?;
+        let role = request.role.as_ref();
+        let node_states = register.list_resource::<NodeState>(None, None).await?;
         let node_states = node_states
             .into_iter()
-            .map(|(_, node_state)| node_state.into())
+            .filter_map(|(key, node_state)| {
+                let id = remove_resource::<NodeState>(key.as_str());
+                let node_state = models::NodeState {
+                    id: id.to_owned(),
+                    role: node_state.role,
+                    arch: node_state.arch,
+                    os: node_state.os,
+                    status: node_state.status,
+                    timestamp: node_state.timestamp,
+                };
+                let role = match role {
+                    Some(role) => role,
+                    None => return Some(node_state),
+                };
+                if &node_state.role == role {
+                    return Some(node_state);
+                }
+                None
+            })
             .collect::<Vec<models::NodeState>>();
         Ok(node_states)
     }
@@ -1180,23 +1197,26 @@ mod handlers {
     ) -> Result<impl warp::Reply, Infallible> {
         // validate request
         let builder_id = request.builder_id.as_str();
-        let node_state =
-            match get_internal_node_state(&mut register, lease_id, &NodeRole::Builder, builder_id)
-                .await
-            {
-                Ok(node_state) => node_state,
-                Err(err) => return Ok(http_internal_error(err.into())),
-            };
+        let node_state = match get_internal_node_state(&mut register, lease_id, builder_id).await {
+            Ok(node_state) => node_state,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+
         // find builder address
-        let address = match node_state {
-            Some(node_state) => node_state.external_address,
+        let node_state = match node_state {
+            Some(node_state) => node_state,
             None => {
                 return Ok(http_not_found(Failure::new(format!(
-                    "builder '{}' not found",
+                    "node '{}' not found",
                     builder_id
                 ))))
             }
         };
+        match validations::validate_node_state(&node_state, &NodeRole::Builder) {
+            Ok(()) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        }
+        let address = node_state.external_address;
         let mut client = match builder_client(address.as_str()).await {
             Ok(client) => client,
             Err(err) => return Ok(http_internal_error(err.into())),
@@ -1229,23 +1249,25 @@ mod handlers {
     ) -> Result<impl warp::Reply, Infallible> {
         // validate request
         let builder_id = request.builder_id.as_str();
-        let node_state =
-            match get_internal_node_state(&mut register, lease_id, &NodeRole::Builder, builder_id)
-                .await
-            {
-                Ok(node_state) => node_state,
-                Err(err) => return Ok(http_internal_error(err.into())),
-            };
-        // find builder address
-        let address = match node_state {
-            Some(node_state) => node_state.external_address,
+        let node_state = match get_internal_node_state(&mut register, lease_id, builder_id).await {
+            Ok(node_state) => node_state,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        let node_state = match node_state {
+            Some(node_state) => node_state,
             None => {
                 return Ok(http_not_found(Failure::new(format!(
-                    "builder '{}' not found",
+                    "node '{}' not found",
                     builder_id
                 ))))
             }
         };
+        match validations::validate_node_state(&node_state, &NodeRole::Builder) {
+            Ok(()) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        }
+        // find builder address
+        let address = node_state.external_address;
         let mut client = match builder_client(address.as_str()).await {
             Ok(client) => client,
             Err(err) => return Ok(http_internal_error(err.into())),
@@ -1278,23 +1300,25 @@ mod handlers {
     ) -> Result<impl warp::Reply, Infallible> {
         // validate request
         let builder_id = request.builder_id.as_str();
-        let node_state =
-            match get_internal_node_state(&mut register, lease_id, &NodeRole::Builder, builder_id)
-                .await
-            {
-                Ok(node_state) => node_state,
-                Err(err) => return Ok(http_internal_error(err.into())),
-            };
-        // find builder address
-        let address = match node_state {
-            Some(node_state) => node_state.external_address,
+        let node_state = match get_internal_node_state(&mut register, lease_id, builder_id).await {
+            Ok(node_state) => node_state,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
+        let node_state = match node_state {
+            Some(node_state) => node_state,
             None => {
                 return Ok(http_not_found(Failure::new(format!(
-                    "builder '{}' not found",
+                    "node '{}' not found",
                     builder_id
                 ))))
             }
         };
+        match validations::validate_node_state(&node_state, &NodeRole::Builder) {
+            Ok(()) => (),
+            Err(err) => return Ok(http_bad_request(err.into())),
+        }
+        // find builder address
+        let address = node_state.external_address;
         let mut client = match builder_client(address.as_str()).await {
             Ok(client) => client,
             Err(err) => return Ok(http_internal_error(err.into())),
@@ -1319,24 +1343,17 @@ mod handlers {
         lease_id: i64,
         request: models::ActivateNodeRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match validations::validate_activate_node_request(&request) {
-            Ok(()) => (),
-            Err(err) => return Ok(http_bad_request(err.into())),
-        };
         let node_id = request.id.as_str();
-        let node_role = request.role;
-        let node_state =
-            match get_internal_node_state(&mut register, lease_id, &node_role, node_id).await {
-                Ok(node_state) => node_state,
-                Err(err) => return Ok(http_internal_error(err.into())),
-            };
+        let node_state = match get_internal_node_state(&mut register, lease_id, node_id).await {
+            Ok(node_state) => node_state,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
         // find node address
         let address = match node_state {
             Some(node_state) => node_state.external_address,
             None => {
                 return Ok(http_not_found(Failure::new(format!(
-                    "node '({}, {})' not found",
-                    node_role.to_string(),
+                    "node '(id = {})' not found",
                     node_id
                 ))))
             }
@@ -1356,24 +1373,17 @@ mod handlers {
         lease_id: i64,
         request: models::DeactivateNodeRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match validations::validate_deactivate_node_request(&request) {
-            Ok(()) => (),
-            Err(err) => return Ok(http_bad_request(err.into())),
-        };
         let node_id = request.id.as_str();
-        let node_role = request.role;
-        let node_state =
-            match get_internal_node_state(&mut register, lease_id, &node_role, node_id).await {
-                Ok(node_state) => node_state,
-                Err(err) => return Ok(http_internal_error(err.into())),
-            };
+        let node_state = match get_internal_node_state(&mut register, lease_id, node_id).await {
+            Ok(node_state) => node_state,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
         // find node address
         let address = match node_state {
             Some(node_state) => node_state.external_address,
             None => {
                 return Ok(http_not_found(Failure::new(format!(
-                    "node '({}, {})' not found",
-                    node_role.to_string(),
+                    "node '(id = {})' not found",
                     node_id
                 ))))
             }
@@ -1393,24 +1403,17 @@ mod handlers {
         lease_id: i64,
         request: models::ShutdownNodeRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match validations::validate_shutdown_node_request(&request) {
-            Ok(()) => (),
-            Err(err) => return Ok(http_bad_request(err.into())),
-        };
         let node_id = request.id.as_str();
-        let node_role = request.role;
-        let node_state =
-            match get_internal_node_state(&mut register, lease_id, &node_role, node_id).await {
-                Ok(node_state) => node_state,
-                Err(err) => return Ok(http_internal_error(err.into())),
-            };
+        let node_state = match get_internal_node_state(&mut register, lease_id, node_id).await {
+            Ok(node_state) => node_state,
+            Err(err) => return Ok(http_internal_error(err.into())),
+        };
         // find node address
         let address = match node_state {
             Some(node_state) => node_state.external_address,
             None => {
                 return Ok(http_not_found(Failure::new(format!(
-                    "node '({}, {})' not found",
-                    node_role.to_string(),
+                    "node '(id = {})' not found",
                     node_id
                 ))))
             }
@@ -1469,13 +1472,14 @@ mod handlers {
         request: models::ListAppMetadataRequest,
     ) -> pipebuilder_common::Result<Vec<models::AppMetadata>> {
         let namespace = request.namespace.as_str();
-        let id = request.id;
-        let metas = register.list_app_metadata(namespace, id).await?;
+        let id = request.id.as_deref();
+        let metas = register
+            .list_resource::<AppMetadata>(Some(namespace), id)
+            .await?;
         let metas = metas
             .into_iter()
             .map(|(key, meta)| {
-                let id_version =
-                    remove_resource_namespace(key.as_str(), RESOURCE_APP_METADATA, namespace);
+                let id_version = remove_resource_namespace::<AppMetadata>(key.as_str(), namespace);
                 let id_version = id_version.split('/').collect::<Vec<&str>>();
                 let id = id_version.get(0).expect("id not found in key").to_string();
                 let version: u64 = id_version
@@ -1515,13 +1519,15 @@ mod handlers {
         request: models::ListManifestMetadataRequest,
     ) -> pipebuilder_common::Result<Vec<models::ManifestMetadata>> {
         let namespace = request.namespace.as_str();
-        let id = request.id;
-        let metas = register.list_manifest_metadata(namespace, id).await?;
+        let id = request.id.as_deref();
+        let metas = register
+            .list_resource::<ManifestMetadata>(Some(namespace), id)
+            .await?;
         let metas = metas
             .into_iter()
             .map(|(key, meta)| {
                 let id_version =
-                    remove_resource_namespace(key.as_str(), RESOURCE_MANIFEST_METADATA, namespace);
+                    remove_resource_namespace::<ManifestMetadata>(key.as_str(), namespace);
                 let id_version = id_version.split('/').collect::<Vec<&str>>();
                 let id = id_version.get(0).expect("id not found in key").to_string();
                 let version: u64 = id_version
@@ -1547,7 +1553,9 @@ mod handlers {
         request: models::UpdateNamespaceRequest,
     ) -> pipebuilder_common::Result<models::Namespace> {
         let id = request.id;
-        let (_, namespace) = register.update_namespace(lease_id, id.as_str()).await?;
+        let (_, namespace) = register
+            .update_default_resource::<Namespace>(None, id.as_str(), lease_id)
+            .await?;
         let created = namespace.created;
         Ok(models::Namespace { id, created })
     }
@@ -1571,7 +1579,7 @@ mod handlers {
         let namespace = request.namespace;
         let id = request.id;
         let (_, project) = register
-            .update_project(lease_id, namespace.as_str(), id.as_str())
+            .update_default_resource::<Project>(Some(namespace.as_str()), id.as_str(), lease_id)
             .await?;
         let created = project.created;
         Ok(models::Project { id, created })
@@ -1597,11 +1605,11 @@ mod handlers {
         register: &mut Register,
         _request: models::ListNamespaceRequest,
     ) -> pipebuilder_common::Result<Vec<models::Namespace>> {
-        let namespaces = register.list_namespace().await?;
+        let namespaces = register.list_resource::<Namespace>(None, None).await?;
         let namespaces = namespaces
             .into_iter()
             .map(|(key, namespace)| {
-                let id = remove_resource(key.as_str(), RESOURCE_NAMESPACE);
+                let id = remove_resource::<Namespace>(key.as_str());
                 models::Namespace {
                     id: id.to_owned(),
                     created: namespace.created,
@@ -1626,12 +1634,13 @@ mod handlers {
         request: models::ListProjectRequest,
     ) -> pipebuilder_common::Result<Vec<models::Project>> {
         let namespace = request.namespace;
-        let projects = register.list_project(namespace.as_str()).await?;
+        let projects = register
+            .list_resource::<Project>(Some(namespace.as_str()), None)
+            .await?;
         let projects = projects
             .into_iter()
             .map(|(key, project)| {
-                let id =
-                    remove_resource_namespace(key.as_str(), RESOURCE_PROJECT, namespace.as_str());
+                let id = remove_resource_namespace::<Project>(key.as_str(), namespace.as_str());
                 models::Project {
                     id: id.to_owned(),
                     created: project.created,
@@ -1663,7 +1672,7 @@ mod handlers {
         let namespace = request.namespace;
         let id = request.id;
         register
-            .delete_project(namespace.as_str(), id.as_str())
+            .delete_resource::<Project>(Some(namespace.as_str()), id.as_str(), None)
             .await?;
         Ok(models::DeleteProjectResponse {})
     }
@@ -1688,7 +1697,9 @@ mod handlers {
         request: models::DeleteNamespaceRequest,
     ) -> pipebuilder_common::Result<models::DeleteNamespaceResponse> {
         let id = request.id;
-        register.delete_namespace(id.as_str()).await?;
+        register
+            .delete_resource::<Namespace>(None, id.as_str(), None)
+            .await?;
         Ok(models::DeleteNamespaceResponse {})
     }
 
@@ -1729,10 +1740,9 @@ mod handlers {
     async fn get_internal_node_state(
         register: &mut Register,
         lease_id: i64,
-        role: &NodeRole,
         id: &str,
-    ) -> pipebuilder_common::Result<Option<InternalNodeState>> {
-        register.get_node_state(lease_id, role, id).await
+    ) -> pipebuilder_common::Result<Option<NodeState>> {
+        register.get_resource(None, id, None, lease_id).await
     }
 
     async fn schedule(
@@ -1795,8 +1805,9 @@ mod handlers {
 mod validations {
 
     use pipebuilder_common::{
-        api::models, invalid_api_request, manifest_metadata_namespace_id, namespace_key,
-        project_namespace_id, Build, NodeRole, Register, Result,
+        api::models, invalid_api_request, AppMetadata, Build, BuildMetadata, BuildSnapshot,
+        ManifestMetadata, ManifestSnapshot, NodeRole, NodeState, Project, Register,
+        ResourceKeyBuilder, ResourceType, Result,
     };
 
     pub async fn validate_build_request(
@@ -1999,7 +2010,7 @@ mod validations {
         validate_namespace(register, namespace).await?;
         let id = request.id.as_str();
         validate_project(register, namespace, id).await?;
-        match is_version_build_prefix_exist(register, namespace, id).await? {
+        match is_build_metadata_exist(register, namespace, id).await? {
             true => Err(invalid_api_request(format!(
                 "can not delete build snapshot (namespace = {}, id = {}), builds found",
                 namespace, id
@@ -2034,7 +2045,7 @@ mod validations {
             }
             false => (),
         };
-        match is_app_metadata_prefix_exist(register, namespace, id).await? {
+        match is_app_metadata_exist(register, namespace, id).await? {
             true => Err(invalid_api_request(format!(
                 "can not delete project (namespace = {}, id = {}), app metadata found.",
                 namespace, id
@@ -2048,7 +2059,7 @@ mod validations {
         request: &models::DeleteNamespaceRequest,
     ) -> Result<()> {
         let id = request.id.as_str();
-        match is_project_prefix_exist(register, id).await? {
+        match is_project_exist(register, id).await? {
             true => Err(invalid_api_request(format!(
                 "can not delete namespace '{}', project found",
                 id
@@ -2066,21 +2077,6 @@ mod validations {
         validate_role(role)
     }
 
-    pub fn validate_activate_node_request(request: &models::ActivateNodeRequest) -> Result<()> {
-        let role = &request.role;
-        validate_activate_role(role)
-    }
-
-    pub fn validate_deactivate_node_request(request: &models::DeactivateNodeRequest) -> Result<()> {
-        let role = &request.role;
-        validate_deactivate_role(role)
-    }
-
-    pub fn validate_shutdown_node_request(request: &models::ShutdownNodeRequest) -> Result<()> {
-        let role = &request.role;
-        validate_shutdown_role(role)
-    }
-
     fn validate_role(role: &NodeRole) -> Result<()> {
         match role {
             NodeRole::Undefined => Err(invalid_api_request(String::from("undefined node role"))),
@@ -2088,25 +2084,16 @@ mod validations {
         }
     }
 
-    fn validate_shutdown_role(role: &NodeRole) -> Result<()> {
-        match role {
-            NodeRole::Builder | NodeRole::Repository | NodeRole::Scheduler => Ok(()),
-            _ => Err(invalid_api_request(String::from("can not shutdown node"))),
+    pub fn validate_node_state(state: &NodeState, expected_role: &NodeRole) -> Result<()> {
+        let actual_role = &state.role;
+        if actual_role != expected_role {
+            return Err(invalid_api_request(format!(
+                "invalid node state, expect '{}', actual '{}'",
+                expected_role.to_string(),
+                actual_role.to_string()
+            )));
         }
-    }
-
-    fn validate_activate_role(role: &NodeRole) -> Result<()> {
-        match role {
-            NodeRole::Builder => Ok(()),
-            _ => Err(invalid_api_request(String::from("can not shutdown node"))),
-        }
-    }
-
-    fn validate_deactivate_role(role: &NodeRole) -> Result<()> {
-        match role {
-            NodeRole::Builder => Ok(()),
-            _ => Err(invalid_api_request(String::from("can not shutdown node"))),
-        }
+        Ok(())
     }
 
     fn validate_target_platform(target_platform: &str) -> Result<()> {
@@ -2120,7 +2107,10 @@ mod validations {
     }
 
     async fn validate_namespace(register: &mut Register, namespace: &str) -> Result<()> {
-        let key = namespace_key(namespace);
+        let key = ResourceKeyBuilder::new()
+            .resource(ResourceType::Namespace)
+            .id(namespace)
+            .build();
         let is_exist = register.is_exist(key).await?;
         match is_exist {
             true => Ok(()),
@@ -2132,7 +2122,11 @@ mod validations {
     }
 
     async fn validate_project(register: &mut Register, namespace: &str, id: &str) -> Result<()> {
-        let key = project_namespace_id(namespace, id);
+        let key = ResourceKeyBuilder::new()
+            .resource(ResourceType::Project)
+            .namespace(namespace)
+            .id(id)
+            .build();
         let is_exist = register.is_exist(key).await?;
         match is_exist {
             true => Ok(()),
@@ -2148,17 +2142,20 @@ mod validations {
         namespace: &str,
         id: &str,
     ) -> Result<bool> {
-        let prefix = manifest_metadata_namespace_id(namespace, id);
-        register.is_prefix_exist(prefix).await
+        register
+            .is_resource_exist::<ManifestMetadata>(namespace, Some(id))
+            .await
     }
 
     // check build metadata exists or not
-    async fn is_version_build_prefix_exist(
+    async fn is_build_metadata_exist(
         register: &mut Register,
         namespace: &str,
         id: &str,
     ) -> Result<bool> {
-        register.is_version_build_prefix_exist(namespace, id).await
+        register
+            .is_resource_exist::<BuildMetadata>(namespace, Some(id))
+            .await
     }
 
     async fn is_build_snapshot_exist(
@@ -2166,7 +2163,9 @@ mod validations {
         namespace: &str,
         id: &str,
     ) -> Result<bool> {
-        register.is_build_snapshot_exist(namespace, id).await
+        register
+            .is_resource_exist::<BuildSnapshot>(namespace, Some(id))
+            .await
     }
 
     async fn is_manifest_snapshot_exist(
@@ -2174,18 +2173,22 @@ mod validations {
         namespace: &str,
         id: &str,
     ) -> Result<bool> {
-        register.is_manifest_snapshot_exist(namespace, id).await
+        register
+            .is_resource_exist::<ManifestSnapshot>(namespace, Some(id))
+            .await
     }
 
-    async fn is_app_metadata_prefix_exist(
+    async fn is_app_metadata_exist(
         register: &mut Register,
         namespace: &str,
         id: &str,
     ) -> Result<bool> {
-        register.is_app_metadata_prefix_exist(namespace, id).await
+        register
+            .is_resource_exist::<AppMetadata>(namespace, Some(id))
+            .await
     }
 
-    async fn is_project_prefix_exist(register: &mut Register, namespace: &str) -> Result<bool> {
-        register.is_project_prefix_exist(namespace).await
+    async fn is_project_exist(register: &mut Register, namespace: &str) -> Result<bool> {
+        register.is_resource_exist::<Project>(namespace, None).await
     }
 }

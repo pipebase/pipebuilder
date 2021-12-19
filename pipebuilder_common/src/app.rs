@@ -1,3 +1,4 @@
+use crate::{BlobResource, Resource, ResourceType};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -12,12 +13,22 @@ pub struct AppMetadata {
     pub created: DateTime<Utc>,
 }
 
-impl AppMetadata {
-    pub fn new(size: usize) -> Self {
+impl BlobResource for AppMetadata {
+    fn new(size: usize) -> Self {
         AppMetadata {
             pulls: 0,
             size,
             created: Utc::now(),
         }
+    }
+
+    fn incr_usage(&mut self) {
+        self.pulls += 1
+    }
+}
+
+impl Resource for AppMetadata {
+    fn ty() -> ResourceType {
+        ResourceType::AppMetadata
     }
 }

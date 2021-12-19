@@ -8,7 +8,7 @@ use crate::{
     },
     grpc::{build, node, repository},
     utils::prost_timestamp_to_datetime_utc,
-    BuildStatus, Error, NodeArch, NodeOS, NodeRole, NodeState as InternalNodeState, NodeStatus,
+    BuildStatus, Error, NodeArch, NodeOS, NodeRole, NodeStatus,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -486,7 +486,6 @@ pub struct DeleteBuildCacheResponse {}
 
 #[derive(Serialize, Deserialize)]
 pub struct ActivateNodeRequest {
-    pub role: NodeRole,
     pub id: String,
 }
 
@@ -495,7 +494,6 @@ pub struct ActivateNodeResponse {}
 
 #[derive(Serialize, Deserialize)]
 pub struct DeactivateNodeRequest {
-    pub role: NodeRole,
     pub id: String,
 }
 
@@ -504,7 +502,6 @@ pub struct DeactivateNodeResponse {}
 
 #[derive(Serialize, Deserialize)]
 pub struct ShutdownNodeRequest {
-    pub role: NodeRole,
     pub id: String,
 }
 
@@ -861,25 +858,6 @@ impl From<build::GetBuildLogResponse> for GetBuildLogResponse {
     fn from(origin: build::GetBuildLogResponse) -> Self {
         let buffer = origin.buffer;
         GetBuildLogResponse { buffer }
-    }
-}
-
-impl From<InternalNodeState> for NodeState {
-    fn from(origin: InternalNodeState) -> Self {
-        let id = origin.id;
-        let role = origin.role;
-        let arch = origin.arch;
-        let os = origin.os;
-        let status = origin.status;
-        let timestamp = origin.timestamp;
-        NodeState {
-            id,
-            role,
-            arch,
-            os,
-            status,
-            timestamp,
-        }
     }
 }
 
