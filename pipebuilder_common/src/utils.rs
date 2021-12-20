@@ -1,7 +1,4 @@
-use crate::{
-    errors::{cargo_error, Result},
-    grpc::{build::builder_client::BuilderClient, node::node_client::NodeClient},
-};
+use crate::errors::{cargo_error, Result};
 use chrono::{DateTime, TimeZone, Utc};
 use etcd_client::{Event, EventType};
 use filetime::FileTime;
@@ -23,7 +20,6 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
     process::Command,
 };
-use tonic::transport::Channel;
 use tracing::{info, warn};
 
 // filesystem ops
@@ -311,17 +307,6 @@ where
         return Ok(Some((event.event_type(), key.to_owned(), value)));
     }
     Ok(None)
-}
-
-// rpc
-pub async fn build_builder_client(protocol: &str, address: &str) -> Result<BuilderClient<Channel>> {
-    let client = BuilderClient::connect(format!("{}://{}", protocol, address)).await?;
-    Ok(client)
-}
-
-pub async fn build_node_client(protocol: &str, address: &str) -> Result<NodeClient<Channel>> {
-    let client = NodeClient::connect(format!("{}://{}", protocol, address)).await?;
-    Ok(client)
 }
 
 // hash

@@ -1,24 +1,8 @@
 use crate::{build::BuilderService, config::BuilderConfig};
 use pipebuilder_common::{
-    grpc::repository::repository_client::RepositoryClient, reset_directory, LocalBuildContext,
-    Register, Result,
+    grpc::client::RepositoryClientBuilder, LocalBuildContextBuilder, Register, Result,
 };
-use tonic::transport::Channel;
 use tracing::info;
-
-fn build_builder_service(
-    lease_id: i64,
-    register: Register,
-    repository_client: RepositoryClient<Channel>,
-    context: LocalBuildContext,
-) -> BuilderService {
-    BuilderService::new(lease_id, register, repository_client, context)
-}
-
-async fn build_repository_client(endpoint: String) -> Result<RepositoryClient<Channel>> {
-    let repository_client = RepositoryClient::connect(endpoint).await?;
-    Ok(repository_client)
-}
 
 pub async fn bootstrap(
     node_id: String,
@@ -27,27 +11,36 @@ pub async fn bootstrap(
     lease_id: i64,
     register: Register,
 ) -> Result<BuilderService> {
-    let repository_endpoint = config.repository_endpoint;
-    let repository_client = build_repository_client(repository_endpoint).await?;
+    let repository_client_config = config.repository_client;
+    let protocol = repository_client_config.protocol;
+    let address = repository_client_config.address;
+    let endpoint = format!("{}://{}", protocol, address);
+    info!(
+        endpoint = endpoint.as_str(),
+        "connect repository service ..."
+    );
+    let repository_client = RepositoryClientBuilder::default()
+        .protocol(protocol)
+        .address(address.as_str())
+        .connect()
+        .await?;
     let workspace = config.workspace;
     let restore_directory = config.restore_directory;
     let log_directory = config.log_directory;
     let reset = config.reset.unwrap_or(true);
-    if reset {
-        info!(path = workspace.as_str(), "reset workspace");
-        reset_directory(&workspace).await?;
-        info!(path = restore_directory.as_str(), "reset restore directory");
-        reset_directory(&restore_directory).await?;
-        info!(path = log_directory.as_str(), "reset log directory");
-        reset_directory(&log_directory).await?;
-    }
-    let build_context = LocalBuildContext::new(
-        node_id,
-        external_address,
-        workspace,
-        restore_directory,
-        log_directory,
-    );
-    let builder_svc = build_builder_service(lease_id, register, repository_client, build_context);
+    let build_context = LocalBuildContextBuilder::default()
+        .id(node_id)
+        .address(external_address)
+        .workspace(workspace)
+        .restore_directory(restore_directory)
+        .log_directory(log_directory)
+        .build();
+    let builder_svc = BuilderService::builder()
+        .lease_id(lease_id)
+        .register(register)
+        .repository_client(repository_client)
+        .context(build_context)
+        .build();
+    builder_svc.init(reset).await?;
     Ok(builder_svc)
 }

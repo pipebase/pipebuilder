@@ -1,13 +1,13 @@
 use pipebuilder_common::{
-    create_directory,
+    self, create_directory,
     grpc::repository::{
         repository_server::Repository, DeleteAppResponse, DeleteCatalogSchemaResponse,
         DeleteCatalogsResponse, DeleteManifestResponse, GetAppResponse, GetCatalogSchemaResponse,
         GetCatalogsResponse, GetManifestResponse, PostAppResponse, PutCatalogSchemaResponse,
         PutCatalogsResponse, PutManifestResponse,
     },
-    read_file, rpc_internal_error, rpc_not_found, sub_path, write_file, AppMetadata,
-    CatalogSchemaMetadata, CatalogSchemaSnapshot, CatalogsMetadata, CatalogsSnapshot,
+    read_file, reset_directory, rpc_internal_error, rpc_not_found, sub_path, write_file,
+    AppMetadata, CatalogSchemaMetadata, CatalogSchemaSnapshot, CatalogsMetadata, CatalogsSnapshot,
     ManifestMetadata, ManifestSnapshot, Register,
 };
 use std::fs::remove_dir_all;
@@ -23,14 +23,14 @@ pub const TARGET_CATALOGS: &str = "catalogs.yml";
 pub struct RepositoryServiceBuilder {
     register: Option<Register>,
     lease_id: Option<i64>,
-    // app binary repository
-    app_repository: Option<String>,
-    // manifest file repository
-    manifest_repository: Option<String>,
-    // catalog schema repository
-    catalog_schema_repository: Option<String>,
-    // catalogs repository
-    catalogs_repository: Option<String>,
+    // app binary directory
+    app_directory: Option<String>,
+    // manifest file directory
+    manifest_directory: Option<String>,
+    // catalog schema directory
+    catalog_schema_directory: Option<String>,
+    // catalogs directory
+    catalogs_directory: Option<String>,
 }
 
 impl RepositoryServiceBuilder {
@@ -44,23 +44,23 @@ impl RepositoryServiceBuilder {
         self
     }
 
-    pub fn app_repository(mut self, app_repository: String) -> Self {
-        self.app_repository = Some(app_repository);
+    pub fn app_directory(mut self, app_directory: String) -> Self {
+        self.app_directory = Some(app_directory);
         self
     }
 
-    pub fn manifest_repository(mut self, manifest_repository: String) -> Self {
-        self.manifest_repository = Some(manifest_repository);
+    pub fn manifest_directory(mut self, manifest_directory: String) -> Self {
+        self.manifest_directory = Some(manifest_directory);
         self
     }
 
-    pub fn catalog_schema_repository(mut self, catalog_schema_repository: String) -> Self {
-        self.catalog_schema_repository = Some(catalog_schema_repository);
+    pub fn catalog_schema_directory(mut self, catalog_schema_directory: String) -> Self {
+        self.catalog_schema_directory = Some(catalog_schema_directory);
         self
     }
 
-    pub fn catalogs_repository(mut self, catalogs_repository: String) -> Self {
-        self.catalogs_repository = Some(catalogs_repository);
+    pub fn catalogs_directory(mut self, catalogs_directory: String) -> Self {
+        self.catalogs_directory = Some(catalogs_directory);
         self
     }
 
@@ -68,16 +68,16 @@ impl RepositoryServiceBuilder {
         RepositoryService {
             register: self.register.expect("register undefined"),
             lease_id: self.lease_id.expect("lease id undefined"),
-            app_repository: self.app_repository.expect("app repository undefined"),
-            manifest_repository: self
-                .manifest_repository
-                .expect("manifest repository undefined"),
-            catalog_schema_repository: self
-                .catalog_schema_repository
-                .expect("catalog schema repository undefined"),
-            catalogs_repository: self
-                .catalogs_repository
-                .expect("catalogs repository undefined"),
+            app_directory: self.app_directory.expect("app directory undefined"),
+            manifest_directory: self
+                .manifest_directory
+                .expect("manifest directory undefined"),
+            catalog_schema_directory: self
+                .catalog_schema_directory
+                .expect("catalog schema directory undefined"),
+            catalogs_directory: self
+                .catalogs_directory
+                .expect("catalogs directory undefined"),
         }
     }
 }
@@ -85,15 +85,48 @@ impl RepositoryServiceBuilder {
 pub struct RepositoryService {
     register: Register,
     lease_id: i64,
-    // app binary repository
-    app_repository: String,
+    // app binary directory
+    app_directory: String,
     // manifest file repository
-    manifest_repository: String,
+    manifest_directory: String,
     // TODO: remote repository as backup
     // catalog schema repository
-    catalog_schema_repository: String,
+    catalog_schema_directory: String,
     // catalogs repository
-    catalogs_repository: String,
+    catalogs_directory: String,
+}
+
+impl RepositoryService {
+    pub fn builder() -> RepositoryServiceBuilder {
+        RepositoryServiceBuilder::default()
+    }
+
+    pub async fn init(&self, reset: bool) -> pipebuilder_common::Result<()> {
+        let app_directory = &self.app_directory;
+        let manifest_directory = &self.manifest_directory;
+        let catalog_schema_directory = &self.catalog_schema_directory;
+        let catalogs_directory = &self.catalogs_directory;
+        if reset {
+            info!(path = app_directory.as_str(), "reset app directory");
+            reset_directory(app_directory).await?;
+            info!(
+                path = manifest_directory.as_str(),
+                "reset manifest directory"
+            );
+            reset_directory(manifest_directory).await?;
+            info!(
+                path = catalog_schema_directory.as_str(),
+                "reset catalog schema directory"
+            );
+            reset_directory(catalog_schema_directory).await?;
+            info!(
+                path = catalogs_directory.as_str(),
+                "reset catalogs directory"
+            );
+            reset_directory(catalogs_directory).await?;
+        }
+        Ok(())
+    }
 }
 
 #[tonic::async_trait]
@@ -115,7 +148,7 @@ impl Repository for RepositoryService {
             manifest_version = version,
             "get manifest"
         );
-        let repository = self.manifest_repository.as_str();
+        let repository = self.manifest_directory.as_str();
         let buffer = match read_target_from_repo(
             repository,
             namespace.as_str(),
@@ -197,7 +230,7 @@ impl Repository for RepositoryService {
                 return Err(rpc_internal_error(err));
             }
         };
-        let repository = self.manifest_repository.as_str();
+        let repository = self.manifest_directory.as_str();
         let buffer = request.buffer.as_slice();
         match write_target_into_repo(
             repository,
@@ -264,7 +297,7 @@ impl Repository for RepositoryService {
             manifest_version = version,
             "delete manifest"
         );
-        let repository = self.manifest_repository.as_str();
+        let repository = self.manifest_directory.as_str();
         match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
             Ok(_) => (),
             Err(err) => {
@@ -317,7 +350,7 @@ impl Repository for RepositoryService {
             build_version = version,
             "get app"
         );
-        let repository = self.app_repository.as_str();
+        let repository = self.app_directory.as_str();
         let buffer = match read_target_from_repo(
             repository,
             namespace.as_str(),
@@ -383,7 +416,7 @@ impl Repository for RepositoryService {
             "post app"
         );
         let buffer = request.buffer.as_slice();
-        let repository = self.app_repository.as_str();
+        let repository = self.app_directory.as_str();
         match write_target_into_repo(
             repository,
             namespace.as_str(),
@@ -451,7 +484,7 @@ impl Repository for RepositoryService {
             build_version = version,
             "delete app"
         );
-        let repository = self.app_repository.as_str();
+        let repository = self.app_directory.as_str();
         match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
             Ok(_) => (),
             Err(err) => {
@@ -502,7 +535,7 @@ impl Repository for RepositoryService {
             catalog_schema_version = version,
             "get catalog schema"
         );
-        let repository = self.catalog_schema_repository.as_str();
+        let repository = self.catalog_schema_directory.as_str();
         let buffer = match read_target_from_repo(
             repository,
             namespace.as_str(),
@@ -588,7 +621,7 @@ impl Repository for RepositoryService {
                 return Err(rpc_internal_error(err));
             }
         };
-        let repository = self.catalog_schema_repository.as_str();
+        let repository = self.catalog_schema_directory.as_str();
         let buffer = request.buffer.as_slice();
         match write_target_into_repo(
             repository,
@@ -655,7 +688,7 @@ impl Repository for RepositoryService {
             catalog_schema_version = version,
             "delete catalog schema"
         );
-        let repository = self.catalog_schema_repository.as_str();
+        let repository = self.catalog_schema_directory.as_str();
         match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
             Ok(_) => (),
             Err(err) => {
@@ -710,7 +743,7 @@ impl Repository for RepositoryService {
             catalogs_version = version,
             "get catalogs"
         );
-        let repository = self.catalogs_repository.as_str();
+        let repository = self.catalogs_directory.as_str();
         let buffer = match read_target_from_repo(
             repository,
             namespace.as_str(),
@@ -792,7 +825,7 @@ impl Repository for RepositoryService {
                 return Err(rpc_internal_error(err));
             }
         };
-        let repository = self.catalogs_repository.as_str();
+        let repository = self.catalogs_directory.as_str();
         let buffer = request.buffer.as_slice();
         match write_target_into_repo(
             repository,
@@ -859,7 +892,7 @@ impl Repository for RepositoryService {
             catalogs_version = version,
             "delete catalog schema"
         );
-        let repository = self.catalogs_repository.as_str();
+        let repository = self.catalogs_directory.as_str();
         match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
             Ok(_) => (),
             Err(err) => {

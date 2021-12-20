@@ -154,6 +154,54 @@ impl Resource for BuildSnapshot {
     }
 }
 
+#[derive(Default)]
+pub struct LocalBuildContextBuilder {
+    // builder id
+    id: Option<String>,
+    // builder external_address
+    address: Option<String>,
+    workspace: Option<String>,
+    restore_directory: Option<String>,
+    log_directory: Option<String>,
+}
+
+impl LocalBuildContextBuilder {
+    pub fn id(mut self, id: String) -> Self {
+        self.id = Some(id);
+        self
+    }
+
+    pub fn address(mut self, address: String) -> Self {
+        self.address = Some(address);
+        self
+    }
+
+    pub fn workspace(mut self, workspace: String) -> Self {
+        self.workspace = Some(workspace);
+        self
+    }
+
+    pub fn restore_directory(mut self, restore_directory: String) -> Self {
+        self.restore_directory = Some(restore_directory);
+        self
+    }
+
+    pub fn log_directory(mut self, log_directory: String) -> Self {
+        self.log_directory = Some(log_directory);
+        self
+    }
+
+    pub fn build(self) -> LocalBuildContext {
+        LocalBuildContext {
+            id: self.id.expect("builder id undefined"),
+            address: self.address.expect("builder external address undefined"),
+            workspace: self.workspace.expect("workspace directory undefined"),
+            restore_directory: self.restore_directory.expect("restore directory undefined"),
+            log_directory: self.log_directory.expect("log directory undefined"),
+        }
+    }
+}
+
 // build context shared by all local builds
 #[derive(Clone)]
 pub struct LocalBuildContext {

@@ -7,6 +7,7 @@ pub struct RepositoryConfig {
     pub app: String,
     pub catalog_schema: String,
     pub catalogs: String,
+    pub reset: Option<bool>,
 }
 
 #[derive(Deserialize)]

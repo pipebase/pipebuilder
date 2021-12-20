@@ -1,20 +1,15 @@
-use pipebuilder_common::BaseConfig;
+use pipebuilder_common::{grpc::client::RpcClientConfig, BaseConfig};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct GrpcClientConfig {
-    pub endpoint: String,
-}
-
-#[derive(Deserialize)]
-pub struct GrpcClientConfigs {
-    pub repository: GrpcClientConfig,
-    pub scheduler: GrpcClientConfig,
+pub struct RpcClientConfigs {
+    pub repository: RpcClientConfig,
+    pub scheduler: RpcClientConfig,
 }
 
 #[derive(Deserialize)]
 pub struct ApiConfig {
-    pub clients: GrpcClientConfigs,
+    pub clients: RpcClientConfigs,
 }
 
 #[derive(Deserialize)]

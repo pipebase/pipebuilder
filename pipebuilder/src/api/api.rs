@@ -498,13 +498,13 @@ mod handlers {
     use super::validations;
     use pipebuilder_common::{
         api::models::{self, Failure},
-        build_builder_client, build_node_client,
         grpc::{
             build::{
                 builder_client::BuilderClient, BuildRequest, CancelBuildRequest,
                 DeleteBuildCacheRequest, GetBuildLogRequest, ScanBuildCacheRequest,
                 ScanBuildRequest,
             },
+            client::{BuilderClientBuilder, NodeClientBuilder, RpcProtocolType},
             node::{
                 node_client::NodeClient, node_server::Node, ActivateRequest, DeactivateRequest,
                 ShutdownRequest, StatusRequest,
@@ -1763,11 +1763,19 @@ mod handlers {
 
     async fn builder_client(address: &str) -> pipebuilder_common::Result<BuilderClient<Channel>> {
         // TODO (Li Yu): configurable protocol
-        build_builder_client("http", address).await
+        BuilderClientBuilder::default()
+            .protocol(RpcProtocolType::Http)
+            .address(address)
+            .connect()
+            .await
     }
 
     async fn node_client(address: &str) -> pipebuilder_common::Result<NodeClient<Channel>> {
-        build_node_client("http", address).await
+        NodeClientBuilder::default()
+            .protocol(RpcProtocolType::Http)
+            .address(address)
+            .connect()
+            .await
     }
 
     fn failure(status_code: StatusCode, failure: Failure) -> http::Result<Response<String>> {

@@ -1,7 +1,7 @@
 use chrono::Utc;
 use flurry::HashMap;
 use pipebuilder_common::{
-    app_workspace, datetime_utc_to_prost_timestamp,
+    self, app_workspace, datetime_utc_to_prost_timestamp,
     grpc::{
         build::{
             builder_server::Builder, BuildCacheMetadata as RpcBuildCacheMetadata, BuildMetadataKey,
@@ -10,12 +10,53 @@ use pipebuilder_common::{
         },
         repository::repository_client::RepositoryClient,
     },
-    remove_directory, sub_path, Build, BuildCacheMetadata, BuildMetadata, BuildSnapshot,
-    BuildStatus, LocalBuildContext, Register, PATH_APP,
+    remove_directory, reset_directory, sub_path, Build, BuildCacheMetadata, BuildMetadata,
+    BuildSnapshot, BuildStatus, LocalBuildContext, Register, PATH_APP,
 };
 use std::sync::Arc;
 use tonic::{transport::Channel, Response};
 use tracing::{error, info, warn};
+
+#[derive(Default)]
+pub struct BuilderServiceBuilder {
+    lease_id: Option<i64>,
+    register: Option<Register>,
+    repository_client: Option<RepositoryClient<Channel>>,
+    context: Option<LocalBuildContext>,
+}
+
+impl BuilderServiceBuilder {
+    pub fn lease_id(mut self, lease_id: i64) -> Self {
+        self.lease_id = Some(lease_id);
+        self
+    }
+
+    pub fn register(mut self, register: Register) -> Self {
+        self.register = Some(register);
+        self
+    }
+
+    pub fn repository_client(mut self, repository_client: RepositoryClient<Channel>) -> Self {
+        self.repository_client = Some(repository_client);
+        self
+    }
+
+    pub fn context(mut self, context: LocalBuildContext) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    pub fn build(self) -> BuilderService {
+        BuilderService {
+            lease_id: self.lease_id.expect("lease id undefined"),
+            register: self.register.expect("register undefined"),
+            repository_client: self.repository_client.expect("repository client undefined"),
+            context: self.context.expect("local build context undefined"),
+            builds: Arc::new(HashMap::new()),
+            caches: Arc::new(HashMap::new()),
+        }
+    }
+}
 
 pub struct BuilderService {
     lease_id: i64,
@@ -29,20 +70,23 @@ pub struct BuilderService {
 }
 
 impl BuilderService {
-    pub fn new(
-        lease_id: i64,
-        register: Register,
-        repository_client: RepositoryClient<Channel>,
-        context: LocalBuildContext,
-    ) -> Self {
-        BuilderService {
-            lease_id,
-            register,
-            repository_client,
-            context,
-            builds: Arc::new(HashMap::new()),
-            caches: Arc::new(HashMap::new()),
+    pub fn builder() -> BuilderServiceBuilder {
+        BuilderServiceBuilder::default()
+    }
+
+    pub async fn init(&self, reset: bool) -> pipebuilder_common::Result<()> {
+        let workspace = &self.context.workspace;
+        let restore_directory = &self.context.restore_directory;
+        let log_directory = &self.context.log_directory;
+        if reset {
+            info!(path = workspace.as_str(), "reset workspace directory");
+            reset_directory(workspace).await?;
+            info!(path = restore_directory.as_str(), "reset restore directory");
+            reset_directory(restore_directory).await?;
+            info!(path = log_directory.as_str(), "reset log directory");
+            reset_directory(log_directory).await?;
         }
+        Ok(())
     }
 }
 
