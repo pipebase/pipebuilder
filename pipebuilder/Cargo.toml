@@ -11,23 +11,23 @@ keywords = ["pipebase", "CI"]
 
 [[bin]]
 name = "api"
-path = "src/api/app.rs"
+path = "src/api/main.rs"
 
 [[bin]]
 name = "builder"
-path = "src/builder/app.rs"
+path = "src/builder/main.rs"
 
 [[bin]]
 name = "pbctl"
-path = "src/cli/app.rs"
+path = "src/cli/main.rs"
 
 [[bin]]
 name = "scheduler"
-path = "src/scheduler/app.rs"
+path = "src/scheduler/main.rs"
 
 [[bin]]
 name = "repository"
-path = "src/repository/app.rs"
+path = "src/repository/main.rs"
 
 [dependencies]
 chrono = { version = "0.4" }
