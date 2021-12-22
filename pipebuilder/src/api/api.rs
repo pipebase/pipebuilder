@@ -23,21 +23,29 @@ pub mod filters {
                 register.clone(),
                 lease_id,
             ))
+            .boxed()
             .or(manifest::filters::v1_manifest(
                 repository_client.clone(),
                 register.clone(),
             ))
+            .boxed()
             .or(catalogs::filters::v1_catalogs(
                 repository_client.clone(),
                 register.clone(),
             ))
+            .boxed()
             .or(catalog_schema::filters::v1_catalog_schema(
                 repository_client,
                 register.clone(),
             ))
+            .boxed()
             .or(namespace::filters::v1_namespace(register.clone(), lease_id))
+            .boxed()
             .or(node::filters::v1_node(register.clone(), lease_id))
+            .boxed()
             .or(project::filters::v1_project(register, lease_id))
+            .boxed()
             .or(admin::filters::admin(node_svc))
+            .boxed()
     }
 }
