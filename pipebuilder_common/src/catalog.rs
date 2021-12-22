@@ -1,10 +1,14 @@
 use crate::{
-    invalid_catalog_name, json_schema_error, BlobResource, Resource, ResourceType, Result, Snapshot,
+    append_dot_format_suffix, create_directory, invalid_catalog_name, json_schema_error,
+    write_file, BlobResource, Resource, ResourceType, Result, Snapshot,
 };
 use chrono::{DateTime, Utc};
 use jsonschema::JSONSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct CatalogSchemaMetadata {
@@ -65,13 +69,18 @@ impl Resource for CatalogSchemaSnapshot {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct CatalogSchemaMetadataKey {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
 // Pipe configuration
 #[derive(Serialize, Deserialize)]
 pub struct Catalog {
     // schema info
-    pub schema_namespace: String,
-    pub schema_id: String,
-    pub schema_version: u64,
+    pub schema: CatalogSchemaMetadataKey,
     // catalog filename
     pub name: String,
     // catalog context in yaml
@@ -86,12 +95,40 @@ impl Catalog {
         visitor.visit(self)
     }
 
-    pub fn get_schema_info(&self) -> (&String, &String, u64) {
-        (&self.schema_namespace, &self.schema_id, self.schema_version)
+    pub fn get_schema_metadata_key(&self) -> &CatalogSchemaMetadataKey {
+        &self.schema
     }
 
     pub fn get_name(&self) -> &String {
         &self.name
+    }
+
+    pub fn get_yml(&self) -> &String {
+        &self.yml
+    }
+
+    // deserialize array of catalogs from bytes
+    pub fn from_buffer(catalogs: &[u8]) -> Result<Vec<Self>> {
+        let catalogs: Vec<Self> = serde_yaml::from_slice(catalogs)?;
+        Ok(catalogs)
+    }
+
+    pub async fn dump_catalogs<P>(catalogs: &[u8], directory: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        create_directory(&directory).await?;
+        let catalogs = Self::from_buffer(catalogs)?;
+        let mut path = PathBuf::new();
+        path.push(directory);
+        for catalog in catalogs.iter() {
+            let name = append_dot_format_suffix(catalog.name.as_str(), "yml");
+            let yml = catalog.yml.as_bytes();
+            path.push(name);
+            write_file(path.as_path(), yml).await?;
+            path.pop();
+        }
+        Ok(())
     }
 }
 
@@ -114,7 +151,7 @@ impl CatalogSchemaValidator {
         Self::from_json_value(&schema)
     }
 
-    pub fn from_slice(schema: &[u8]) -> Result<Self> {
+    pub fn from_buffer(schema: &[u8]) -> Result<Self> {
         let schema = serde_json::from_slice(schema)?;
         Self::from_json_value(&schema)
     }
@@ -159,23 +196,12 @@ impl ValidateCatalog for CatalogSchemaValidator {
     }
 }
 
-pub struct CatalogNameValidator {
+#[derive(Default)]
+pub struct CatalogsNameValidator {
     names: Vec<String>,
 }
 
-impl CatalogNameValidator {
-    pub fn new() -> Self {
-        CatalogNameValidator { names: vec![] }
-    }
-}
-
-impl Default for CatalogNameValidator {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl VisitCatalog for CatalogNameValidator {
+impl VisitCatalog for CatalogsNameValidator {
     fn visit(&mut self, c: &Catalog) -> Result<()> {
         let name = c.get_name().to_owned();
         self.names.push(name);
@@ -183,7 +209,7 @@ impl VisitCatalog for CatalogNameValidator {
     }
 }
 
-impl ValidateCatalog for CatalogNameValidator {
+impl ValidateCatalog for CatalogsNameValidator {
     fn validate(&self) -> Result<()> {
         let len = self.names.len();
         let mut name_set: HashSet<String> = HashSet::new();
@@ -321,7 +347,10 @@ impl Resource for CatalogsSnapshot {
 #[cfg(test)]
 mod tests {
 
-    use crate::{Catalog, CatalogNameValidator, CatalogSchemaValidator, ValidateCatalog};
+    use crate::{
+        Catalog, CatalogSchemaMetadataKey, CatalogSchemaValidator, CatalogsNameValidator,
+        ValidateCatalog,
+    };
 
     const TEST_NAMESPACE: &str = "test";
     const TEST_CATALOG_SCHEMA_SCHEMA_ID: &str = "test_schema";
@@ -435,10 +464,13 @@ ticks: 10
     // sample validation for timer catalog
     #[test]
     fn test_valid_catalog() {
+        let test_catalog_schema = CatalogSchemaMetadataKey {
+            namespace: String::from(TEST_NAMESPACE),
+            id: String::from(TEST_CATALOG_SCHEMA_SCHEMA_ID),
+            version: TEST_CATALOG_SCHEMA_VERSION,
+        };
         let test_catalog = Catalog {
-            schema_namespace: String::from(TEST_NAMESPACE),
-            schema_id: String::from(TEST_CATALOG_SCHEMA_SCHEMA_ID),
-            schema_version: TEST_CATALOG_SCHEMA_VERSION,
+            schema: test_catalog_schema,
             name: String::from(TEST_CATALOG_NAME),
             yml: String::from(TEST_CATALOG_YAML),
         };
@@ -449,7 +481,7 @@ ticks: 10
             .expect("failed to visit catalog");
         schema_validator.validate().expect("invalid catalog schema");
 
-        let mut name_validator = CatalogNameValidator::new();
+        let mut name_validator = CatalogsNameValidator::default();
         test_catalog
             .accept(&mut name_validator)
             .expect("failed to visit catalog");

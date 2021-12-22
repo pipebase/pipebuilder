@@ -60,6 +60,8 @@ function setup() {
     mkdir -p ${data_directory}/builds/logs
     mkdir -p ${data_directory}/builds/restores
     mkdir -p ${data_directory}/manifests
+	mkdir -p ${data_directory}/catalogs
+	mkdir -p ${data_directory}/catalog-schema
 }
 
 function cleanup() {
@@ -69,6 +71,8 @@ function cleanup() {
     rm -rf ${data_directory}/builds/logs/*
     rm -rf ${data_directory}/builds/restores/*
     rm -rf ${data_directory}/manifests/*
+	rm -rf ${data_directory}/catalogs/*
+	rm -rf ${data_directory}/catalog-schema/*
 }
 
 # Entrypoint of data volume setup script

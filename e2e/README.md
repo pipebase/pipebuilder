@@ -46,6 +46,25 @@ pbctl pull -n dev -i A_TEST_PROJECT -v BUILD_VERSION && \
 chmod +x app && \
 ./app
 ```
+## Test Catalogs
+use timer as sample
+```sh
+cd e2e/tests/timer
+```
+push timer catalog schema `.json`
+```sh
+pbctl push catalog-schema -n dev -i timer_schema -f catalog_schemas/timer_schema.json
+```
+push and validate app catalogs `.yml`
+```sh
+pbctl push catalogs -n dev -i timer -f catalogs/catalogs.yml
+```
+pull and dump catalogs
+```sh
+pbctl pull catalogs -n dev -i timer -v 0 -d /LOCAL/DUMP/FOLDER
+```
+note that file dump should be the same as `e2e/tests/timer/catalogs/timer.yml`
+
 ## Cleanup
 shutdown internal node
 ```sh

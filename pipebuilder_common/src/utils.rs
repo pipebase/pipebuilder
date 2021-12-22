@@ -206,6 +206,10 @@ where
     Ok(())
 }
 
+pub fn append_dot_format_suffix(filename: &str, format: &str) -> String {
+    format!("{}.{}", filename, format)
+}
+
 // run cmd and collect status and output
 async fn cmd_status_output(mut cmd: Command) -> Result<(i32, String)> {
     let output = cmd.output().await?;

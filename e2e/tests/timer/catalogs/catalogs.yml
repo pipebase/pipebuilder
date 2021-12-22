@@ -1,0 +1,9 @@
+- name: timer
+  schema:
+    namespace: dev
+    id: timer_schema
+    version: 0
+  yml: |-
+    interval:
+      Millis: 1000
+    ticks: 10

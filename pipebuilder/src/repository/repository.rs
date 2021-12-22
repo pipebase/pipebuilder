@@ -16,7 +16,7 @@ use tracing::{error, info};
 
 pub const TARGET_MANIFEST: &str = "pipe.yml";
 pub const TARGET_APP: &str = "app";
-pub const TARGET_CATALOG_SCHEMA: &str = "schema.yml";
+pub const TARGET_CATALOG_SCHEMA: &str = "schema.json";
 pub const TARGET_CATALOGS: &str = "catalogs.yml";
 
 #[derive(Default)]

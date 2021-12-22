@@ -1,7 +1,11 @@
 use super::Cmd;
 use crate::ops::{
-    do_app::pull_app, do_build::pull_build_log, do_catalog_schema::pull_catalog_schema,
-    do_catalogs::pull_catalogs, do_manifest::pull_manifest, print::print_utf8,
+    do_app::pull_app,
+    do_build::pull_build_log,
+    do_catalog_schema::pull_catalog_schema,
+    do_catalogs::{dump_catalogs, pull_catalogs},
+    do_manifest::pull_manifest,
+    print::print_utf8,
 };
 use pipebuilder_common::{api::client::ApiClient, write_file, Result};
 
@@ -118,6 +122,11 @@ pub fn catalogs() -> Cmd {
                 .help("Specify catalogs version")
                 .required(true)
                 .takes_value(true),
+            Arg::new("directory")
+                .short('d')
+                .help("Specify directory where catalogs written into")
+                .required(false)
+                .takes_value(true),
         ])
 }
 
@@ -129,6 +138,7 @@ pub async fn exec_catalogs(client: ApiClient, args: &clap::ArgMatches) -> Result
         .unwrap()
         .parse()
         .expect("invalid catalogs version");
+    let directory = args.value_of("directory");
     let response = pull_catalogs(
         &client,
         namespace.to_owned(),
@@ -136,7 +146,11 @@ pub async fn exec_catalogs(client: ApiClient, args: &clap::ArgMatches) -> Result
         catalogs_version,
     )
     .await?;
-    print_utf8(response.buffer)
+    let buffer = response.buffer;
+    match directory {
+        Some(directory) => dump_catalogs(buffer.as_slice(), directory).await,
+        None => print_utf8(buffer),
+    }
 }
 
 pub fn app() -> Cmd {

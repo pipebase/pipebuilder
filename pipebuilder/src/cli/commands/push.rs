@@ -111,7 +111,7 @@ pub async fn exec_catalogs(client: ApiClient, args: &clap::ArgMatches) -> Result
     let id = args.value_of("id").unwrap();
     let file = args.value_of("file").unwrap();
     let buffer = read_file(file).await?;
-    validate_catalogs(buffer.as_slice())?;
+    validate_catalogs(&client, buffer.as_slice()).await?;
     let response = push_catalogs(&client, namespace.to_owned(), id.to_owned(), buffer).await?;
     print_record(&response);
     Ok(())

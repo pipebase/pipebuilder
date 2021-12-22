@@ -8,7 +8,10 @@ use super::{
     },
     models,
 };
-use crate::{api_client_error, api_server_error, CatalogSchemaValidator, Result};
+use crate::{
+    api_client_error, api_server_error, Catalog, CatalogSchemaValidator, CatalogsNameValidator,
+    Result, ValidateCatalog,
+};
 use reqwest::{
     header::{HeaderMap, HeaderName},
     Body, Client, Response,
@@ -583,13 +586,52 @@ impl ApiClient {
     }
 
     pub fn validate_catalog_schema(schema: &[u8]) -> Result<()> {
-        let _ = CatalogSchemaValidator::from_slice(schema)?;
+        let _ = CatalogSchemaValidator::from_buffer(schema)?;
         Ok(())
     }
 
-    pub fn validate_catalogs(_catalogs: &[u8]) -> Result<()> {
-        // read schema and validate catalog
-        // let _ = CatalogSchemaValidator::from_slice(schema)?;
+    pub async fn validate_catalogs(&self, catalogs: &[u8]) -> Result<()> {
+        // deserialize catalogs
+        let catalogs = Catalog::from_buffer(catalogs)?;
+        // validate catalog naming
+        Self::validate_catalogs_name(catalogs.as_slice())?;
+        // validate catalog against catalog schema
+        for catalog in catalogs.iter() {
+            self.validate_catalog(catalog).await?;
+        }
         Ok(())
+    }
+
+    fn validate_catalogs_name(catalogs: &[Catalog]) -> Result<()> {
+        let mut validator = CatalogsNameValidator::default();
+        for catalog in catalogs {
+            catalog.accept(&mut validator)?;
+        }
+        validator.validate()
+    }
+
+    async fn validate_catalog(&self, catalog: &Catalog) -> Result<()> {
+        let schema = catalog.get_schema_metadata_key();
+        let namespace = schema.namespace.to_owned();
+        let id = schema.id.to_owned();
+        let version = schema.version;
+        // TODO: Catalog schema caching at client side
+        let request = models::GetCatalogSchemaRequest {
+            namespace,
+            id,
+            version,
+        };
+        let resp = self.pull_catalog_schema(&request).await?;
+        let buffer = resp.buffer;
+        let mut validator = CatalogSchemaValidator::from_buffer(buffer.as_slice())?;
+        catalog.accept(&mut validator)?;
+        validator.validate()
+    }
+
+    pub async fn dump_catalogs<P>(catalogs: &[u8], directory: P) -> Result<()>
+    where
+        P: AsRef<std::path::Path>,
+    {
+        Catalog::dump_catalogs(catalogs, directory).await
     }
 }

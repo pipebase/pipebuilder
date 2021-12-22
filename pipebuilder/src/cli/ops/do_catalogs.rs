@@ -100,7 +100,14 @@ pub(crate) async fn list_catalogs_metadata(
     client.list_catalogs_metadata(&request).await
 }
 
-pub(crate) fn validate_catalogs(schema: &[u8]) -> Result<()> {
-    ApiClient::validate_catalogs(schema)?;
+pub(crate) async fn validate_catalogs(client: &ApiClient, catalogs: &[u8]) -> Result<()> {
+    client.validate_catalogs(catalogs).await?;
     Ok(())
+}
+
+pub(crate) async fn dump_catalogs<P>(catalogs: &[u8], directory: P) -> Result<()>
+where
+    P: AsRef<std::path::Path>,
+{
+    ApiClient::dump_catalogs(catalogs, directory).await
 }
