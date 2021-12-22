@@ -109,9 +109,18 @@ pub struct CatalogSchemaValidator {
 }
 
 impl CatalogSchemaValidator {
-    pub fn new(schema: &str) -> Result<Self> {
+    pub fn from_literal(schema: &str) -> Result<Self> {
         let schema = serde_json::from_str(schema)?;
-        let schema = match JSONSchema::compile(&schema) {
+        Self::from_json_value(&schema)
+    }
+
+    pub fn from_slice(schema: &[u8]) -> Result<Self> {
+        let schema = serde_json::from_slice(schema)?;
+        Self::from_json_value(&schema)
+    }
+
+    pub fn from_json_value(schema: &serde_json::Value) -> Result<Self> {
+        let schema = match JSONSchema::compile(schema) {
             Ok(schema) => schema,
             Err(err) => {
                 let operation = String::from("compile");
@@ -433,7 +442,7 @@ ticks: 10
             name: String::from(TEST_CATALOG_NAME),
             yml: String::from(TEST_CATALOG_YAML),
         };
-        let mut schema_validator = CatalogSchemaValidator::new(TEST_CATALOG_SCHEMA)
+        let mut schema_validator = CatalogSchemaValidator::from_literal(TEST_CATALOG_SCHEMA)
             .expect("failed to create schema validator");
         test_catalog
             .accept(&mut schema_validator)

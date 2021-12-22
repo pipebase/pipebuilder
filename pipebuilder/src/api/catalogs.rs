@@ -7,85 +7,85 @@ pub mod filters {
     use tonic::transport::Channel;
     use warp::Filter;
 
-    // manifest api
-    pub fn v1_manifest(
+    // catalogs api
+    pub fn v1_catalogs(
         repository_client: RepositoryClient<Channel>,
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        v1_manifest_post(repository_client.clone(), register.clone())
-            .or(v1_manifest_get(repository_client.clone(), register.clone()))
-            .or(v1_manifest_metadata_list(register.clone()))
-            .or(v1_manifest_delete(repository_client, register.clone()))
-            .or(v1_manifest_snapshot_list(register.clone()))
-            .or(v1_manifest_snapshot_delete(register))
+        v1_catalogs_post(repository_client.clone(), register.clone())
+            .or(v1_catalogs_get(repository_client.clone(), register.clone()))
+            .or(v1_catalogs_metadata_list(register.clone()))
+            .or(v1_catalogs_delete(repository_client, register.clone()))
+            .or(v1_catalogs_snapshot_list(register.clone()))
+            .or(v1_catalogs_snapshot_delete(register))
     }
 
-    pub fn v1_manifest_post(
+    pub fn v1_catalogs_post(
         repository_client: RepositoryClient<Channel>,
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "manifest")
+        warp::path!("api" / "v1" / "catalogs")
             .and(warp::post())
             .and(utils::filters::with_repository_client(repository_client))
             .and(utils::filters::with_register(register))
-            .and(utils::filters::json_request::<models::PostManifestRequest>())
-            .and_then(handlers::post_manifest)
+            .and(utils::filters::json_request::<models::PostCatalogsRequest>())
+            .and_then(handlers::post_catalogs)
     }
 
-    pub fn v1_manifest_get(
+    pub fn v1_catalogs_get(
         repository_client: RepositoryClient<Channel>,
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "manifest")
+        warp::path!("api" / "v1" / "catalogs")
             .and(warp::get())
             .and(utils::filters::with_repository_client(repository_client))
             .and(utils::filters::with_register(register))
-            .and(warp::query::<models::GetManifestRequest>())
-            .and_then(handlers::get_manifest)
+            .and(warp::query::<models::GetCatalogsRequest>())
+            .and_then(handlers::get_catalogs)
     }
 
-    pub fn v1_manifest_snapshot_list(
+    pub fn v1_catalogs_snapshot_list(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "manifest" / "snapshot")
+        warp::path!("api" / "v1" / "catalogs" / "snapshot")
             .and(warp::get())
             .and(utils::filters::with_register(register))
-            .and(warp::query::<models::ListManifestSnapshotRequest>())
-            .and_then(handlers::list_manifest_snapshot)
+            .and(warp::query::<models::ListCatalogsSnapshotRequest>())
+            .and_then(handlers::list_catalogs_snapshot)
     }
 
-    pub fn v1_manifest_snapshot_delete(
+    pub fn v1_catalogs_snapshot_delete(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "manifest" / "snapshot")
+        warp::path!("api" / "v1" / "catalogs" / "snapshot")
             .and(warp::delete())
             .and(utils::filters::with_register(register))
             .and(utils::filters::json_request::<
-                models::DeleteManifestSnapshotRequest,
+                models::DeleteCatalogsSnapshotRequest,
             >())
-            .and_then(handlers::delete_manifest_snapshot)
+            .and_then(handlers::delete_catalogs_snapshot)
     }
 
-    pub fn v1_manifest_metadata_list(
+    pub fn v1_catalogs_metadata_list(
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "manifest" / "metadata")
+        warp::path!("api" / "v1" / "catalogs" / "metadata")
             .and(warp::get())
             .and(utils::filters::with_register(register))
-            .and(warp::query::<models::ListManifestMetadataRequest>())
-            .and_then(handlers::list_manifest_metadata)
+            .and(warp::query::<models::ListCatalogsMetadataRequest>())
+            .and_then(handlers::list_catalogs_metadata)
     }
 
-    pub fn v1_manifest_delete(
+    pub fn v1_catalogs_delete(
         repository_client: RepositoryClient<Channel>,
         register: Register,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path!("api" / "v1" / "manifest")
+        warp::path!("api" / "v1" / "catalogs")
             .and(warp::delete())
             .and(utils::filters::with_repository_client(repository_client))
             .and(utils::filters::with_register(register))
-            .and(utils::filters::json_request::<models::DeleteManifestRequest>())
-            .and_then(handlers::delete_manifest)
+            .and(utils::filters::json_request::<models::DeleteCatalogsRequest>())
+            .and_then(handlers::delete_catalogs)
     }
 }
 
@@ -94,91 +94,91 @@ mod handlers {
     use pipebuilder_common::{
         api::models,
         grpc::repository::{
-            repository_client::RepositoryClient, DeleteManifestRequest, GetManifestRequest,
-            PutManifestRequest,
+            repository_client::RepositoryClient, DeleteCatalogsRequest, GetCatalogsRequest,
+            PutCatalogsRequest,
         },
-        remove_resource_namespace, ManifestMetadata, ManifestSnapshot, Register,
+        remove_resource_namespace, CatalogsMetadata, CatalogsSnapshot, Register,
     };
     use std::convert::Infallible;
     use tonic::transport::Channel;
 
-    pub async fn post_manifest(
+    pub async fn post_catalogs(
         mut client: RepositoryClient<Channel>,
         mut register: Register,
-        request: models::PostManifestRequest,
+        request: models::PostCatalogsRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         // validate request
-        match validations::validate_post_manifest_request(&mut register, &request).await {
+        match validations::validate_post_catalogs_request(&mut register, &request).await {
             Ok(_) => (),
             Err(err) => return Ok(utils::handlers::http_bad_request(err.into())),
         };
-        match do_post_manifest(&mut client, request).await {
+        match do_post_catalogs(&mut client, request).await {
             Ok(response) => Ok(utils::handlers::ok(&response)),
             Err(err) => Ok(utils::handlers::http_internal_error(err.into())),
         }
     }
 
-    async fn do_post_manifest(
+    async fn do_post_catalogs(
         client: &mut RepositoryClient<Channel>,
-        request: models::PostManifestRequest,
-    ) -> pipebuilder_common::Result<models::PostManifestResponse> {
-        let request: PutManifestRequest = request.into();
-        let response = client.put_manifest(request).await?;
+        request: models::PostCatalogsRequest,
+    ) -> pipebuilder_common::Result<models::PostCatalogsResponse> {
+        let request: PutCatalogsRequest = request.into();
+        let response = client.put_catalogs(request).await?;
         Ok(response.into_inner().into())
     }
 
-    pub async fn get_manifest(
+    pub async fn get_catalogs(
         mut client: RepositoryClient<Channel>,
         mut register: Register,
-        request: models::GetManifestRequest,
+        request: models::GetCatalogsRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         // validate request
-        match validations::validate_get_manifest_request(&mut register, &request).await {
+        match validations::validate_get_catalogs_request(&mut register, &request).await {
             Ok(_) => (),
             Err(err) => return Ok(utils::handlers::http_bad_request(err.into())),
         };
-        match do_get_manifest(&mut client, request).await {
+        match do_get_catalogs(&mut client, request).await {
             Ok(response) => Ok(utils::handlers::ok(&response)),
             Err(err) => Ok(utils::handlers::http_not_found(err.into())),
         }
     }
 
-    async fn do_get_manifest(
+    async fn do_get_catalogs(
         client: &mut RepositoryClient<Channel>,
-        request: models::GetManifestRequest,
-    ) -> pipebuilder_common::Result<models::GetManifestResponse> {
-        let request: GetManifestRequest = request.into();
-        let response = client.get_manifest(request).await?;
+        request: models::GetCatalogsRequest,
+    ) -> pipebuilder_common::Result<models::GetCatalogsResponse> {
+        let request: GetCatalogsRequest = request.into();
+        let response = client.get_catalogs(request).await?;
         Ok(response.into_inner().into())
     }
 
-    pub async fn list_manifest_snapshot(
+    pub async fn list_catalogs_snapshot(
         mut register: Register,
-        request: models::ListManifestSnapshotRequest,
+        request: models::ListCatalogsSnapshotRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         // validate request
-        match validations::validate_list_manifest_snapshot_request(&mut register, &request).await {
+        match validations::validate_list_catalogs_snapshot_request(&mut register, &request).await {
             Ok(_) => (),
             Err(err) => return Ok(utils::handlers::http_bad_request(err.into())),
         };
-        match do_list_manifest_snapshot(&mut register, request).await {
+        match do_list_catalogs_snapshot(&mut register, request).await {
             Ok(response) => Ok(utils::handlers::ok(&response)),
             Err(err) => Ok(utils::handlers::http_internal_error(err.into())),
         }
     }
 
-    async fn do_list_manifest_snapshot(
+    async fn do_list_catalogs_snapshot(
         register: &mut Register,
-        request: models::ListManifestSnapshotRequest,
-    ) -> pipebuilder_common::Result<Vec<models::ManifestSnapshot>> {
+        request: models::ListCatalogsSnapshotRequest,
+    ) -> pipebuilder_common::Result<Vec<models::CatalogsSnapshot>> {
         let namespace = request.namespace;
         let manifest_snapshots = register
-            .list_resource::<ManifestSnapshot>(Some(namespace.as_str()), None)
+            .list_resource::<CatalogsSnapshot>(Some(namespace.as_str()), None)
             .await?;
-        let snapshots: Vec<models::ManifestSnapshot> = manifest_snapshots
+        let snapshots: Vec<models::CatalogsSnapshot> = manifest_snapshots
             .into_iter()
-            .map(|(key, manifest_snapshot)| models::ManifestSnapshot {
-                id: remove_resource_namespace::<ManifestSnapshot>(key.as_str(), namespace.as_str())
+            .map(|(key, manifest_snapshot)| models::CatalogsSnapshot {
+                id: remove_resource_namespace::<CatalogsSnapshot>(key.as_str(), namespace.as_str())
                     .to_owned(),
                 latest_version: manifest_snapshot.latest_version,
             })
@@ -186,87 +186,87 @@ mod handlers {
         Ok(snapshots)
     }
 
-    pub async fn delete_manifest_snapshot(
+    pub async fn delete_catalogs_snapshot(
         mut register: Register,
-        request: models::DeleteManifestSnapshotRequest,
+        request: models::DeleteCatalogsSnapshotRequest,
     ) -> Result<impl warp::Reply, Infallible> {
-        match validations::validate_delete_manifest_snapshot_request(&mut register, &request).await
+        match validations::validate_delete_catalogs_snapshot_request(&mut register, &request).await
         {
             Ok(()) => (),
             Err(err) => return Ok(utils::handlers::http_bad_request(err.into())),
         };
-        match do_delete_manifest_snapshot(&mut register, request).await {
+        match do_delete_catalogs_snapshot(&mut register, request).await {
             Ok(response) => Ok(utils::handlers::ok(&response)),
             Err(err) => Ok(utils::handlers::http_internal_error(err.into())),
         }
     }
 
-    async fn do_delete_manifest_snapshot(
+    async fn do_delete_catalogs_snapshot(
         register: &mut Register,
-        request: models::DeleteManifestSnapshotRequest,
-    ) -> pipebuilder_common::Result<models::DeleteManifestSnapshotResponse> {
+        request: models::DeleteCatalogsSnapshotRequest,
+    ) -> pipebuilder_common::Result<models::DeleteCatalogsSnapshotResponse> {
         let namespace = request.namespace;
         let id = request.id;
         register
-            .delete_resource::<ManifestSnapshot>(Some(namespace.as_str()), id.as_str(), None)
+            .delete_resource::<CatalogsSnapshot>(Some(namespace.as_str()), id.as_str(), None)
             .await?;
-        Ok(models::DeleteManifestSnapshotResponse {})
+        Ok(models::DeleteCatalogsSnapshotResponse {})
     }
 
-    pub async fn delete_manifest(
+    pub async fn delete_catalogs(
         mut client: RepositoryClient<Channel>,
         mut register: Register,
-        request: models::DeleteManifestRequest,
+        request: models::DeleteCatalogsRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         // validate request
-        match validations::validate_delete_manifest_request(&mut register, &request).await {
+        match validations::validate_delete_catalogs_request(&mut register, &request).await {
             Ok(_) => (),
             Err(err) => return Ok(utils::handlers::http_bad_request(err.into())),
         };
-        match do_delete_manifest(&mut client, request).await {
+        match do_delete_catalogs(&mut client, request).await {
             Ok(response) => Ok(utils::handlers::ok(&response)),
             Err(err) => Ok(utils::handlers::http_internal_error(err.into())),
         }
     }
 
-    async fn do_delete_manifest(
+    async fn do_delete_catalogs(
         client: &mut RepositoryClient<Channel>,
-        request: models::DeleteManifestRequest,
-    ) -> pipebuilder_common::Result<models::DeleteManifestResponse> {
-        let request: DeleteManifestRequest = request.into();
-        let response = client.delete_manifest(request).await?;
+        request: models::DeleteCatalogsRequest,
+    ) -> pipebuilder_common::Result<models::DeleteCatalogsResponse> {
+        let request: DeleteCatalogsRequest = request.into();
+        let response = client.delete_catalogs(request).await?;
         Ok(response.into_inner().into())
     }
 
-    pub async fn list_manifest_metadata(
+    pub async fn list_catalogs_metadata(
         mut register: Register,
-        request: models::ListManifestMetadataRequest,
+        request: models::ListCatalogsMetadataRequest,
     ) -> Result<impl warp::Reply, Infallible> {
         // validate request
-        match validations::validate_list_manifest_metadata_request(&mut register, &request).await {
+        match validations::validate_list_catalogs_metadata_request(&mut register, &request).await {
             Ok(_) => (),
             Err(err) => return Ok(utils::handlers::http_bad_request(err.into())),
         };
-        match do_list_manifest_metadata(&mut register, request).await {
+        match do_list_catalogs_metadata(&mut register, request).await {
             Ok(resp) => Ok(utils::handlers::ok(&resp)),
             Err(err) => Ok(utils::handlers::http_internal_error(err.into())),
         }
     }
 
-    async fn do_list_manifest_metadata(
+    async fn do_list_catalogs_metadata(
         register: &mut Register,
-        request: models::ListManifestMetadataRequest,
-    ) -> pipebuilder_common::Result<Vec<models::ManifestMetadata>> {
+        request: models::ListCatalogsMetadataRequest,
+    ) -> pipebuilder_common::Result<Vec<models::CatalogsMetadata>> {
         let namespace = request.namespace.as_str();
         let id = request.id.as_deref();
         let metas = register
-            .list_resource::<ManifestMetadata>(Some(namespace), id)
+            .list_resource::<CatalogsMetadata>(Some(namespace), id)
             .await?;
         let metas = metas
             .into_iter()
             .map(|(key, meta)| {
                 let id_version =
-                    remove_resource_namespace::<ManifestMetadata>(key.as_str(), namespace);
+                    remove_resource_namespace::<CatalogsMetadata>(key.as_str(), namespace);
                 let id_version = id_version.split('/').collect::<Vec<&str>>();
                 let id = id_version.get(0).expect("id not found in key").to_string();
                 let version: u64 = id_version
@@ -274,7 +274,7 @@ mod handlers {
                     .expect("version not found in key")
                     .parse()
                     .expect("cannot parse version as u64");
-                models::ManifestMetadata {
+                models::CatalogsMetadata {
                     id,
                     version,
                     pulls: meta.pulls,
@@ -282,7 +282,7 @@ mod handlers {
                     created: meta.created,
                 }
             })
-            .collect::<Vec<models::ManifestMetadata>>();
+            .collect::<Vec<models::CatalogsMetadata>>();
         Ok(metas)
     }
 }

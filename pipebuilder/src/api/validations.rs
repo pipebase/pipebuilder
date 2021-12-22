@@ -1,5 +1,6 @@
 use pipebuilder_common::{
     api::models, invalid_api_request, AppMetadata, Build, BuildMetadata, BuildSnapshot,
+    CatalogSchemaMetadata, CatalogSchemaSnapshot, CatalogsMetadata, CatalogsSnapshot,
     ManifestMetadata, ManifestSnapshot, NodeRole, NodeState, Project, Register, ResourceKeyBuilder,
     ResourceType, Result,
 };
@@ -109,6 +110,23 @@ pub async fn validate_delete_manifest_request(
     validate_project(register, namespace, id).await
 }
 
+pub async fn validate_delete_manifest_snapshot_request(
+    register: &mut Register,
+    request: &models::DeleteManifestSnapshotRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await?;
+    let id = request.id.as_str();
+    validate_project(register, namespace, id).await?;
+    match is_manifest_metadata_exist(register, namespace, id).await? {
+        true => Err(invalid_api_request(format!(
+            "can not delete manifest snapshot (namespace = {}, id = {}), manifests found",
+            namespace, id
+        ))),
+        false => Ok(()),
+    }
+}
+
 pub async fn validate_list_manifest_snapshot_request(
     register: &mut Register,
     request: &models::ListManifestSnapshotRequest,
@@ -120,6 +138,130 @@ pub async fn validate_list_manifest_snapshot_request(
 pub async fn validate_list_manifest_metadata_request(
     register: &mut Register,
     request: &models::ListManifestMetadataRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await?;
+    let id = match request.id.as_ref() {
+        Some(id) => id,
+        None => return Ok(()),
+    };
+    validate_project(register, namespace, id).await
+}
+
+pub async fn validate_post_catalog_schema_request(
+    register: &mut Register,
+    request: &models::PostCatalogSchemaRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await
+}
+
+pub async fn validate_get_catalog_schema_request(
+    register: &mut Register,
+    request: &models::GetCatalogSchemaRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await
+}
+
+pub async fn validate_delete_catalog_schema_request(
+    register: &mut Register,
+    request: &models::DeleteCatalogSchemaRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await
+}
+
+pub async fn validate_delete_catalog_schema_snapshot_request(
+    register: &mut Register,
+    request: &models::DeleteCatalogSchemaSnapshotRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await?;
+    let id = request.id.as_str();
+    match is_catalog_schema_metadata_exist(register, namespace, id).await? {
+        true => Err(invalid_api_request(format!(
+            "can not delete catalog schema snapshot (namespace = {}, id = {}), catalog schema found",
+            namespace, id
+        ))),
+        false => Ok(()),
+    }
+}
+
+pub async fn validate_list_catalog_schema_snapshot_request(
+    register: &mut Register,
+    request: &models::ListCatalogSchemaSnapshotRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await
+}
+
+pub async fn validate_list_catalog_schema_metadata_request(
+    register: &mut Register,
+    request: &models::ListCatalogSchemaMetadataRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await
+}
+
+pub async fn validate_post_catalogs_request(
+    register: &mut Register,
+    request: &models::PostCatalogsRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await?;
+    let id = request.id.as_str();
+    validate_project(register, namespace, id).await
+}
+
+pub async fn validate_get_catalogs_request(
+    register: &mut Register,
+    request: &models::GetCatalogsRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await?;
+    let id = request.id.as_str();
+    validate_project(register, namespace, id).await
+}
+
+pub async fn validate_delete_catalogs_request(
+    register: &mut Register,
+    request: &models::DeleteCatalogsRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await?;
+    let id = request.id.as_str();
+    validate_project(register, namespace, id).await
+}
+
+pub async fn validate_delete_catalogs_snapshot_request(
+    register: &mut Register,
+    request: &models::DeleteCatalogsSnapshotRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await?;
+    let id = request.id.as_str();
+    validate_project(register, namespace, id).await?;
+    match is_catalogs_metadata_exist(register, namespace, id).await? {
+        true => Err(invalid_api_request(format!(
+            "can not delete catalogs snapshot (namespace = {}, id = {}), catalogs found",
+            namespace, id
+        ))),
+        false => Ok(()),
+    }
+}
+
+pub async fn validate_list_catalogs_snapshot_request(
+    register: &mut Register,
+    request: &models::ListCatalogsSnapshotRequest,
+) -> Result<()> {
+    let namespace = request.namespace.as_str();
+    validate_namespace(register, namespace).await
+}
+
+pub async fn validate_list_catalogs_metadata_request(
+    register: &mut Register,
+    request: &models::ListCatalogsMetadataRequest,
 ) -> Result<()> {
     let namespace = request.namespace.as_str();
     validate_namespace(register, namespace).await?;
@@ -179,23 +321,6 @@ pub async fn validate_put_project_request(
     validate_namespace(register, namespace).await
 }
 
-pub async fn validate_delete_manifest_snapshot_request(
-    register: &mut Register,
-    request: &models::DeleteManifestSnapshotRequest,
-) -> Result<()> {
-    let namespace = request.namespace.as_str();
-    validate_namespace(register, namespace).await?;
-    let id = request.id.as_str();
-    validate_project(register, namespace, id).await?;
-    match is_manifest_metadata_exist(register, namespace, id).await? {
-        true => Err(invalid_api_request(format!(
-            "can not delete manifest snapshot (namespace = {}, id = {}), manifests found",
-            namespace, id
-        ))),
-        false => Ok(()),
-    }
-}
-
 pub async fn validate_delete_build_snapshot_request(
     register: &mut Register,
     request: &models::DeleteBuildSnapshotRequest,
@@ -239,6 +364,15 @@ pub async fn validate_delete_project_request(
         }
         false => (),
     };
+    match is_catalogs_snapshot_exist(register, namespace, id).await? {
+        true => {
+            return Err(invalid_api_request(format!(
+                "can not delete project (namespace = {}, id = {}), catalogs snapshot found.",
+                namespace, id
+            )))
+        }
+        false => (),
+    };
     match is_app_metadata_exist(register, namespace, id).await? {
         true => Err(invalid_api_request(format!(
             "can not delete project (namespace = {}, id = {}), app metadata found.",
@@ -253,6 +387,15 @@ pub async fn validate_delete_namespace_request(
     request: &models::DeleteNamespaceRequest,
 ) -> Result<()> {
     let id = request.id.as_str();
+    match is_catalog_schema_snapshot_exist(register, id).await? {
+        true => {
+            return Err(invalid_api_request(format!(
+                "can not delete namespace '{}', catalog schema snapshot found",
+                id
+            )))
+        }
+        false => (),
+    };
     match is_project_exist(register, id).await? {
         true => Err(invalid_api_request(format!(
             "can not delete namespace '{}', project found",
@@ -352,6 +495,26 @@ async fn is_build_metadata_exist(
         .await
 }
 
+async fn is_catalog_schema_metadata_exist(
+    register: &mut Register,
+    namespace: &str,
+    id: &str,
+) -> Result<bool> {
+    register
+        .is_resource_exist::<CatalogSchemaMetadata>(namespace, Some(id))
+        .await
+}
+
+async fn is_catalogs_metadata_exist(
+    register: &mut Register,
+    namespace: &str,
+    id: &str,
+) -> Result<bool> {
+    register
+        .is_resource_exist::<CatalogsMetadata>(namespace, Some(id))
+        .await
+}
+
 async fn is_build_snapshot_exist(
     register: &mut Register,
     namespace: &str,
@@ -369,6 +532,25 @@ async fn is_manifest_snapshot_exist(
 ) -> Result<bool> {
     register
         .is_resource_exist::<ManifestSnapshot>(namespace, Some(id))
+        .await
+}
+
+async fn is_catalog_schema_snapshot_exist(
+    register: &mut Register,
+    namespace: &str,
+) -> Result<bool> {
+    register
+        .is_resource_exist::<CatalogSchemaSnapshot>(namespace, None)
+        .await
+}
+
+async fn is_catalogs_snapshot_exist(
+    register: &mut Register,
+    namespace: &str,
+    id: &str,
+) -> Result<bool> {
+    register
+        .is_resource_exist::<CatalogsSnapshot>(namespace, Some(id))
         .await
 }
 

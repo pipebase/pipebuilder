@@ -1,24 +1,16 @@
 use super::print::Printer;
 use pipebuilder_common::{
-    api::{
-        client::ApiClient,
-        models::{
-            DeleteManifestRequest, DeleteManifestSnapshotRequest, GetManifestRequest,
-            GetManifestResponse, ListManifestMetadataRequest, ListManifestSnapshotRequest,
-            ManifestMetadata, ManifestSnapshot, PostManifestRequest, PostManifestResponse,
-        },
-    },
+    api::{client::ApiClient, models},
     Result,
 };
-use std::fs;
 
 pub(crate) async fn push_manifest(
     client: &ApiClient,
     namespace: String,
     id: String,
     buffer: Vec<u8>,
-) -> Result<PostManifestResponse> {
-    let request = PostManifestRequest {
+) -> Result<models::PostManifestResponse> {
+    let request = models::PostManifestRequest {
         namespace,
         id,
         buffer,
@@ -31,8 +23,8 @@ pub(crate) async fn pull_manifest(
     namespace: String,
     id: String,
     version: u64,
-) -> Result<GetManifestResponse> {
-    let request = GetManifestRequest {
+) -> Result<models::GetManifestResponse> {
+    let request = models::GetManifestRequest {
         namespace,
         id,
         version,
@@ -43,8 +35,8 @@ pub(crate) async fn pull_manifest(
 pub(crate) async fn list_manifest_snapshot(
     client: &ApiClient,
     namespace: String,
-) -> Result<Vec<ManifestSnapshot>> {
-    let request = ListManifestSnapshotRequest { namespace };
+) -> Result<Vec<models::ManifestSnapshot>> {
+    let request = models::ListManifestSnapshotRequest { namespace };
     client.list_manifest_snapshot(&request).await
 }
 
@@ -54,7 +46,7 @@ pub(crate) async fn delete_manifest(
     id: String,
     version: u64,
 ) -> Result<()> {
-    let request = DeleteManifestRequest {
+    let request = models::DeleteManifestRequest {
         namespace,
         id,
         version,
@@ -67,7 +59,7 @@ pub(crate) async fn delete_manifest_snapshot(
     namespace: String,
     id: String,
 ) -> Result<()> {
-    let request = DeleteManifestSnapshotRequest { namespace, id };
+    let request = models::DeleteManifestSnapshotRequest { namespace, id };
     client.delete_manifest_snapshot(&request).await
 }
 
@@ -84,14 +76,17 @@ pub(crate) async fn delete_manifest_all(
         let version = manifest_metadata.version;
         printer.status(
             "Deleting",
-            format!("manifest '{}/{}/{}'", namespace, id, version),
+            format!(
+                "manifest (namespace = {}, id = {}, version = {})",
+                namespace, id, version
+            ),
         )?;
         delete_manifest(client, namespace.clone(), id, version).await?;
     }
     // delete manifest snapshot
     printer.status(
         "Deleting",
-        format!("manifest snapshot '{}/{}'", namespace, id),
+        format!("manifest snapshot (namespace = {}, id = {})", namespace, id),
     )?;
     delete_manifest_snapshot(client, namespace.clone(), id.clone()).await
 }
@@ -100,17 +95,12 @@ pub(crate) async fn list_manifest_metadata(
     client: &ApiClient,
     namespace: String,
     id: Option<String>,
-) -> Result<Vec<ManifestMetadata>> {
-    let request = ListManifestMetadataRequest { namespace, id };
+) -> Result<Vec<models::ManifestMetadata>> {
+    let request = models::ListManifestMetadataRequest { namespace, id };
     client.list_manifest_metadata(&request).await
 }
 
-pub(crate) fn validate_manifest(client: &ApiClient, path: &str) -> Result<()> {
-    client.validate_manifest(path)?;
+pub(crate) fn validate_manifest(manifest: &[u8]) -> Result<()> {
+    ApiClient::validate_manifest(manifest)?;
     Ok(())
-}
-
-pub(crate) fn read_file(path: &str) -> Result<Vec<u8>> {
-    let buffer = fs::read(path)?;
-    Ok(buffer)
 }

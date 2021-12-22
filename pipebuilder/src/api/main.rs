@@ -3,6 +3,8 @@ mod api;
 mod app;
 mod bootstrap;
 mod build;
+mod catalog_schema;
+mod catalogs;
 mod config;
 mod manifest;
 mod namespace;

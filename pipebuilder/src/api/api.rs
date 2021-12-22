@@ -1,5 +1,5 @@
 pub mod filters {
-    use crate::{admin, app, build, manifest, namespace, node, project};
+    use crate::{admin, app, build, catalog_schema, catalogs, manifest, namespace, node, project};
     use pipebuilder_common::{
         grpc::{
             repository::repository_client::RepositoryClient,
@@ -24,6 +24,14 @@ pub mod filters {
                 lease_id,
             ))
             .or(manifest::filters::v1_manifest(
+                repository_client.clone(),
+                register.clone(),
+            ))
+            .or(catalogs::filters::v1_catalogs(
+                repository_client.clone(),
+                register.clone(),
+            ))
+            .or(catalog_schema::filters::v1_catalog_schema(
                 repository_client,
                 register.clone(),
             ))
