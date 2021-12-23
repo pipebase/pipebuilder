@@ -45,3 +45,21 @@ jobs:
         with:
           command: test
           args: --package e2e --features itest build::tests::test_build
+  catalog:
+    name: Catalog Itest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: setup data volume
+        run: ./e2e/setup-data-volume.sh
+      - name: setup CI
+        run: ./e2e/setup-ci.sh
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --package e2e --features itest catalog::tests::test_catalog
