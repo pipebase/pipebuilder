@@ -1,6 +1,11 @@
 use super::Cmd;
 use crate::ops::{
-    do_app::pull_app, do_build::pull_build_log, do_manifest::pull_manifest, print::print_utf8,
+    do_app::pull_app,
+    do_build::pull_build_log,
+    do_catalog_schema::pull_catalog_schema,
+    do_catalogs::{dump_catalogs, pull_catalogs},
+    do_manifest::pull_manifest,
+    print::print_utf8,
 };
 use pipebuilder_common::{api::client::ApiClient, write_file, Result};
 
@@ -9,9 +14,13 @@ use clap::Arg;
 pub(crate) const DEFAULT_APP_DOWNLOAD_PATH: &str = "./app";
 
 pub fn cmd() -> Cmd {
-    Cmd::new("pull")
-        .about("Pull resource")
-        .subcommands(vec![app(), build_log(), manifest()])
+    Cmd::new("pull").about("Pull resource").subcommands(vec![
+        app(),
+        build_log(),
+        catalogs(),
+        catalog_schema(),
+        manifest(),
+    ])
 }
 
 pub fn manifest() -> Cmd {
@@ -52,6 +61,96 @@ pub async fn exec_manifest(client: ApiClient, args: &clap::ArgMatches) -> Result
     )
     .await?;
     print_utf8(response.buffer)
+}
+
+pub fn catalog_schema() -> Cmd {
+    Cmd::new("catalog-schema")
+        .about("Pull catalog schema given namespace, schema id and version")
+        .args(vec![
+            Arg::new("namespace")
+                .short('n')
+                .help("Specify namespace")
+                .required(true)
+                .takes_value(true),
+            Arg::new("id")
+                .short('i')
+                .help("Specify catalog schema id")
+                .required(true)
+                .takes_value(true),
+            Arg::new("version")
+                .short('v')
+                .help("Specify catalog schema version")
+                .required(true)
+                .takes_value(true),
+        ])
+}
+
+pub async fn exec_catalog_schema(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+    let namespace = args.value_of("namespace").unwrap();
+    let id = args.value_of("id").unwrap();
+    let catalog_schema_version = args
+        .value_of("version")
+        .unwrap()
+        .parse()
+        .expect("invalid catalog schema version");
+    let response = pull_catalog_schema(
+        &client,
+        namespace.to_owned(),
+        id.to_owned(),
+        catalog_schema_version,
+    )
+    .await?;
+    print_utf8(response.buffer)
+}
+
+pub fn catalogs() -> Cmd {
+    Cmd::new("catalogs")
+        .about("Pull catalogs given namespace, project id and version")
+        .args(vec![
+            Arg::new("namespace")
+                .short('n')
+                .help("Specify namespace")
+                .required(true)
+                .takes_value(true),
+            Arg::new("id")
+                .short('i')
+                .help("Specify project id")
+                .required(true)
+                .takes_value(true),
+            Arg::new("version")
+                .short('v')
+                .help("Specify catalogs version")
+                .required(true)
+                .takes_value(true),
+            Arg::new("directory")
+                .short('d')
+                .help("Specify directory where catalogs written into")
+                .required(false)
+                .takes_value(true),
+        ])
+}
+
+pub async fn exec_catalogs(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+    let namespace = args.value_of("namespace").unwrap();
+    let id = args.value_of("id").unwrap();
+    let catalogs_version = args
+        .value_of("version")
+        .unwrap()
+        .parse()
+        .expect("invalid catalogs version");
+    let directory = args.value_of("directory");
+    let response = pull_catalogs(
+        &client,
+        namespace.to_owned(),
+        id.to_owned(),
+        catalogs_version,
+    )
+    .await?;
+    let buffer = response.buffer;
+    match directory {
+        Some(directory) => dump_catalogs(buffer.as_slice(), directory).await,
+        None => print_utf8(buffer),
+    }
 }
 
 pub fn app() -> Cmd {

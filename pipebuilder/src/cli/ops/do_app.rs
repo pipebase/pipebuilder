@@ -57,7 +57,10 @@ pub(crate) async fn delete_app_all(
         let version = app_metadata.version;
         printer.status(
             "Deleting",
-            format!("app '{}/{}/{}'", namespace, id, version),
+            format!(
+                "app (namespace = {}, id = {}, version = {})",
+                namespace, id, version
+            ),
         )?;
         delete_app(client, namespace.clone(), id.clone(), version).await?;
     }

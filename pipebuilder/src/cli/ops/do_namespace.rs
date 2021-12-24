@@ -1,4 +1,5 @@
 use super::{
+    do_catalog_schema::{delete_catalog_schema_all, list_catalog_schema_snapshot},
     do_project::{delete_project, list_project},
     print::Printer,
 };
@@ -27,6 +28,10 @@ pub(crate) async fn delete_namespace(client: &ApiClient, namespace: String) -> R
     for project in list_project(client, namespace.clone()).await? {
         let id = project.id;
         delete_project(client, namespace.clone(), id).await?;
+    }
+    for catalog_schema in list_catalog_schema_snapshot(client, namespace.clone()).await? {
+        let id = catalog_schema.id;
+        delete_catalog_schema_all(client, namespace.clone(), id).await?;
     }
     printer.status("Deleting", format!("namespace {}", namespace))?;
     let request = DeleteNamespaceRequest { id: namespace };

@@ -1,5 +1,4 @@
 use crate::{
-    app_workspace,
     constants::{
         PATH_APP, PATH_APP_BUILD_LOG, PATH_APP_LOCK, PATH_APP_MAIN, PATH_APP_RELEASE_BINARY,
         PATH_APP_TARGET, PATH_APP_TOML_MANIFEST,
@@ -8,10 +7,10 @@ use crate::{
     grpc::repository::{GetManifestRequest, PostAppRequest},
     open_lock_file, read_file,
     utils::{
-        app_build_log_directory, app_restore_directory, cargo_build, cargo_fmt, cargo_init,
-        copy_directory, create_directory, move_directory, parse_toml, remove_directory, sub_path,
-        write_file, write_toml, TomlManifest,
+        cargo_build, cargo_fmt, cargo_init, copy_directory, create_directory, move_directory,
+        parse_toml, remove_directory, write_file, write_toml, PathBuilder, TomlManifest,
     },
+    Resource, ResourceType, Snapshot,
 };
 use chrono::{DateTime, Utc};
 use pipegen::models::App;
@@ -107,6 +106,12 @@ impl BuildMetadata {
     }
 }
 
+impl Resource for BuildMetadata {
+    fn ty() -> ResourceType {
+        ResourceType::BuildMetadata
+    }
+}
+
 pub struct BuildCacheMetadata {
     pub timestamp: DateTime<Utc>,
 }
@@ -133,6 +138,66 @@ impl Default for BuildCacheMetadata {
 #[derive(Default, Deserialize, Serialize)]
 pub struct BuildSnapshot {
     pub latest_version: u64,
+}
+
+impl Snapshot for BuildSnapshot {
+    fn incr_version(&mut self) {
+        self.latest_version += 1
+    }
+}
+
+impl Resource for BuildSnapshot {
+    fn ty() -> ResourceType {
+        ResourceType::BuildSnapshot
+    }
+}
+
+#[derive(Default)]
+pub struct LocalBuildContextBuilder {
+    // builder id
+    id: Option<String>,
+    // builder external_address
+    address: Option<String>,
+    workspace: Option<String>,
+    restore_directory: Option<String>,
+    log_directory: Option<String>,
+}
+
+impl LocalBuildContextBuilder {
+    pub fn id(mut self, id: String) -> Self {
+        self.id = Some(id);
+        self
+    }
+
+    pub fn address(mut self, address: String) -> Self {
+        self.address = Some(address);
+        self
+    }
+
+    pub fn workspace(mut self, workspace: String) -> Self {
+        self.workspace = Some(workspace);
+        self
+    }
+
+    pub fn restore_directory(mut self, restore_directory: String) -> Self {
+        self.restore_directory = Some(restore_directory);
+        self
+    }
+
+    pub fn log_directory(mut self, log_directory: String) -> Self {
+        self.log_directory = Some(log_directory);
+        self
+    }
+
+    pub fn build(self) -> LocalBuildContext {
+        LocalBuildContext {
+            id: self.id.expect("builder id undefined"),
+            address: self.address.expect("builder external address undefined"),
+            workspace: self.workspace.expect("workspace directory undefined"),
+            restore_directory: self.restore_directory.expect("restore directory undefined"),
+            log_directory: self.log_directory.expect("log directory undefined"),
+        }
+    }
 }
 
 // build context shared by all local builds
@@ -193,9 +258,14 @@ impl Build {
         id: &str,
         version: u64,
     ) -> Result<Vec<u8>> {
-        let app_log_directory = app_build_log_directory(log_directory, namespace, id, version);
-        let app_log_path = sub_path(app_log_directory.as_str(), PATH_APP_BUILD_LOG);
-        read_file(app_log_path.as_str()).await
+        let app_log_path = PathBuilder::default()
+            .push(log_directory)
+            .push(namespace)
+            .push(id)
+            .push(version.to_string())
+            .push(PATH_APP_BUILD_LOG)
+            .build();
+        read_file(app_log_path.as_path()).await
     }
 
     pub fn new(
@@ -360,15 +430,28 @@ impl Build {
             "create build workspace"
         );
         // try restore app build workspace
-        let app_workspace = app_workspace(workspace, namespace, id, build_version);
-        create_directory(app_workspace.as_str()).await?;
-        let app_restore_directory =
-            app_restore_directory(restore_directory, namespace, id, target_platform);
-        // create restore directory if not exists
-        create_directory(app_restore_directory.as_str()).await?;
-        let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
-        let app_restore_lock_path = sub_path(app_restore_directory.as_str(), PATH_APP_LOCK);
-        let mut app_restore_lock_file = open_lock_file(app_restore_lock_path.as_str())?;
+        let app_workspace = PathBuilder::default()
+            .push(workspace)
+            .push(namespace)
+            .push(id)
+            .push(build_version.to_string())
+            .build();
+        create_directory(app_workspace.as_path()).await?;
+        let app_restore_directory = PathBuilder::default()
+            .push(restore_directory)
+            .push(namespace)
+            .push(id)
+            .push(target_platform)
+            .build();
+        // create restore directory / lock file if not exists
+        create_directory(app_restore_directory.as_path()).await?;
+        let app_restore_path = PathBuilder::clone_from(&app_restore_directory)
+            .push(PATH_APP)
+            .build();
+        let app_restore_lock_path = PathBuilder::clone_from(&app_restore_directory)
+            .push(PATH_APP_LOCK)
+            .build();
+        let mut app_restore_lock_file = open_lock_file(app_restore_lock_path.as_path())?;
         if app_restore_lock_file.try_lock()? {
             // try restore from compiled app
             if copy_directory(app_restore_path.clone(), app_workspace.clone()).await? {
@@ -393,9 +476,11 @@ impl Build {
         );
         // can not restore from compiled app, cargo init app
         // cargo init
-        let app_path = sub_path(app_workspace.as_str(), PATH_APP);
-        create_directory(app_path.as_str()).await?;
-        cargo_init(app_path.as_str()).await?;
+        let app_path = PathBuilder::clone_from(&app_workspace)
+            .push(PATH_APP)
+            .build();
+        create_directory(app_path.as_path()).await?;
+        cargo_init(app_path.as_os_str()).await?;
         Ok(Some(BuildStatus::Generate))
     }
 
@@ -415,22 +500,31 @@ impl Build {
             target_platform = target_platform,
             "generate app"
         );
-        let app_workspace = app_workspace(workspace, namespace, id, build_version);
-        let toml_path = sub_path(app_workspace.as_str(), PATH_APP_TOML_MANIFEST);
-        let mut toml_manifest: TomlManifest = parse_toml(toml_path.as_str()).await?;
+        let app_workspace = PathBuilder::default()
+            .push(workspace)
+            .push(namespace)
+            .push(id)
+            .push(build_version.to_string())
+            .build();
+        let toml_path = PathBuilder::clone_from(&app_workspace)
+            .push(PATH_APP_TOML_MANIFEST)
+            .build();
+        let mut toml_manifest: TomlManifest = parse_toml(toml_path.as_path()).await?;
         toml_manifest.init();
         let app = self.app.as_ref().expect("app not initialized");
         let additionals = app.get_dependencies().clone();
         for additional in additionals {
             toml_manifest.add_dependency(additional.get_name(), additional.into());
         }
-        write_toml(&toml_manifest, toml_path.as_str()).await?;
+        write_toml(&toml_manifest, toml_path.as_path()).await?;
         // generate src/main.rs
         let generated_code = self.app.as_ref().expect("app not initialized").generate();
-        let main_path = sub_path(app_workspace.as_str(), PATH_APP_MAIN);
-        write_file(main_path.as_str(), generated_code.as_bytes()).await?;
+        let main_path = PathBuilder::clone_from(&app_workspace)
+            .push(PATH_APP_MAIN)
+            .build();
+        write_file(main_path.as_path(), generated_code.as_bytes()).await?;
         // fmt code
-        cargo_fmt(toml_path.as_str()).await?;
+        cargo_fmt(toml_path.as_os_str()).await?;
         Ok(Some(BuildStatus::Build))
     }
 
@@ -452,13 +546,25 @@ impl Build {
             "build app"
         );
         // cargo build and stream log to file
-        let app_workspace = app_workspace(workspace, namespace, id, build_version);
-        let cargo_workdir = sub_path(app_workspace.as_str(), PATH_APP);
+        let cargo_workdir = PathBuilder::default()
+            .push(workspace)
+            .push(namespace)
+            .push(id)
+            .push(build_version.to_string())
+            .push(PATH_APP)
+            .build();
         // prepare log directory
-        let log_directory = app_build_log_directory(log_directory, namespace, id, build_version);
-        create_directory(log_directory.as_str()).await?;
-        let log_path = sub_path(log_directory.as_str(), PATH_APP_BUILD_LOG);
-        cargo_build(cargo_workdir.as_str(), target_platform, log_path.as_str()).await?;
+        let log_directory = PathBuilder::default()
+            .push(log_directory)
+            .push(namespace)
+            .push(id)
+            .push(build_version.to_string())
+            .build();
+        create_directory(log_directory.as_path()).await?;
+        let log_path = PathBuilder::clone_from(&log_directory)
+            .push(PATH_APP_BUILD_LOG)
+            .build();
+        cargo_build(cargo_workdir.as_path(), target_platform, log_path.as_path()).await?;
         Ok(Some(BuildStatus::Publish))
     }
 
@@ -479,15 +585,20 @@ impl Build {
             target_platform = target_platform,
             "publish app binary"
         );
-        let app_workspace = app_workspace(workspace, namespace, id, build_version);
-        let target_path = sub_path(app_workspace.as_str(), PATH_APP_TARGET);
-        let target_platform_release_binary =
-            format!("{}/{}", target_platform, PATH_APP_RELEASE_BINARY);
-        let release_path = sub_path(
-            target_path.as_str(),
-            target_platform_release_binary.as_str(),
-        );
-        let buffer = read_file(release_path.as_str()).await?;
+        let app_workspace = PathBuilder::default()
+            .push(workspace)
+            .push(namespace)
+            .push(id)
+            .push(build_version.to_string())
+            .build();
+        let target_path = PathBuilder::clone_from(&app_workspace)
+            .push(PATH_APP_TARGET)
+            .build();
+        let release_path = PathBuilder::clone_from(&target_path)
+            .push(target_platform)
+            .push(PATH_APP_RELEASE_BINARY)
+            .build();
+        let buffer = read_file(release_path.as_path()).await?;
         let request = self.build_post_app_request(buffer);
         let _ = self.repository_client.post_app(request).await?.into_inner();
         Ok(Some(BuildStatus::Store))
@@ -510,14 +621,29 @@ impl Build {
             target_platform = target_platform,
             "store app"
         );
-        let app_directory = app_workspace(workspace, namespace, id, build_version);
-        let app_path = sub_path(app_directory.as_str(), PATH_APP);
-        let app_restore_directory =
-            app_restore_directory(restore_directory, namespace, id, target_platform);
-        create_directory(app_restore_directory.as_str()).await?;
-        let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
-        let app_restore_lock_path = sub_path(app_restore_directory.as_str(), PATH_APP_LOCK);
-        let mut app_restore_lock_file = open_lock_file(app_restore_lock_path.as_str())?;
+
+        let app_path = PathBuilder::default()
+            .push(workspace)
+            .push(namespace)
+            .push(id)
+            .push(build_version.to_string())
+            .push(PATH_APP)
+            .build();
+        let app_restore_directory = PathBuilder::default()
+            .push(restore_directory)
+            .push(namespace)
+            .push(id)
+            .push(target_platform)
+            .build();
+        // create restore directory / lock file if not exists
+        create_directory(app_restore_directory.as_path()).await?;
+        let app_restore_path = PathBuilder::clone_from(&app_restore_directory)
+            .push(PATH_APP)
+            .build();
+        let app_restore_lock_path = PathBuilder::clone_from(&app_restore_directory)
+            .push(PATH_APP_LOCK)
+            .build();
+        let mut app_restore_lock_file = open_lock_file(app_restore_lock_path.as_path())?;
         // lock file before store compiled app - avoid corruption due to race
         if !app_restore_lock_file.try_lock()? {
             warn!(
@@ -526,13 +652,12 @@ impl Build {
                 manifest_version = manifest_version,
                 build_version = build_version,
                 target_platform = target_platform,
-                "lock file '{}' failed, skip app store ...",
-                app_restore_lock_path
+                "lock file failed, skip app store ...",
             );
             return Ok(Some(BuildStatus::Succeed));
         }
         // do store compiled app
-        let r = Self::do_store_app(app_path, app_restore_path).await;
+        let r = Self::do_store_app(&app_path, &app_restore_path).await;
         // unlock file regardless of store succeed or fail
         app_restore_lock_file.unlock()?;
         match r {
@@ -541,11 +666,14 @@ impl Build {
         }
     }
 
-    async fn do_store_app(app_path: String, app_restore_path: String) -> Result<()> {
+    async fn do_store_app(
+        app_path: &std::path::Path,
+        app_restore_path: &std::path::Path,
+    ) -> Result<()> {
         // cleanup previous app build cache if any
-        let _ = remove_directory(app_restore_path.as_str()).await;
-        create_directory(app_restore_path.as_str()).await?;
-        move_directory(app_path.as_str(), app_restore_path.as_str()).await
+        let _ = remove_directory(app_restore_path).await;
+        create_directory(app_restore_path).await?;
+        move_directory(app_path, app_restore_path).await
     }
 
     pub fn succeed(&mut self) -> Result<Option<BuildStatus>> {
@@ -568,13 +696,21 @@ impl Build {
         id: &str,
         target_platform: &str,
     ) -> Result<()> {
-        let app_restore_directory =
-            app_restore_directory(restore_directory, namespace, id, target_platform);
-        let app_restore_path = sub_path(app_restore_directory.as_str(), PATH_APP);
-        let app_restore_lock_path = sub_path(app_restore_directory.as_str(), PATH_APP_LOCK);
-        let mut app_restore_lock_file = open_lock_file(app_restore_lock_path.as_str())?;
+        let app_restore_directory = PathBuilder::default()
+            .push(restore_directory)
+            .push(namespace)
+            .push(id)
+            .push(target_platform)
+            .build();
+        let app_restore_path = PathBuilder::clone_from(&app_restore_directory)
+            .push(PATH_APP)
+            .build();
+        let app_restore_lock_path = PathBuilder::clone_from(&app_restore_directory)
+            .push(PATH_APP_LOCK)
+            .build();
+        let mut app_restore_lock_file = open_lock_file(app_restore_lock_path.as_path())?;
         if app_restore_lock_file.try_lock()? {
-            remove_directory(app_restore_path.as_str()).await?;
+            remove_directory(app_restore_path.as_path()).await?;
             app_restore_lock_file.unlock()?;
         }
         Ok(())

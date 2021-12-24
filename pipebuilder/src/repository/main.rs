@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
         pipebuilder_common::bootstrap(config.base).await?;
     // bootstrap repository svc
     let lease_id = lease_svc.get_lease_id();
-    let repository_svc = bootstrap(config.repository, register, lease_id);
+    let repository_svc = bootstrap(config.repository, register, lease_id).await?;
     // bootstrap server
     let node_id = node_svc.get_id();
     let internal_address = node_svc.get_internal_address();

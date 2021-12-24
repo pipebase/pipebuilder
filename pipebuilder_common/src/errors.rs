@@ -23,8 +23,13 @@ pub enum ErrorImpl {
     Etcd(#[from] etcd_client::Error),
     #[error("io error, detail: {0:?}")]
     Io(#[from] io::Error),
-    #[error("json error, detail: {0:?}")]
+    #[error("json serde error, detail: {0:?}")]
     Json(#[from] serde_json::Error),
+    #[error("json schema error, operation: {operation:?}, messages: {messages:?}")]
+    JsonSchema {
+        operation: String,
+        messages: Vec<String>,
+    },
     #[error("tonic transport error, detail: {0:?}")]
     TonicTransport(#[from] tonic::transport::Error),
     #[error("yaml error, detail: {0:?}")]
@@ -41,6 +46,8 @@ pub enum ErrorImpl {
     Utf8(#[from] FromUtf8Error),
     #[error("cargo {cmd:?} error, code: {code:?}, message: {msg:?}")]
     Cargo { cmd: String, code: i32, msg: String },
+    #[error("invalid catalog name, reason: {reason:?}, message: {message:?}")]
+    CatalogName { reason: String, message: String },
     #[error("reqwest error, detail: {0:?}")]
     Reqwest(#[from] reqwest::Error),
     #[error("http header name error, detail: {0:?}")]
@@ -191,6 +198,17 @@ pub fn api_server_error(
 
 pub fn invalid_api_request(message: String) -> Error {
     Error(Box::new(ErrorImpl::ApiRequest { message }))
+}
+
+pub fn json_schema_error(operation: String, messages: Vec<String>) -> Error {
+    Error(Box::new(ErrorImpl::JsonSchema {
+        operation,
+        messages,
+    }))
+}
+
+pub fn invalid_catalog_name(reason: String, message: String) -> Error {
+    Error(Box::new(ErrorImpl::CatalogName { reason, message }))
 }
 
 // rpc status

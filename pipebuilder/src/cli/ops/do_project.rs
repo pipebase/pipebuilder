@@ -1,6 +1,6 @@
 use super::{
-    do_app::delete_app_all, do_build::delete_build_all, do_manifest::delete_manifest_all,
-    print::Printer,
+    do_app::delete_app_all, do_build::delete_build_all, do_catalogs::delete_catalogs_all,
+    do_manifest::delete_manifest_all, print::Printer,
 };
 use pipebuilder_common::{
     api::{
@@ -32,10 +32,14 @@ pub(crate) async fn delete_project(
     id: String,
 ) -> Result<()> {
     let mut printer = Printer::new();
-    printer.status("Deleting", format!("project {}/{}", namespace, id))?;
+    printer.status(
+        "Deleting",
+        format!("project (namespace = {}, id = {})", namespace, id),
+    )?;
     delete_app_all(client, namespace.clone(), id.clone()).await?;
     delete_build_all(client, namespace.clone(), id.clone()).await?;
     delete_manifest_all(client, namespace.clone(), id.clone()).await?;
+    delete_catalogs_all(client, namespace.clone(), id.clone()).await?;
     let request = DeleteProjectRequest { namespace, id };
     client.delete_project(&request).await
 }

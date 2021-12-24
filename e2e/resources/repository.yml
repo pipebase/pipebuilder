@@ -10,3 +10,5 @@ base:
 repository:
   manifest: e2e/data/manifests
   app: e2e/data/apps
+  catalog_schema: e2e/data/catalog-schema
+  catalogs: e2e/data/catalogs

@@ -1,3 +1,4 @@
+use crate::{Resource, ResourceType};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -16,5 +17,11 @@ impl Namespace {
 impl Default for Namespace {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Resource for Namespace {
+    fn ty() -> ResourceType {
+        ResourceType::Namespace
     }
 }

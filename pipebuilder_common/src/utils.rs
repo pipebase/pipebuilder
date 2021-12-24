@@ -1,10 +1,4 @@
-use crate::{
-    errors::{cargo_error, Result},
-    grpc::{build::builder_client::BuilderClient, node::node_client::NodeClient},
-    node_role_prefix, NodeRole, RESOURCE_APP_METADATA, RESOURCE_BUILD_METADATA,
-    RESOURCE_BUILD_SNAPSHOT, RESOURCE_MANIFEST_METADATA, RESOURCE_MANIFEST_SNAPSHOT,
-    RESOURCE_NAMESPACE, RESOURCE_NODE, RESOURCE_PROJECT,
-};
+use crate::errors::{cargo_error, Result};
 use chrono::{DateTime, TimeZone, Utc};
 use etcd_client::{Event, EventType};
 use filetime::FileTime;
@@ -26,7 +20,6 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
     process::Command,
 };
-use tonic::transport::Channel;
 use tracing::{info, warn};
 
 // filesystem ops
@@ -101,34 +94,30 @@ where
     Ok(config)
 }
 
-// app build workspace
-pub fn app_workspace(workspace: &str, namespace: &str, id: &str, build_version: u64) -> String {
-    format!("{}/{}/{}/{}", workspace, namespace, id, build_version)
+// path ops
+#[derive(Default)]
+pub struct PathBuilder {
+    buffer: std::path::PathBuf,
 }
 
-pub fn app_build_log_directory(
-    log_directory: &str,
-    namespace: &str,
-    id: &str,
-    build_version: u64,
-) -> String {
-    format!("{}/{}/{}/{}", log_directory, namespace, id, build_version)
-}
+impl PathBuilder {
+    pub fn push<P>(mut self, path: P) -> Self
+    where
+        P: AsRef<std::path::Path>,
+    {
+        self.buffer.push(path);
+        self
+    }
 
-pub fn app_restore_directory(
-    restore_directory: &str,
-    namespace: &str,
-    id: &str,
-    target_platform: &str,
-) -> String {
-    format!(
-        "{}/{}/{}/{}",
-        restore_directory, namespace, id, target_platform
-    )
-}
+    pub fn build(self) -> std::path::PathBuf {
+        self.buffer
+    }
 
-pub fn sub_path(parent_directory: &str, path: &str) -> String {
-    format!("{}/{}", parent_directory, path)
+    pub fn clone_from(path: &std::path::Path) -> Self {
+        PathBuilder {
+            buffer: path.to_path_buf(),
+        }
+    }
 }
 
 // remove directory and return success flag
@@ -213,6 +202,10 @@ where
     Ok(())
 }
 
+pub fn append_dot_format_suffix(filename: &str, format: &str) -> String {
+    format!("{}.{}", filename, format)
+}
+
 // run cmd and collect status and output
 async fn cmd_status_output(mut cmd: Command) -> Result<(i32, String)> {
     let output = cmd.output().await?;
@@ -246,7 +239,10 @@ fn cargo_binary() -> OsString {
     }
 }
 
-pub async fn cargo_init(path: &str) -> Result<()> {
+pub async fn cargo_init<S>(path: S) -> Result<()>
+where
+    S: AsRef<std::ffi::OsStr>,
+{
     let mut cmd = Command::new(cargo_binary());
     cmd.arg("init").arg(path);
     let (code, out) = cmd_status_output(cmd).await?;
@@ -256,9 +252,12 @@ pub async fn cargo_init(path: &str) -> Result<()> {
     }
 }
 
-pub async fn cargo_fmt(manifest_path: &str) -> Result<()> {
+pub async fn cargo_fmt<S>(path: S) -> Result<()>
+where
+    S: AsRef<std::ffi::OsStr>,
+{
     let mut cmd = Command::new(cargo_binary());
-    cmd.arg("fmt").arg("--manifest-path").arg(manifest_path);
+    cmd.arg("fmt").arg("--manifest-path").arg(path);
     let (code, out) = cmd_status_output(cmd).await?;
     match code == 0 {
         true => Ok(()),
@@ -267,7 +266,11 @@ pub async fn cargo_fmt(manifest_path: &str) -> Result<()> {
 }
 
 // target platform: https://doc.rust-lang.org/cargo/commands/cargo-build.html#compilation-options
-pub async fn cargo_build(cargo_workdir: &str, target_platform: &str, log_path: &str) -> Result<()> {
+pub async fn cargo_build<P, S>(cargo_workdir: P, target_platform: S, log_path: P) -> Result<()>
+where
+    P: AsRef<std::path::Path>,
+    S: AsRef<std::ffi::OsStr>,
+{
     let log_file = fs::File::create(log_path).await?.into_std().await;
     let mut cmd = Command::new(cargo_binary());
     cmd.arg("build")
@@ -314,138 +317,6 @@ where
         return Ok(Some((event.event_type(), key.to_owned(), value)));
     }
     Ok(None)
-}
-
-// key prefix functions
-pub fn root_resource(resource: &str) -> String {
-    format!("/{}", resource)
-}
-
-pub fn resource_id(resource: &str, id: &str) -> String {
-    format!("/{}/{}", resource, id)
-}
-
-pub fn resource_namespace(resource: &str, namespace: &str) -> String {
-    format!("/{}/{}", resource, namespace)
-}
-
-pub fn resource_namespace_id(resource: &str, namespace: &str, id: &str) -> String {
-    format!("/{}/{}/{}", resource, namespace, id)
-}
-
-pub fn resource_namespace_id_version(
-    resource: &str,
-    namespace: &str,
-    id: &str,
-    version: u64,
-) -> String {
-    format!("/{}/{}/{}/{}", resource, namespace, id, version)
-}
-
-pub fn namespace_key(id: &str) -> String {
-    resource_id(RESOURCE_NAMESPACE, id)
-}
-
-pub fn node_key(role: &NodeRole, id: &str) -> String {
-    let role_prefix = node_role_prefix(role);
-    resource_id(role_prefix, id)
-}
-
-pub fn node_role_prefix_key(role: Option<&NodeRole>) -> String {
-    let role_prefix = match role {
-        Some(role) => node_role_prefix(role),
-        None => RESOURCE_NODE,
-    };
-    root_resource(role_prefix)
-}
-
-pub fn app_metadata_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_APP_METADATA, namespace)
-}
-
-pub fn app_metadata_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
-    resource_namespace_id_version(RESOURCE_APP_METADATA, namespace, id, version)
-}
-
-pub fn build_snapshot_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_BUILD_SNAPSHOT, namespace)
-}
-
-pub fn manifest_metadata_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_MANIFEST_METADATA, namespace)
-}
-
-pub fn manifest_metadata_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
-    resource_namespace_id_version(RESOURCE_MANIFEST_METADATA, namespace, id, version)
-}
-
-pub fn manifest_snapshot_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_MANIFEST_SNAPSHOT, namespace)
-}
-
-pub fn project_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_PROJECT, namespace)
-}
-
-pub fn version_build_namespace(namespace: &str) -> String {
-    resource_namespace(RESOURCE_BUILD_METADATA, namespace)
-}
-
-pub fn app_metadata_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_APP_METADATA, namespace, id)
-}
-
-pub fn build_snapshot_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_BUILD_SNAPSHOT, namespace, id)
-}
-
-pub fn manifest_metadata_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_MANIFEST_METADATA, namespace, id)
-}
-
-pub fn manifest_snapshot_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_MANIFEST_SNAPSHOT, namespace, id)
-}
-
-pub fn project_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_PROJECT, namespace, id)
-}
-
-pub fn build_metadata_namespace_id(namespace: &str, id: &str) -> String {
-    resource_namespace_id(RESOURCE_BUILD_METADATA, namespace, id)
-}
-
-pub fn build_metadata_namespace_id_version(namespace: &str, id: &str, version: u64) -> String {
-    resource_namespace_id_version(RESOURCE_BUILD_METADATA, namespace, id, version)
-}
-
-// remove '/resource/namespace/' and return id/<suffix> given a key
-pub fn remove_resource_namespace<'a>(key: &'a str, resource: &str, namespace: &str) -> &'a str {
-    let pattern = format!("{}/", resource_namespace(resource, namespace));
-    key.strip_prefix(pattern.as_str()).unwrap_or_else(|| {
-        panic!(
-            "key '{}' not start with '/{}/{}/'",
-            key, resource, namespace
-        )
-    })
-}
-
-// remove '/resource/' and return suffix
-pub fn remove_resource<'a>(key: &'a str, resource: &str) -> &'a str {
-    let pattern = format!("{}/", root_resource(resource));
-    key.strip_prefix(pattern.as_str())
-        .unwrap_or_else(|| panic!("key '{}' not start with '/{}/'", key, resource))
-}
-
-// rpc
-pub async fn build_builder_client(protocol: &str, address: &str) -> Result<BuilderClient<Channel>> {
-    let client = BuilderClient::connect(format!("{}://{}", protocol, address)).await?;
-    Ok(client)
-}
-
-pub async fn build_node_client(protocol: &str, address: &str) -> Result<NodeClient<Channel>> {
-    let client = NodeClient::connect(format!("{}://{}", protocol, address)).await?;
-    Ok(client)
 }
 
 // hash

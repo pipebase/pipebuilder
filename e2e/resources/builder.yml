@@ -8,7 +8,9 @@ base:
   register:
     endpoints: ["localhost:2379"]
 builder:
-  repository_endpoint: http://127.0.0.1:17000
+  repository_client: 
+    protocol: Http
+    address: 127.0.0.1:17000
   workspace: e2e/data/builds/apps
   restore_directory: e2e/data/builds/restores
   log_directory: e2e/data/builds/logs

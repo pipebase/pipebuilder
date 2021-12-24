@@ -1,0 +1,96 @@
+{
+    "title": "timer",
+    "type": "object",
+    "definitions": {
+        "interval_in_millis": {
+            "type": "object",
+            "properties": {
+                "Millis": {
+                    "type": "integer"
+                }
+            },
+            "required": [ "Millis" ],
+            "additionalProperties": false
+        },
+        "interval_in_secs": {
+            "type": "object",
+            "properties": {
+                "Secs": {
+                    "type": "integer"
+                }
+            },
+            "required": [ "Secs" ],
+            "additionalProperties": false
+        },
+        "interval_in_minutes": {
+            "type": "object",
+            "properties": {
+                "Minutes": {
+                    "type": "integer"
+                }
+            },
+            "required": [ "Minutes" ],
+            "additionalProperties": false
+        },
+        "interval_in_hours": {
+            "type": "object",
+            "properties": {
+                "Hours": {
+                    "type": "integer"
+                }
+            },
+            "required": [ "Hours" ],
+            "additionalProperties": false
+        },
+        "interval_in_days": {
+            "type": "object",
+            "properties": {
+                "Days": {
+                    "type": "integer"
+                }
+            },
+            "required": [ "Days" ],
+            "additionalProperties": false
+        },
+        "intervals": {
+            "oneOf": [
+                {
+                    "$ref": "#/definitions/interval_in_millis"
+                },
+                {
+                    "$ref": "#/definitions/interval_in_secs"
+                },
+                {
+                    "$ref": "#/definitions/interval_in_minutes"
+                },
+                {
+                    "$ref": "#/definitions/interval_in_hours"
+                },
+                {
+                    "$ref": "#/definitions/interval_in_days"
+                }
+            ]
+        }
+    },
+    "properties": {
+        "interval": {
+            "oneOf": [
+                {
+                    "$ref": "#/definitions/intervals"
+                }
+            ]
+        },
+        "delay": {
+            "oneOf": [
+                {
+                    "$ref": "#/definitions/intervals"
+                }
+            ]
+        },
+        "ticks": {
+            "type": "integer"
+        }
+    },
+    "required": [ "interval", "ticks" ],
+    "additionalProperties": false
+}

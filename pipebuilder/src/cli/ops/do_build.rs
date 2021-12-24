@@ -121,12 +121,18 @@ pub(crate) async fn delete_build_all(
         let version = build_metadata.version;
         printer.status(
             "Deleting",
-            format!("build '{}/{}/{}'", namespace, id, version),
+            format!(
+                "build (namespace = {}, id = {}, version = {})",
+                namespace, id, version
+            ),
         )?;
         delete_build(client, namespace.clone(), id, version).await?;
     }
     // delete build snapshot
-    printer.status("Deleting", format!("build snapshot '{}/{}'", namespace, id))?;
+    printer.status(
+        "Deleting",
+        format!("build snapshot (namespace = {}, id = {})", namespace, id),
+    )?;
     delete_build_snapshot(client, namespace.clone(), id.clone()).await?;
     Ok(())
 }

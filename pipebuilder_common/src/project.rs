@@ -1,3 +1,4 @@
+use crate::{Resource, ResourceType};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -16,5 +17,11 @@ impl Project {
 impl Default for Project {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Resource for Project {
+    fn ty() -> ResourceType {
+        ResourceType::Project
     }
 }

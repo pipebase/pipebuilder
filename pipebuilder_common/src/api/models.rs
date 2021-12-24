@@ -8,7 +8,7 @@ use crate::{
     },
     grpc::{build, node, repository},
     utils::prost_timestamp_to_datetime_utc,
-    BuildStatus, Error, NodeArch, NodeOS, NodeRole, NodeState as InternalNodeState, NodeStatus,
+    BuildStatus, Error, NodeArch, NodeOS, NodeRole, NodeStatus,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -84,6 +84,70 @@ pub struct GetManifestResponse {
     pub buffer: Vec<u8>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DeleteManifestRequest {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteManifestResponse {}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListManifestMetadataRequest {
+    pub namespace: String,
+    pub id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ManifestMetadata {
+    // project id
+    pub id: String,
+    // manifest version
+    pub version: u64,
+    pub pulls: u64,
+    pub size: usize,
+    pub created: DateTime<Utc>,
+}
+
+impl Display for ManifestMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:<id_width$}{version:<version_width$}{pulls:<pulls_width$}{size:<size_width$}{created:<created_width$}",
+            id = self.id,
+            version = self.version,
+            pulls = self.pulls,
+            size = self.size,
+            created = self.created,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+            pulls_width = DISPLAY_COUNT_WIDTH,
+            size_width = DISPLAY_SIZE_WIDTH,
+            created_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for ManifestMetadata {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}",
+            col0 = "Id",
+            col1 = "Version",
+            col2 = "Pulls",
+            col3 = "Size",
+            col4 = "Created",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+            col2_width = DISPLAY_COUNT_WIDTH,
+            col3_width = DISPLAY_SIZE_WIDTH,
+            col4_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ListManifestSnapshotRequest {
     pub namespace: String,
@@ -128,6 +192,284 @@ pub struct DeleteManifestSnapshotRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct DeleteManifestSnapshotResponse {}
+
+#[derive(Serialize, Deserialize)]
+pub struct PostCatalogSchemaRequest {
+    pub namespace: String,
+    pub id: String,
+    pub buffer: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PostCatalogSchemaResponse {
+    pub version: u64,
+}
+
+impl Display for PostCatalogSchemaResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "catalog schema version: {}", self.version)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetCatalogSchemaRequest {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetCatalogSchemaResponse {
+    pub buffer: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DeleteCatalogSchemaRequest {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteCatalogSchemaResponse {}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListCatalogSchemaMetadataRequest {
+    pub namespace: String,
+    pub id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CatalogSchemaMetadata {
+    // schema id
+    pub id: String,
+    // manifest version
+    pub version: u64,
+    pub pulls: u64,
+    pub size: usize,
+    pub created: DateTime<Utc>,
+}
+
+impl Display for CatalogSchemaMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:<id_width$}{version:<version_width$}{pulls:<pulls_width$}{size:<size_width$}{created:<created_width$}",
+            id = self.id,
+            version = self.version,
+            pulls = self.pulls,
+            size = self.size,
+            created = self.created,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+            pulls_width = DISPLAY_COUNT_WIDTH,
+            size_width = DISPLAY_SIZE_WIDTH,
+            created_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for CatalogSchemaMetadata {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}",
+            col0 = "Id",
+            col1 = "Version",
+            col2 = "Pulls",
+            col3 = "Size",
+            col4 = "Created",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+            col2_width = DISPLAY_COUNT_WIDTH,
+            col3_width = DISPLAY_SIZE_WIDTH,
+            col4_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListCatalogSchemaSnapshotRequest {
+    pub namespace: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CatalogSchemaSnapshot {
+    pub id: String,
+    pub latest_version: u64,
+}
+
+impl Display for CatalogSchemaSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:<id_width$}{latest_version:<version_width$}",
+            id = self.id,
+            latest_version = self.latest_version,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for CatalogSchemaSnapshot {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}",
+            col0 = "Id",
+            col1 = "Latest Version",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteCatalogSchemaSnapshotRequest {
+    pub namespace: String,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteCatalogSchemaSnapshotResponse {}
+
+#[derive(Serialize, Deserialize)]
+pub struct PostCatalogsRequest {
+    pub namespace: String,
+    pub id: String,
+    pub buffer: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PostCatalogsResponse {
+    pub version: u64,
+}
+
+impl Display for PostCatalogsResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "catalogs version: {}", self.version)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetCatalogsRequest {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GetCatalogsResponse {
+    pub buffer: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DeleteCatalogsRequest {
+    pub namespace: String,
+    pub id: String,
+    pub version: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteCatalogsResponse {}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListCatalogsMetadataRequest {
+    pub namespace: String,
+    pub id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CatalogsMetadata {
+    // project id
+    pub id: String,
+    // manifest version
+    pub version: u64,
+    pub pulls: u64,
+    pub size: usize,
+    pub created: DateTime<Utc>,
+}
+
+impl Display for CatalogsMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:<id_width$}{version:<version_width$}{pulls:<pulls_width$}{size:<size_width$}{created:<created_width$}",
+            id = self.id,
+            version = self.version,
+            pulls = self.pulls,
+            size = self.size,
+            created = self.created,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+            pulls_width = DISPLAY_COUNT_WIDTH,
+            size_width = DISPLAY_SIZE_WIDTH,
+            created_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for CatalogsMetadata {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}",
+            col0 = "Id",
+            col1 = "Version",
+            col2 = "Pulls",
+            col3 = "Size",
+            col4 = "Created",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+            col2_width = DISPLAY_COUNT_WIDTH,
+            col3_width = DISPLAY_SIZE_WIDTH,
+            col4_width = DISPLAY_TIMESTAMP_WIDTH,
+        )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ListCatalogsSnapshotRequest {
+    pub namespace: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CatalogsSnapshot {
+    pub id: String,
+    pub latest_version: u64,
+}
+
+impl Display for CatalogsSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{id:<id_width$}{latest_version:<version_width$}",
+            id = self.id,
+            latest_version = self.latest_version,
+            id_width = DISPLAY_ID_WIDTH,
+            version_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
+impl PrintHeader for CatalogsSnapshot {
+    fn print_header() {
+        println!(
+            "{col0:<col0_width$}{col1:<col1_width$}",
+            col0 = "Id",
+            col1 = "Latest Version",
+            col0_width = DISPLAY_ID_WIDTH,
+            col1_width = DISPLAY_VERSION_WIDTH,
+        )
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteCatalogsSnapshotRequest {
+    pub namespace: String,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteCatalogsSnapshotResponse {}
 
 #[derive(Serialize, Deserialize)]
 pub struct ListBuildSnapshotRequest {
@@ -285,16 +627,6 @@ pub struct DeleteAppRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct DeleteAppResponse {}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct DeleteManifestRequest {
-    pub namespace: String,
-    pub id: String,
-    pub version: u64,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct DeleteManifestResponse {}
 
 #[derive(Serialize, Deserialize)]
 pub struct GetAppRequest {
@@ -486,7 +818,6 @@ pub struct DeleteBuildCacheResponse {}
 
 #[derive(Serialize, Deserialize)]
 pub struct ActivateNodeRequest {
-    pub role: NodeRole,
     pub id: String,
 }
 
@@ -495,7 +826,6 @@ pub struct ActivateNodeResponse {}
 
 #[derive(Serialize, Deserialize)]
 pub struct DeactivateNodeRequest {
-    pub role: NodeRole,
     pub id: String,
 }
 
@@ -504,7 +834,6 @@ pub struct DeactivateNodeResponse {}
 
 #[derive(Serialize, Deserialize)]
 pub struct ShutdownNodeRequest {
-    pub role: NodeRole,
     pub id: String,
 }
 
@@ -555,60 +884,6 @@ impl Display for AppMetadata {
 }
 
 impl PrintHeader for AppMetadata {
-    fn print_header() {
-        println!(
-            "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}",
-            col0 = "Id",
-            col1 = "Version",
-            col2 = "Pulls",
-            col3 = "Size",
-            col4 = "Created",
-            col0_width = DISPLAY_ID_WIDTH,
-            col1_width = DISPLAY_VERSION_WIDTH,
-            col2_width = DISPLAY_COUNT_WIDTH,
-            col3_width = DISPLAY_SIZE_WIDTH,
-            col4_width = DISPLAY_TIMESTAMP_WIDTH,
-        )
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ListManifestMetadataRequest {
-    pub namespace: String,
-    pub id: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ManifestMetadata {
-    // project id
-    pub id: String,
-    // manifest version
-    pub version: u64,
-    pub pulls: u64,
-    pub size: usize,
-    pub created: DateTime<Utc>,
-}
-
-impl Display for ManifestMetadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{id:<id_width$}{version:<version_width$}{pulls:<pulls_width$}{size:<size_width$}{created:<created_width$}",
-            id = self.id,
-            version = self.version,
-            pulls = self.pulls,
-            size = self.size,
-            created = self.created,
-            id_width = DISPLAY_ID_WIDTH,
-            version_width = DISPLAY_VERSION_WIDTH,
-            pulls_width = DISPLAY_COUNT_WIDTH,
-            size_width = DISPLAY_SIZE_WIDTH,
-            created_width = DISPLAY_TIMESTAMP_WIDTH,
-        )
-    }
-}
-
-impl PrintHeader for ManifestMetadata {
     fn print_header() {
         println!(
             "{col0:<col0_width$}{col1:<col1_width$}{col2:<col2_width$}{col3:<col3_width$}{col4:<col4_width$}",
@@ -824,6 +1099,143 @@ impl From<repository::GetManifestResponse> for GetManifestResponse {
     }
 }
 
+impl From<DeleteManifestRequest> for repository::DeleteManifestRequest {
+    fn from(origin: DeleteManifestRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let version = origin.version;
+        repository::DeleteManifestRequest {
+            namespace,
+            id,
+            version,
+        }
+    }
+}
+
+impl From<repository::DeleteManifestResponse> for DeleteManifestResponse {
+    fn from(_: repository::DeleteManifestResponse) -> Self {
+        DeleteManifestResponse {}
+    }
+}
+
+impl From<PostCatalogSchemaRequest> for repository::PutCatalogSchemaRequest {
+    fn from(origin: PostCatalogSchemaRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let buffer = origin.buffer;
+        repository::PutCatalogSchemaRequest {
+            namespace,
+            id,
+            buffer,
+        }
+    }
+}
+
+impl From<repository::PutCatalogSchemaResponse> for PostCatalogSchemaResponse {
+    fn from(origin: repository::PutCatalogSchemaResponse) -> Self {
+        let version = origin.version;
+        PostCatalogSchemaResponse { version }
+    }
+}
+
+impl From<GetCatalogSchemaRequest> for repository::GetCatalogSchemaRequest {
+    fn from(origin: GetCatalogSchemaRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let version = origin.version;
+        repository::GetCatalogSchemaRequest {
+            namespace,
+            id,
+            version,
+        }
+    }
+}
+
+impl From<repository::GetCatalogSchemaResponse> for GetCatalogSchemaResponse {
+    fn from(origin: repository::GetCatalogSchemaResponse) -> Self {
+        let buffer = origin.buffer;
+        GetCatalogSchemaResponse { buffer }
+    }
+}
+
+impl From<DeleteCatalogSchemaRequest> for repository::DeleteCatalogSchemaRequest {
+    fn from(origin: DeleteCatalogSchemaRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let version = origin.version;
+        repository::DeleteCatalogSchemaRequest {
+            namespace,
+            id,
+            version,
+        }
+    }
+}
+
+impl From<repository::DeleteCatalogSchemaResponse> for DeleteCatalogSchemaResponse {
+    fn from(_: repository::DeleteCatalogSchemaResponse) -> Self {
+        DeleteCatalogSchemaResponse {}
+    }
+}
+
+impl From<PostCatalogsRequest> for repository::PutCatalogsRequest {
+    fn from(origin: PostCatalogsRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let buffer = origin.buffer;
+        repository::PutCatalogsRequest {
+            namespace,
+            id,
+            buffer,
+        }
+    }
+}
+
+impl From<repository::PutCatalogsResponse> for PostCatalogsResponse {
+    fn from(origin: repository::PutCatalogsResponse) -> Self {
+        let version = origin.version;
+        PostCatalogsResponse { version }
+    }
+}
+
+impl From<GetCatalogsRequest> for repository::GetCatalogsRequest {
+    fn from(origin: GetCatalogsRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let version = origin.version;
+        repository::GetCatalogsRequest {
+            namespace,
+            id,
+            version,
+        }
+    }
+}
+
+impl From<repository::GetCatalogsResponse> for GetCatalogsResponse {
+    fn from(origin: repository::GetCatalogsResponse) -> Self {
+        let buffer = origin.buffer;
+        GetCatalogsResponse { buffer }
+    }
+}
+
+impl From<DeleteCatalogsRequest> for repository::DeleteCatalogsRequest {
+    fn from(origin: DeleteCatalogsRequest) -> Self {
+        let namespace = origin.namespace;
+        let id = origin.id;
+        let version = origin.version;
+        repository::DeleteCatalogsRequest {
+            namespace,
+            id,
+            version,
+        }
+    }
+}
+
+impl From<repository::DeleteCatalogsResponse> for DeleteCatalogsResponse {
+    fn from(_: repository::DeleteCatalogsResponse) -> Self {
+        DeleteCatalogsResponse {}
+    }
+}
+
 impl From<GetAppRequest> for repository::GetAppRequest {
     fn from(origin: GetAppRequest) -> Self {
         let namespace = origin.namespace;
@@ -861,25 +1273,6 @@ impl From<build::GetBuildLogResponse> for GetBuildLogResponse {
     fn from(origin: build::GetBuildLogResponse) -> Self {
         let buffer = origin.buffer;
         GetBuildLogResponse { buffer }
-    }
-}
-
-impl From<InternalNodeState> for NodeState {
-    fn from(origin: InternalNodeState) -> Self {
-        let id = origin.id;
-        let role = origin.role;
-        let arch = origin.arch;
-        let os = origin.os;
-        let status = origin.status;
-        let timestamp = origin.timestamp;
-        NodeState {
-            id,
-            role,
-            arch,
-            os,
-            status,
-            timestamp,
-        }
     }
 }
 
@@ -969,25 +1362,6 @@ impl From<ShutdownRequest> for node::ShutdownRequest {
 impl From<node::ShutdownResponse> for ShutdownResponse {
     fn from(_: node::ShutdownResponse) -> Self {
         ShutdownResponse {}
-    }
-}
-
-impl From<DeleteManifestRequest> for repository::DeleteManifestRequest {
-    fn from(origin: DeleteManifestRequest) -> Self {
-        let namespace = origin.namespace;
-        let id = origin.id;
-        let version = origin.version;
-        repository::DeleteManifestRequest {
-            namespace,
-            id,
-            version,
-        }
-    }
-}
-
-impl From<repository::DeleteManifestResponse> for DeleteManifestResponse {
-    fn from(_: repository::DeleteManifestResponse) -> Self {
-        DeleteManifestResponse {}
     }
 }
 

@@ -3,11 +3,11 @@ use flurry::HashMap;
 use pipebuilder_common::{
     deserialize_event,
     grpc::schedule::{scheduler_server::Scheduler, BuilderInfo, ScheduleResponse},
-    hash_distance, log_event, NodeState, Register,
+    hash_distance, log_event, remove_resource, NodeRole, NodeState, Register,
 };
 use std::sync::Arc;
 use tonic::Response;
-use tracing::{error, info, log::warn};
+use tracing::{error, info, warn};
 
 use crate::config::SchedulerConfig;
 
@@ -36,7 +36,7 @@ impl Scheduler for SchedulerService {
         let builders_ref = self.builders.pin();
         let mut selected_builder_info: Option<BuilderInfo> = None;
         let mut min_hash_distance: u64 = u64::MAX;
-        for builder in builders_ref.values() {
+        for (builder_key, builder) in builders_ref.iter() {
             if !builder.is_active() {
                 continue;
             }
@@ -45,10 +45,10 @@ impl Scheduler for SchedulerService {
                     continue;
                 }
             }
-            let builder_key = builder.id.to_owned();
-            let distance = hash_distance(&request_key, &builder_key);
+            let builder_id = remove_resource::<NodeState>(builder_key).to_owned();
+            let distance = hash_distance(&request_key, &builder_id);
             if distance < min_hash_distance {
-                selected_builder_info = Self::builder_info(builder);
+                selected_builder_info = Self::builder_info(builder_id, builder);
                 if selected_builder_info.is_some() {
                     min_hash_distance = distance;
                 }
@@ -70,7 +70,7 @@ impl SchedulerService {
     pub fn run(&self, mut register: Register) {
         let builders = self.builders.clone();
         let _ = tokio::spawn(async move {
-            let (watcher, stream) = match register.watch_builders().await {
+            let (watcher, stream) = match register.watch_nodes().await {
                 Ok((watcher, stream)) => (watcher, stream),
                 Err(e) => {
                     error!("scheduler service watch fail, error '{}'", e);
@@ -81,10 +81,10 @@ impl SchedulerService {
             info!("create watcher {}", watcher_id);
             match Self::watch(stream, builders.clone()).await {
                 Ok(_) => {
-                    info!("watcher {} exit ...", watcher_id)
+                    info!(watcher_id = watcher_id, "watcher exit ...")
                 }
                 Err(e) => {
-                    error!("watcher {} exit with error '{}'", watcher_id, e)
+                    error!(watcher_id = watcher_id, "watcher exit with error '{}'", e)
                 }
             };
             // cleanup if stop watching
@@ -100,29 +100,39 @@ impl SchedulerService {
         while let Some(resp) = stream.message().await? {
             for event in resp.events() {
                 log_event(event)?;
-                if let Some((event_ty, key, node)) = deserialize_event::<NodeState>(event)? {
+                if let Some((event_ty, node_key, node_state)) =
+                    deserialize_event::<NodeState>(event)?
+                {
                     let builders_ref = builders.pin();
-                    let node = match event_ty {
-                        EventType::Put => node,
+                    let node_state = match event_ty {
+                        EventType::Put => node_state,
                         EventType::Delete => {
-                            builders_ref.remove(&key);
+                            // delete event return node_state as None, delete anyway
+                            builders_ref.remove(&node_key);
                             continue;
                         }
                     };
-                    match node {
-                        Some(node) => {
-                            builders_ref.insert(key, node);
+                    let node_state = match node_state {
+                        Some(node_state) => node_state,
+                        None => {
+                            warn!(
+                                node_key = node_key.as_str(),
+                                "node state undefined in watch event"
+                            );
+                            continue;
                         }
-                        None => warn!("node state undefined for {}", key),
                     };
+                    // collect builder only
+                    if node_state.role == NodeRole::Builder {
+                        builders_ref.insert(node_key, node_state);
+                    }
                 }
             }
         }
         Ok(())
     }
 
-    fn builder_info(state: &NodeState) -> Option<BuilderInfo> {
-        let id = state.id.to_owned();
+    fn builder_info(id: String, state: &NodeState) -> Option<BuilderInfo> {
         let address = state.external_address.to_owned();
         state
             .get_support_target_platform()

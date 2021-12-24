@@ -26,7 +26,7 @@ message PutManifestRequest {
 
 message PutManifestResponse {
     // manifest version
-    uint64 version = 2;
+    uint64 version = 1;
 }
 
 message DeleteManifestRequest {
@@ -78,6 +78,84 @@ message DeleteAppRequest {
 
 message DeleteAppResponse {}
 
+message PutCatalogSchemaRequest {
+    // catalog schema namespace
+    string namespace = 1;
+    // catalog schema id
+    string id = 2;
+    // catalog schema context
+    bytes buffer = 3;
+}
+
+message PutCatalogSchemaResponse {
+    // catalog schema version
+    uint64 version = 1;
+}
+
+message GetCatalogSchemaRequest {
+    // catalog schema namespace
+    string namespace = 1;
+    // catalog schema id
+    string id = 2;
+    // catalog schema version
+    uint64 version = 3;
+}
+
+message GetCatalogSchemaResponse {
+    // catalog schema binaries
+    bytes buffer = 1;
+}
+
+message DeleteCatalogSchemaRequest {
+    // catalog schema namespace
+    string namespace = 1;
+    // catalog schema id
+    string id = 2;
+    // catalog schema version
+    uint64 version = 3;
+}
+
+message DeleteCatalogSchemaResponse {}
+
+message PutCatalogsRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // catalogs context
+    bytes buffer = 3;
+}
+
+message PutCatalogsResponse {
+    // catalogs version
+    uint64 version = 1;
+}
+
+message GetCatalogsRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // catalogs version
+    uint64 version = 3;
+}
+
+message GetCatalogsResponse {
+    // catalogs context
+    bytes buffer = 1;
+}
+
+message DeleteCatalogsRequest {
+    // project namespace
+    string namespace = 1;
+    // project id
+    string id = 2;
+    // catalogs version
+    uint64 version = 3;
+}
+
+message DeleteCatalogsResponse {}
+
 service Repository {
     rpc GetManifest(GetManifestRequest) returns (GetManifestResponse) {}
     rpc PutManifest(PutManifestRequest) returns (PutManifestResponse) {}
@@ -85,4 +163,10 @@ service Repository {
     rpc GetApp(GetAppRequest) returns (GetAppResponse) {}
     rpc PostApp(PostAppRequest) returns (PostAppResponse) {}
     rpc DeleteApp(DeleteAppRequest) returns (DeleteAppResponse) {}
+    rpc GetCatalogSchema(GetCatalogSchemaRequest) returns (GetCatalogSchemaResponse) {}
+    rpc PutCatalogSchema(PutCatalogSchemaRequest) returns (PutCatalogSchemaResponse) {}
+    rpc DeleteCatalogSchema(DeleteCatalogSchemaRequest) returns (DeleteCatalogSchemaResponse) {}
+    rpc GetCatalogs(GetCatalogsRequest) returns (GetCatalogsResponse) {}
+    rpc PutCatalogs(PutCatalogsRequest) returns (PutCatalogsResponse) {}
+    rpc DeleteCatalogs(DeleteCatalogsRequest) returns (DeleteCatalogsResponse) {}
 }

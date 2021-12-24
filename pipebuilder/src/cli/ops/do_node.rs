@@ -17,20 +17,20 @@ pub(crate) async fn list_node_state(
     client.list_node_state(&request).await
 }
 
-pub(crate) async fn activate_node(client: &ApiClient, role: NodeRole, id: String) -> Result<()> {
-    let request = ActivateNodeRequest { role, id };
+pub(crate) async fn activate_node(client: &ApiClient, id: String) -> Result<()> {
+    let request = ActivateNodeRequest { id };
     let _ = client.activate_node(&request).await?;
     Ok(())
 }
 
-pub(crate) async fn deactivate_node(client: &ApiClient, role: NodeRole, id: String) -> Result<()> {
-    let request = DeactivateNodeRequest { role, id };
+pub(crate) async fn deactivate_node(client: &ApiClient, id: String) -> Result<()> {
+    let request = DeactivateNodeRequest { id };
     let _ = client.deactivate_node(&request).await?;
     Ok(())
 }
 
-pub(crate) async fn shutdown_node(client: &ApiClient, role: NodeRole, id: String) -> Result<()> {
-    let request = ShutdownNodeRequest { role, id };
+pub(crate) async fn shutdown_node(client: &ApiClient, id: String) -> Result<()> {
+    let request = ShutdownNodeRequest { id };
     let _ = client.shutdown_node(&request).await?;
     Ok(())
 }

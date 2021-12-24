@@ -10,6 +10,8 @@ base:
 api:
   clients:
     repository:
-      endpoint: http://127.0.0.1:17000
+      protocol: Http
+      address: 127.0.0.1:17000
     scheduler:
-      endpoint: http://127.0.0.1:18000
+      protocol: Http
+      address: 127.0.0.1:18000

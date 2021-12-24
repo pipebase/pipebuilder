@@ -1,7 +1,7 @@
 use chrono::Utc;
 use flurry::HashMap;
 use pipebuilder_common::{
-    app_workspace, datetime_utc_to_prost_timestamp,
+    self, datetime_utc_to_prost_timestamp,
     grpc::{
         build::{
             builder_server::Builder, BuildCacheMetadata as RpcBuildCacheMetadata, BuildMetadataKey,
@@ -10,12 +10,53 @@ use pipebuilder_common::{
         },
         repository::repository_client::RepositoryClient,
     },
-    remove_directory, sub_path, Build, BuildCacheMetadata, BuildMetadata, BuildStatus,
-    LocalBuildContext, Register, PATH_APP,
+    remove_directory, reset_directory, Build, BuildCacheMetadata, BuildMetadata, BuildSnapshot,
+    BuildStatus, LocalBuildContext, PathBuilder, Register, PATH_APP,
 };
 use std::sync::Arc;
 use tonic::{transport::Channel, Response};
 use tracing::{error, info, warn};
+
+#[derive(Default)]
+pub struct BuilderServiceBuilder {
+    lease_id: Option<i64>,
+    register: Option<Register>,
+    repository_client: Option<RepositoryClient<Channel>>,
+    context: Option<LocalBuildContext>,
+}
+
+impl BuilderServiceBuilder {
+    pub fn lease_id(mut self, lease_id: i64) -> Self {
+        self.lease_id = Some(lease_id);
+        self
+    }
+
+    pub fn register(mut self, register: Register) -> Self {
+        self.register = Some(register);
+        self
+    }
+
+    pub fn repository_client(mut self, repository_client: RepositoryClient<Channel>) -> Self {
+        self.repository_client = Some(repository_client);
+        self
+    }
+
+    pub fn context(mut self, context: LocalBuildContext) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    pub fn build(self) -> BuilderService {
+        BuilderService {
+            lease_id: self.lease_id.expect("lease id undefined"),
+            register: self.register.expect("register undefined"),
+            repository_client: self.repository_client.expect("repository client undefined"),
+            context: self.context.expect("local build context undefined"),
+            builds: Arc::new(HashMap::new()),
+            caches: Arc::new(HashMap::new()),
+        }
+    }
+}
 
 pub struct BuilderService {
     lease_id: i64,
@@ -29,20 +70,23 @@ pub struct BuilderService {
 }
 
 impl BuilderService {
-    pub fn new(
-        lease_id: i64,
-        register: Register,
-        repository_client: RepositoryClient<Channel>,
-        context: LocalBuildContext,
-    ) -> Self {
-        BuilderService {
-            lease_id,
-            register,
-            repository_client,
-            context,
-            builds: Arc::new(HashMap::new()),
-            caches: Arc::new(HashMap::new()),
+    pub fn builder() -> BuilderServiceBuilder {
+        BuilderServiceBuilder::default()
+    }
+
+    pub async fn init(&self, reset: bool) -> pipebuilder_common::Result<()> {
+        let workspace = &self.context.workspace;
+        let restore_directory = &self.context.restore_directory;
+        let log_directory = &self.context.log_directory;
+        if reset {
+            info!(path = workspace.as_str(), "reset workspace directory");
+            reset_directory(workspace).await?;
+            info!(path = restore_directory.as_str(), "reset restore directory");
+            reset_directory(restore_directory).await?;
+            info!(path = log_directory.as_str(), "reset log directory");
+            reset_directory(log_directory).await?;
         }
+        Ok(())
     }
 }
 
@@ -68,7 +112,7 @@ impl Builder for BuilderService {
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         let snapshot = match register
-            .incr_build_snapshot(namespace.as_str(), id.as_str(), lease_id)
+            .update_snapshot_resource::<BuildSnapshot>(namespace.as_str(), id.as_str(), lease_id)
             .await
         {
             Ok((_, snapshot)) => snapshot,
@@ -140,9 +184,14 @@ impl Builder for BuilderService {
             )));
         }
         // cleanup local build workspace
-        let app_directory = app_workspace(workspace, namespace.as_str(), id.as_str(), version);
-        let app_path = sub_path(app_directory.as_str(), PATH_APP);
-        if remove_directory(app_path.as_str()).await.is_err() {
+        let app_path = PathBuilder::default()
+            .push(workspace)
+            .push(namespace.as_str())
+            .push(id.as_str())
+            .push(version.to_string())
+            .push(PATH_APP)
+            .build();
+        if remove_directory(app_path.as_path()).await.is_err() {
             error!(
                 namespace = namespace.as_str(),
                 id = id.as_str(),
@@ -376,7 +425,7 @@ async fn update(
     let (namespace, id, _, build_version, target_platform) = build.get_build_meta();
     let (builder_id, builder_address) = build.get_builder_meta();
     let now = Utc::now();
-    let version_build = BuildMetadata::new(
+    let build_metadata = BuildMetadata::new(
         target_platform.to_owned(),
         status,
         now,
@@ -385,12 +434,12 @@ async fn update(
         message,
     );
     register
-        .put_build_metadata(
-            lease_id,
-            namespace.as_str(),
+        .put_resource(
+            Some(namespace.as_str()),
             id.as_str(),
-            build_version,
-            version_build,
+            Some(build_version),
+            build_metadata,
+            lease_id,
         )
         .await?;
     Ok(())
@@ -428,8 +477,8 @@ async fn cancel_build(
     id: &str,
     version: u64,
 ) -> pipebuilder_common::Result<()> {
-    let mut version_build = match register
-        .get_build_metadata(lease_id, namespace, id, version)
+    let mut build_metadata = match register
+        .get_resource::<BuildMetadata>(Some(namespace), id, Some(version), lease_id)
         .await?
     {
         Some(version_build) => version_build,
@@ -443,9 +492,9 @@ async fn cancel_build(
             return Ok(());
         }
     };
-    version_build.status = BuildStatus::Cancel;
+    build_metadata.status = BuildStatus::Cancel;
     register
-        .put_build_metadata(lease_id, namespace, id, version, version_build)
+        .put_resource(Some(namespace), id, Some(version), build_metadata, lease_id)
         .await?;
     Ok(())
 }

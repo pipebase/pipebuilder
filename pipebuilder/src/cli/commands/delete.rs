@@ -2,6 +2,8 @@ use super::Cmd;
 use crate::ops::{
     do_app::{delete_app, delete_app_all},
     do_build::{delete_build, delete_build_all, delete_build_cache},
+    do_catalog_schema::{delete_catalog_schema, delete_catalog_schema_all},
+    do_catalogs::{delete_catalogs, delete_catalogs_all},
     do_manifest::{delete_manifest, delete_manifest_all},
     do_namespace::delete_namespace,
     do_project::delete_project,
@@ -16,6 +18,8 @@ pub fn cmd() -> Cmd {
         .subcommands(vec![
             manifest(),
             build(),
+            catalogs(),
+            catalog_schema(),
             app(),
             project(),
             namespace(),
@@ -56,6 +60,82 @@ pub async fn exec_manifest(client: ApiClient, args: &clap::ArgMatches) -> Result
         namespace.to_owned(),
         id.to_owned(),
         manifest_version,
+    )
+    .await
+}
+
+pub fn catalog_schema() -> Cmd {
+    Cmd::new("catalog-schema")
+        .about("Delete catalog schema given namespace, catalog schema id and version, if no version provide, all catalog schema deleted")
+        .args(vec![
+            Arg::new("namespace")
+                .short('n')
+                .help("Specify namespace")
+                .required(true)
+                .takes_value(true),
+            Arg::new("id")
+                .short('i')
+                .help("Specify catalog schema id")
+                .required(true)
+                .takes_value(true),
+            Arg::new("version")
+                .short('v')
+                .help("Specify catalog schema version")
+                .takes_value(true),
+        ])
+}
+
+pub async fn exec_catalog_schema(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+    let namespace = args.value_of("namespace").unwrap();
+    let id = args.value_of("id").unwrap();
+    let catalog_schema_version: u64 = match args.value_of("version") {
+        Some(version) => version.parse().expect("invalid catalog schema version"),
+        None => {
+            return delete_catalog_schema_all(&client, namespace.to_owned(), id.to_owned()).await
+        }
+    };
+    delete_catalog_schema(
+        &client,
+        namespace.to_owned(),
+        id.to_owned(),
+        catalog_schema_version,
+    )
+    .await
+}
+
+pub fn catalogs() -> Cmd {
+    Cmd::new("catalogs")
+        .about("Delete catalogs given namespace, project id and version, if no version provide, all catalogs deleted")
+        .args(vec![
+            Arg::new("namespace")
+                .short('n')
+                .help("Specify namespace")
+                .required(true)
+                .takes_value(true),
+            Arg::new("id")
+                .short('i')
+                .help("Specify project id")
+                .required(true)
+                .takes_value(true),
+            Arg::new("version")
+                .short('v')
+                .help("Specify catalogs version")
+                .takes_value(true),
+        ])
+}
+
+pub async fn exec_catalogs(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+    let namespace = args.value_of("namespace").unwrap();
+    let id = args.value_of("id").unwrap();
+    let catalogs_version: u64 = match args.value_of("version") {
+        Some(version) => version.parse().expect("invalid catalogs version"),
+        None => return delete_catalogs_all(&client, namespace.to_owned(), id.to_owned()).await,
+    };
+    delete_catalogs(
+        &client,
+        namespace.to_owned(),
+        id.to_owned(),
+        catalogs_version,
     )
     .await
 }
@@ -182,7 +262,8 @@ pub fn build_cache() -> Cmd {
             Arg::new("target-platform")
                 .short('t')
                 .help("Specify target platform, checkout https://doc.rust-lang.org/nightly/rustc/platform-support.html")
-                .takes_value(true),
+                .takes_value(true)
+                .required(true),
         ])
 }
 

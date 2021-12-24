@@ -1,20 +1,21 @@
+use crate::{BlobResource, Resource, ResourceType, Snapshot};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Default, Deserialize, Serialize)]
 pub struct ManifestSnapshot {
     pub latest_version: u64,
 }
 
-impl ManifestSnapshot {
-    pub fn new() -> Self {
-        ManifestSnapshot { latest_version: 0 }
+impl Snapshot for ManifestSnapshot {
+    fn incr_version(&mut self) {
+        self.latest_version += 1;
     }
 }
 
-impl Default for ManifestSnapshot {
-    fn default() -> Self {
-        Self::new()
+impl Resource for ManifestSnapshot {
+    fn ty() -> ResourceType {
+        ResourceType::ManifestSnapshot
     }
 }
 
@@ -29,12 +30,22 @@ pub struct ManifestMetadata {
     pub created: DateTime<Utc>,
 }
 
-impl ManifestMetadata {
-    pub fn new(size: usize) -> Self {
+impl BlobResource for ManifestMetadata {
+    fn new(size: usize) -> Self {
         ManifestMetadata {
             pulls: 0,
             size,
             created: Utc::now(),
         }
+    }
+
+    fn incr_usage(&mut self) {
+        self.pulls += 1
+    }
+}
+
+impl Resource for ManifestMetadata {
+    fn ty() -> ResourceType {
+        ResourceType::ManifestMetadata
     }
 }

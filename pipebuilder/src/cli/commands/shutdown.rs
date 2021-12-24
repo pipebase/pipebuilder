@@ -1,59 +1,27 @@
 use super::Cmd;
 use crate::ops::do_node::shutdown_node;
-use pipebuilder_common::{api::client::ApiClient, NodeRole, Result};
+use pipebuilder_common::{api::client::ApiClient, Result};
 
 use clap::Arg;
 
 pub fn cmd() -> Cmd {
     Cmd::new("shutdown")
-        .about("Shutdown node")
-        .subcommands(vec![builder(), repository(), scheduler()])
+        .about("Shutdown resources")
+        .subcommands(vec![node()])
 }
 
-pub fn builder() -> Cmd {
-    Cmd::new("builder")
-        .about("Shutdown builder given node id")
+pub fn node() -> Cmd {
+    Cmd::new("node")
+        .about("Shutdown node given id")
         .args(vec![Arg::new("id")
             .short('i')
-            .help("Specify builder id")
+            .help("Specify node id")
             .takes_value(true)
             .required(true)])
 }
 
-pub async fn exec_builder(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
+pub async fn exec_node(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
     let id = args.value_of("id").unwrap();
-    let _ = shutdown_node(&client, NodeRole::Builder, id.to_owned()).await?;
-    Ok(())
-}
-
-pub fn scheduler() -> Cmd {
-    Cmd::new("scheduler")
-        .about("Shutdown scheduler given node id")
-        .args(vec![Arg::new("id")
-            .short('i')
-            .help("Specify scheduler id")
-            .takes_value(true)
-            .required(true)])
-}
-
-pub async fn exec_scheduler(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
-    let id = args.value_of("id").unwrap();
-    let _ = shutdown_node(&client, NodeRole::Scheduler, id.to_owned()).await?;
-    Ok(())
-}
-
-pub fn repository() -> Cmd {
-    Cmd::new("repository")
-        .about("Shutdown repository given node id")
-        .args(vec![Arg::new("id")
-            .short('i')
-            .help("Specify repository id")
-            .takes_value(true)
-            .required(true)])
-}
-
-pub async fn exec_repository(client: ApiClient, args: &clap::ArgMatches) -> Result<()> {
-    let id = args.value_of("id").unwrap();
-    let _ = shutdown_node(&client, NodeRole::Repository, id.to_owned()).await?;
+    let _ = shutdown_node(&client, id.to_owned()).await?;
     Ok(())
 }

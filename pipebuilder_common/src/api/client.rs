@@ -1,33 +1,23 @@
 use super::{
     constants::{
         ACTIVATE_NODE, APP, APP_METADATA, BUILD, BUILD_CACHE, BUILD_LOG, BUILD_METADATA,
-        BUILD_SNAPSHOT, CANCEL_BUILD, DEACTIVATE_NODE, MANIFEST, MANIFEST_METADATA,
-        MANIFEST_SNAPSHOT, NAMESPACE, NODE_STATE, PROJECT, SCAN_BUILD, SCAN_BUILD_CACHE, SHUTDOWN,
-        SHUTDOWN_NODE,
+        BUILD_SNAPSHOT, CANCEL_BUILD, CATALOGS, CATALOGS_METADATA, CATALOGS_SNAPSHOT,
+        CATALOG_SCHEMA, CATALOG_SCHEMA_METADATA, CATALOG_SCHEMA_SNAPSHOT, DEACTIVATE_NODE,
+        MANIFEST, MANIFEST_METADATA, MANIFEST_SNAPSHOT, NAMESPACE, NODE_STATE, PROJECT, SCAN_BUILD,
+        SCAN_BUILD_CACHE, SHUTDOWN, SHUTDOWN_NODE,
     },
-    models::{
-        ActivateNodeRequest, ActivateNodeResponse, AppMetadata, BuildCacheMetadata, BuildMetadata,
-        BuildMetadataKey, BuildRequest, BuildResponse, BuildSnapshot, CancelBuildRequest,
-        CancelBuildResponse, DeactivateNodeRequest, DeactivateNodeResponse, DeleteAppRequest,
-        DeleteBuildCacheRequest, DeleteBuildRequest, DeleteBuildSnapshotRequest,
-        DeleteManifestRequest, DeleteManifestSnapshotRequest, DeleteNamespaceRequest,
-        DeleteProjectRequest, Failure, GetAppRequest, GetAppResponse, GetBuildLogRequest,
-        GetBuildLogResponse, GetBuildRequest, GetManifestRequest, GetManifestResponse,
-        ListAppMetadataRequest, ListBuildRequest, ListBuildSnapshotRequest,
-        ListManifestMetadataRequest, ListManifestSnapshotRequest, ListNamespaceRequest,
-        ListNodeStateRequest, ListProjectRequest, ManifestMetadata, ManifestSnapshot, Namespace,
-        NodeState, PostManifestRequest, PostManifestResponse, Project, ScanBuildCacheRequest,
-        ScanBuildRequest, ShutdownNodeRequest, ShutdownNodeResponse, ShutdownRequest,
-        ShutdownResponse, UpdateNamespaceRequest, UpdateProjectRequest,
-    },
+    models,
 };
-use crate::{api_client_error, api_server_error, Result};
+use crate::{
+    api_client_error, api_server_error, Catalog, CatalogSchemaValidator, CatalogsNameValidator,
+    Result, ValidateCatalog,
+};
 use reqwest::{
     header::{HeaderMap, HeaderName},
     Body, Client, Response,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 #[derive(Clone, Deserialize)]
 pub struct BasicAuth {
@@ -169,207 +159,139 @@ impl ApiClient {
         Ok(resp)
     }
 
-    pub async fn build(&self, request: &BuildRequest) -> Result<BuildResponse> {
+    pub async fn build(&self, request: &models::BuildRequest) -> Result<models::BuildResponse> {
         let request = Self::serialize_request(request)?;
         let response = self.post(BUILD, request).await?;
-        let response = Self::get_response_body::<BuildResponse>(response).await?;
+        let response = Self::get_response_body::<models::BuildResponse>(response).await?;
         Ok(response)
     }
 
-    pub async fn get_build_metadata(&self, request: &GetBuildRequest) -> Result<BuildMetadata> {
+    pub async fn get_build_metadata(
+        &self,
+        request: &models::GetBuildRequest,
+    ) -> Result<models::BuildMetadata> {
         let response = self.query(BUILD_METADATA, request).await?;
-        let response = Self::get_response_body::<BuildMetadata>(response).await?;
+        let response = Self::get_response_body::<models::BuildMetadata>(response).await?;
         Ok(response)
     }
 
     pub async fn list_build_metadata(
         &self,
-        request: &ListBuildRequest,
-    ) -> Result<Vec<BuildMetadata>> {
+        request: &models::ListBuildRequest,
+    ) -> Result<Vec<models::BuildMetadata>> {
         let response = self.query(BUILD_METADATA, request).await?;
-        let response = Self::get_response_body::<Vec<BuildMetadata>>(response).await?;
+        let response = Self::get_response_body::<Vec<models::BuildMetadata>>(response).await?;
         Ok(response)
     }
 
-    pub async fn cancel_build(&self, request: &CancelBuildRequest) -> Result<CancelBuildResponse> {
+    pub async fn cancel_build(
+        &self,
+        request: &models::CancelBuildRequest,
+    ) -> Result<models::CancelBuildResponse> {
         let request = Self::serialize_request(request)?;
         let response = self.post(CANCEL_BUILD, request).await?;
-        let response = Self::get_response_body::<CancelBuildResponse>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn list_build_snapshot(
-        &self,
-        request: &ListBuildSnapshotRequest,
-    ) -> Result<Vec<BuildSnapshot>> {
-        let response = self.query(BUILD_SNAPSHOT, request).await?;
-        let response = Self::get_response_body::<Vec<BuildSnapshot>>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn pull_manifest(&self, request: &GetManifestRequest) -> Result<GetManifestResponse> {
-        let response = self.query(MANIFEST, request).await?;
-        let response = Self::get_response_body::<GetManifestResponse>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn push_manifest(
-        &self,
-        request: &PostManifestRequest,
-    ) -> Result<PostManifestResponse> {
-        let request = Self::serialize_request(request)?;
-        let response = self.post(MANIFEST, request).await?;
-        let response = Self::get_response_body::<PostManifestResponse>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn list_manifest_snapshot(
-        &self,
-        request: &ListManifestSnapshotRequest,
-    ) -> Result<Vec<ManifestSnapshot>> {
-        let response = self.query(MANIFEST_SNAPSHOT, request).await?;
-        let response = Self::get_response_body::<Vec<ManifestSnapshot>>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn pull_app(&self, request: &GetAppRequest) -> Result<GetAppResponse> {
-        let response = self.query(APP, request).await?;
-        let response = Self::get_response_body::<GetAppResponse>(response).await?;
+        let response = Self::get_response_body::<models::CancelBuildResponse>(response).await?;
         Ok(response)
     }
 
     pub async fn pull_build_log(
         &self,
-        request: &GetBuildLogRequest,
-    ) -> Result<GetBuildLogResponse> {
+        request: &models::GetBuildLogRequest,
+    ) -> Result<models::GetBuildLogResponse> {
         let response = self.query(BUILD_LOG, request).await?;
-        let response = Self::get_response_body::<GetBuildLogResponse>(response).await?;
+        let response = Self::get_response_body::<models::GetBuildLogResponse>(response).await?;
         Ok(response)
     }
 
-    pub async fn list_node_state(&self, request: &ListNodeStateRequest) -> Result<Vec<NodeState>> {
-        let response = self.query(NODE_STATE, request).await?;
-        let response = Self::get_response_body::<Vec<NodeState>>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn scan_build(&self, request: &ScanBuildRequest) -> Result<Vec<BuildMetadataKey>> {
-        let response = self.query(SCAN_BUILD, request).await?;
-        let response = Self::get_response_body::<Vec<BuildMetadataKey>>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn scan_build_cache(
-        &self,
-        request: &ScanBuildCacheRequest,
-    ) -> Result<Vec<BuildCacheMetadata>> {
-        let response = self.query(SCAN_BUILD_CACHE, request).await?;
-        let response = Self::get_response_body::<Vec<BuildCacheMetadata>>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn delete_build_cache(&self, request: &DeleteBuildCacheRequest) -> Result<()> {
-        let request = Self::serialize_request(request)?;
-        let _ = self.delete(BUILD_CACHE, request).await?;
-        Ok(())
-    }
-
-    pub async fn activate_node(
-        &self,
-        request: &ActivateNodeRequest,
-    ) -> Result<ActivateNodeResponse> {
-        let request = Self::serialize_request(request)?;
-        let response = self.post(ACTIVATE_NODE, request).await?;
-        let response = Self::get_response_body::<ActivateNodeResponse>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn deactivate_node(
-        &self,
-        request: &DeactivateNodeRequest,
-    ) -> Result<DeactivateNodeResponse> {
-        let request = Self::serialize_request(request)?;
-        let response = self.post(DEACTIVATE_NODE, request).await?;
-        let response = Self::get_response_body::<DeactivateNodeResponse>(response).await?;
-        Ok(response)
-    }
-
-    // shutdown internal node except api
-    pub async fn shutdown_node(
-        &self,
-        request: &ShutdownNodeRequest,
-    ) -> Result<ShutdownNodeResponse> {
-        let request = Self::serialize_request(request)?;
-        let response = self.post(SHUTDOWN_NODE, request).await?;
-        let response = Self::get_response_body::<ShutdownNodeResponse>(response).await?;
-        Ok(response)
-    }
-
-    // shutdown api
-    pub async fn shutdown(&self, request: &ShutdownRequest) -> Result<ShutdownResponse> {
-        let request = Self::serialize_request(request)?;
-        let response = self.post(SHUTDOWN, request).await?;
-        let response = Self::get_response_body::<ShutdownResponse>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn list_app_metadata(
-        &self,
-        request: &ListAppMetadataRequest,
-    ) -> Result<Vec<AppMetadata>> {
-        let response = self.query(APP_METADATA, request).await?;
-        let response = Self::get_response_body::<Vec<AppMetadata>>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn list_manifest_metadata(
-        &self,
-        request: &ListManifestMetadataRequest,
-    ) -> Result<Vec<ManifestMetadata>> {
-        let response = self.query(MANIFEST_METADATA, request).await?;
-        let response = Self::get_response_body::<Vec<ManifestMetadata>>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn update_namespace(&self, request: &UpdateNamespaceRequest) -> Result<Namespace> {
-        let request = Self::serialize_request(request)?;
-        let response = self.post(NAMESPACE, request).await?;
-        let response = Self::get_response_body::<Namespace>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn update_project(&self, request: &UpdateProjectRequest) -> Result<Project> {
-        let request = Self::serialize_request(request)?;
-        let response = self.post(PROJECT, request).await?;
-        let response = Self::get_response_body::<Project>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn list_namespace(&self, request: &ListNamespaceRequest) -> Result<Vec<Namespace>> {
-        let response = self.query(NAMESPACE, request).await?;
-        let response = Self::get_response_body::<Vec<Namespace>>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn list_project(&self, request: &ListProjectRequest) -> Result<Vec<Project>> {
-        let response = self.query(PROJECT, request).await?;
-        let response = Self::get_response_body::<Vec<Project>>(response).await?;
-        Ok(response)
-    }
-
-    pub async fn delete_build(&self, request: &DeleteBuildRequest) -> Result<()> {
+    pub async fn delete_build(&self, request: &models::DeleteBuildRequest) -> Result<()> {
         let request = Self::serialize_request(request)?;
         let _ = self.delete(BUILD, request).await?;
         Ok(())
     }
 
-    pub async fn delete_app(&self, request: &DeleteAppRequest) -> Result<()> {
+    pub async fn scan_build(
+        &self,
+        request: &models::ScanBuildRequest,
+    ) -> Result<Vec<models::BuildMetadataKey>> {
+        let response = self.query(SCAN_BUILD, request).await?;
+        let response = Self::get_response_body::<Vec<models::BuildMetadataKey>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn scan_build_cache(
+        &self,
+        request: &models::ScanBuildCacheRequest,
+    ) -> Result<Vec<models::BuildCacheMetadata>> {
+        let response = self.query(SCAN_BUILD_CACHE, request).await?;
+        let response = Self::get_response_body::<Vec<models::BuildCacheMetadata>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn delete_build_cache(
+        &self,
+        request: &models::DeleteBuildCacheRequest,
+    ) -> Result<()> {
         let request = Self::serialize_request(request)?;
-        let _ = self.delete(APP, request).await?;
+        let _ = self.delete(BUILD_CACHE, request).await?;
         Ok(())
     }
 
-    pub async fn delete_manfiest(&self, request: &DeleteManifestRequest) -> Result<()> {
+    pub async fn list_build_snapshot(
+        &self,
+        request: &models::ListBuildSnapshotRequest,
+    ) -> Result<Vec<models::BuildSnapshot>> {
+        let response = self.query(BUILD_SNAPSHOT, request).await?;
+        let response = Self::get_response_body::<Vec<models::BuildSnapshot>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn delete_build_snapshot(
+        &self,
+        request: &models::DeleteBuildSnapshotRequest,
+    ) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(BUILD_SNAPSHOT, request).await?;
+        Ok(())
+    }
+
+    pub async fn pull_manifest(
+        &self,
+        request: &models::GetManifestRequest,
+    ) -> Result<models::GetManifestResponse> {
+        let response = self.query(MANIFEST, request).await?;
+        let response = Self::get_response_body::<models::GetManifestResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn push_manifest(
+        &self,
+        request: &models::PostManifestRequest,
+    ) -> Result<models::PostManifestResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(MANIFEST, request).await?;
+        let response = Self::get_response_body::<models::PostManifestResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_manifest_snapshot(
+        &self,
+        request: &models::ListManifestSnapshotRequest,
+    ) -> Result<Vec<models::ManifestSnapshot>> {
+        let response = self.query(MANIFEST_SNAPSHOT, request).await?;
+        let response = Self::get_response_body::<Vec<models::ManifestSnapshot>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_manifest_metadata(
+        &self,
+        request: &models::ListManifestMetadataRequest,
+    ) -> Result<Vec<models::ManifestMetadata>> {
+        let response = self.query(MANIFEST_METADATA, request).await?;
+        let response = Self::get_response_body::<Vec<models::ManifestMetadata>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn delete_manfiest(&self, request: &models::DeleteManifestRequest) -> Result<()> {
         let request = Self::serialize_request(request)?;
         let _ = self.delete(MANIFEST, request).await?;
         Ok(())
@@ -377,29 +299,247 @@ impl ApiClient {
 
     pub async fn delete_manifest_snapshot(
         &self,
-        request: &DeleteManifestSnapshotRequest,
+        request: &models::DeleteManifestSnapshotRequest,
     ) -> Result<()> {
         let request = Self::serialize_request(request)?;
         let _ = self.delete(MANIFEST_SNAPSHOT, request).await?;
         Ok(())
     }
 
-    pub async fn delete_build_snapshot(&self, request: &DeleteBuildSnapshotRequest) -> Result<()> {
+    pub async fn pull_catalogs(
+        &self,
+        request: &models::GetCatalogsRequest,
+    ) -> Result<models::GetCatalogsResponse> {
+        let response = self.query(CATALOGS, request).await?;
+        let response = Self::get_response_body::<models::GetCatalogsResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn push_catalogs(
+        &self,
+        request: &models::PostCatalogsRequest,
+    ) -> Result<models::PostCatalogsResponse> {
         let request = Self::serialize_request(request)?;
-        let _ = self.delete(BUILD_SNAPSHOT, request).await?;
+        let response = self.post(CATALOGS, request).await?;
+        let response = Self::get_response_body::<models::PostCatalogsResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_catalogs_snapshot(
+        &self,
+        request: &models::ListCatalogsSnapshotRequest,
+    ) -> Result<Vec<models::CatalogsSnapshot>> {
+        let response = self.query(CATALOGS_SNAPSHOT, request).await?;
+        let response = Self::get_response_body::<Vec<models::CatalogsSnapshot>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_catalogs_metadata(
+        &self,
+        request: &models::ListCatalogsMetadataRequest,
+    ) -> Result<Vec<models::CatalogsMetadata>> {
+        let response = self.query(CATALOGS_METADATA, request).await?;
+        let response = Self::get_response_body::<Vec<models::CatalogsMetadata>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn delete_catalogs(&self, request: &models::DeleteCatalogsRequest) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(CATALOGS, request).await?;
         Ok(())
     }
 
-    pub async fn delete_project(&self, request: &DeleteProjectRequest) -> Result<()> {
+    pub async fn delete_catalogs_snapshot(
+        &self,
+        request: &models::DeleteCatalogsSnapshotRequest,
+    ) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(CATALOGS_SNAPSHOT, request).await?;
+        Ok(())
+    }
+
+    pub async fn pull_catalog_schema(
+        &self,
+        request: &models::GetCatalogSchemaRequest,
+    ) -> Result<models::GetCatalogSchemaResponse> {
+        let response = self.query(CATALOG_SCHEMA, request).await?;
+        let response =
+            Self::get_response_body::<models::GetCatalogSchemaResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn push_catalog_schema(
+        &self,
+        request: &models::PostCatalogSchemaRequest,
+    ) -> Result<models::PostCatalogSchemaResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(CATALOG_SCHEMA, request).await?;
+        let response =
+            Self::get_response_body::<models::PostCatalogSchemaResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_catalog_schema_snapshot(
+        &self,
+        request: &models::ListCatalogSchemaSnapshotRequest,
+    ) -> Result<Vec<models::CatalogSchemaSnapshot>> {
+        let response = self.query(CATALOG_SCHEMA_SNAPSHOT, request).await?;
+        let response =
+            Self::get_response_body::<Vec<models::CatalogSchemaSnapshot>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_catalog_schema_metadata(
+        &self,
+        request: &models::ListCatalogSchemaMetadataRequest,
+    ) -> Result<Vec<models::CatalogSchemaMetadata>> {
+        let response = self.query(CATALOG_SCHEMA_METADATA, request).await?;
+        let response =
+            Self::get_response_body::<Vec<models::CatalogSchemaMetadata>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn delete_catalog_schema(
+        &self,
+        request: &models::DeleteCatalogSchemaRequest,
+    ) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(CATALOG_SCHEMA, request).await?;
+        Ok(())
+    }
+
+    pub async fn delete_catalog_schema_snapshot(
+        &self,
+        request: &models::DeleteCatalogSchemaSnapshotRequest,
+    ) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(CATALOG_SCHEMA_SNAPSHOT, request).await?;
+        Ok(())
+    }
+
+    pub async fn pull_app(
+        &self,
+        request: &models::GetAppRequest,
+    ) -> Result<models::GetAppResponse> {
+        let response = self.query(APP, request).await?;
+        let response = Self::get_response_body::<models::GetAppResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_app_metadata(
+        &self,
+        request: &models::ListAppMetadataRequest,
+    ) -> Result<Vec<models::AppMetadata>> {
+        let response = self.query(APP_METADATA, request).await?;
+        let response = Self::get_response_body::<Vec<models::AppMetadata>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn delete_app(&self, request: &models::DeleteAppRequest) -> Result<()> {
+        let request = Self::serialize_request(request)?;
+        let _ = self.delete(APP, request).await?;
+        Ok(())
+    }
+
+    pub async fn update_project(
+        &self,
+        request: &models::UpdateProjectRequest,
+    ) -> Result<models::Project> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(PROJECT, request).await?;
+        let response = Self::get_response_body::<models::Project>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn delete_project(&self, request: &models::DeleteProjectRequest) -> Result<()> {
         let request = Self::serialize_request(request)?;
         let _ = self.delete(PROJECT, request).await?;
         Ok(())
     }
 
-    pub async fn delete_namespace(&self, request: &DeleteNamespaceRequest) -> Result<()> {
+    pub async fn list_project(
+        &self,
+        request: &models::ListProjectRequest,
+    ) -> Result<Vec<models::Project>> {
+        let response = self.query(PROJECT, request).await?;
+        let response = Self::get_response_body::<Vec<models::Project>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn update_namespace(
+        &self,
+        request: &models::UpdateNamespaceRequest,
+    ) -> Result<models::Namespace> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(NAMESPACE, request).await?;
+        let response = Self::get_response_body::<models::Namespace>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn list_namespace(
+        &self,
+        request: &models::ListNamespaceRequest,
+    ) -> Result<Vec<models::Namespace>> {
+        let response = self.query(NAMESPACE, request).await?;
+        let response = Self::get_response_body::<Vec<models::Namespace>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn delete_namespace(&self, request: &models::DeleteNamespaceRequest) -> Result<()> {
         let request = Self::serialize_request(request)?;
         let _ = self.delete(NAMESPACE, request).await?;
         Ok(())
+    }
+
+    pub async fn list_node_state(
+        &self,
+        request: &models::ListNodeStateRequest,
+    ) -> Result<Vec<models::NodeState>> {
+        let response = self.query(NODE_STATE, request).await?;
+        let response = Self::get_response_body::<Vec<models::NodeState>>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn activate_node(
+        &self,
+        request: &models::ActivateNodeRequest,
+    ) -> Result<models::ActivateNodeResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(ACTIVATE_NODE, request).await?;
+        let response = Self::get_response_body::<models::ActivateNodeResponse>(response).await?;
+        Ok(response)
+    }
+
+    pub async fn deactivate_node(
+        &self,
+        request: &models::DeactivateNodeRequest,
+    ) -> Result<models::DeactivateNodeResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(DEACTIVATE_NODE, request).await?;
+        let response = Self::get_response_body::<models::DeactivateNodeResponse>(response).await?;
+        Ok(response)
+    }
+
+    // shutdown internal node except api
+    pub async fn shutdown_node(
+        &self,
+        request: &models::ShutdownNodeRequest,
+    ) -> Result<models::ShutdownNodeResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(SHUTDOWN_NODE, request).await?;
+        let response = Self::get_response_body::<models::ShutdownNodeResponse>(response).await?;
+        Ok(response)
+    }
+
+    // shutdown api
+    pub async fn shutdown(
+        &self,
+        request: &models::ShutdownRequest,
+    ) -> Result<models::ShutdownResponse> {
+        let request = Self::serialize_request(request)?;
+        let response = self.post(SHUTDOWN, request).await?;
+        let response = Self::get_response_body::<models::ShutdownResponse>(response).await?;
+        Ok(response)
     }
 
     fn serialize_request<T>(request: &T) -> Result<Vec<u8>>
@@ -426,7 +566,7 @@ impl ApiClient {
         // parse failure message
         let buffer = response.bytes().await?;
         let buffer = buffer.to_vec();
-        let message = match serde_json::from_slice::<Failure>(&buffer) {
+        let message = match serde_json::from_slice::<models::Failure>(&buffer) {
             Ok(failure) => Some(failure.error),
             Err(_) => None,
         };
@@ -439,10 +579,59 @@ impl ApiClient {
         unreachable!()
     }
 
-    pub fn validate_manifest(&self, path: &str) -> Result<()> {
-        let path = PathBuf::from(path);
-        let app = pipegen::models::App::read_from_path(path.as_path())?;
+    pub fn validate_manifest(manifest: &[u8]) -> Result<()> {
+        let app = pipegen::models::App::read_from_buffer(manifest)?;
         app.validate()?;
         Ok(())
+    }
+
+    pub fn validate_catalog_schema(schema: &[u8]) -> Result<()> {
+        let _ = CatalogSchemaValidator::from_buffer(schema)?;
+        Ok(())
+    }
+
+    pub async fn validate_catalogs(&self, catalogs: &[u8]) -> Result<()> {
+        // deserialize catalogs
+        let catalogs = Catalog::from_buffer(catalogs)?;
+        // validate catalog naming
+        Self::validate_catalogs_name(catalogs.as_slice())?;
+        // validate catalog against catalog schema
+        for catalog in catalogs.iter() {
+            self.validate_catalog(catalog).await?;
+        }
+        Ok(())
+    }
+
+    fn validate_catalogs_name(catalogs: &[Catalog]) -> Result<()> {
+        let mut validator = CatalogsNameValidator::default();
+        for catalog in catalogs {
+            catalog.accept(&mut validator)?;
+        }
+        validator.validate()
+    }
+
+    async fn validate_catalog(&self, catalog: &Catalog) -> Result<()> {
+        let schema = catalog.get_schema_metadata_key();
+        let namespace = schema.namespace.to_owned();
+        let id = schema.id.to_owned();
+        let version = schema.version;
+        // TODO: Catalog schema caching at client side
+        let request = models::GetCatalogSchemaRequest {
+            namespace,
+            id,
+            version,
+        };
+        let resp = self.pull_catalog_schema(&request).await?;
+        let buffer = resp.buffer;
+        let mut validator = CatalogSchemaValidator::from_buffer(buffer.as_slice())?;
+        catalog.accept(&mut validator)?;
+        validator.validate()
+    }
+
+    pub async fn dump_catalogs<P>(catalogs: &[u8], directory: P) -> Result<()>
+    where
+        P: AsRef<std::path::Path>,
+    {
+        Catalog::dump_catalogs(catalogs, directory).await
     }
 }
