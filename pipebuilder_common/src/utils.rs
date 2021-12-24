@@ -94,34 +94,30 @@ where
     Ok(config)
 }
 
-// app build workspace
-pub fn app_workspace(workspace: &str, namespace: &str, id: &str, build_version: u64) -> String {
-    format!("{}/{}/{}/{}", workspace, namespace, id, build_version)
+// path ops
+#[derive(Default)]
+pub struct PathBuilder {
+    buffer: std::path::PathBuf,
 }
 
-pub fn app_build_log_directory(
-    log_directory: &str,
-    namespace: &str,
-    id: &str,
-    build_version: u64,
-) -> String {
-    format!("{}/{}/{}/{}", log_directory, namespace, id, build_version)
-}
+impl PathBuilder {
+    pub fn push<P>(mut self, path: P) -> Self
+    where
+        P: AsRef<std::path::Path>,
+    {
+        self.buffer.push(path);
+        self
+    }
 
-pub fn app_restore_directory(
-    restore_directory: &str,
-    namespace: &str,
-    id: &str,
-    target_platform: &str,
-) -> String {
-    format!(
-        "{}/{}/{}/{}",
-        restore_directory, namespace, id, target_platform
-    )
-}
+    pub fn build(self) -> std::path::PathBuf {
+        self.buffer
+    }
 
-pub fn sub_path(parent_directory: &str, path: &str) -> String {
-    format!("{}/{}", parent_directory, path)
+    pub fn clone_from(path: &std::path::Path) -> Self {
+        PathBuilder {
+            buffer: path.to_path_buf(),
+        }
+    }
 }
 
 // remove directory and return success flag
@@ -243,7 +239,10 @@ fn cargo_binary() -> OsString {
     }
 }
 
-pub async fn cargo_init(path: &str) -> Result<()> {
+pub async fn cargo_init<S>(path: S) -> Result<()>
+where
+    S: AsRef<std::ffi::OsStr>,
+{
     let mut cmd = Command::new(cargo_binary());
     cmd.arg("init").arg(path);
     let (code, out) = cmd_status_output(cmd).await?;
@@ -253,9 +252,12 @@ pub async fn cargo_init(path: &str) -> Result<()> {
     }
 }
 
-pub async fn cargo_fmt(manifest_path: &str) -> Result<()> {
+pub async fn cargo_fmt<S>(path: S) -> Result<()>
+where
+    S: AsRef<std::ffi::OsStr>,
+{
     let mut cmd = Command::new(cargo_binary());
-    cmd.arg("fmt").arg("--manifest-path").arg(manifest_path);
+    cmd.arg("fmt").arg("--manifest-path").arg(path);
     let (code, out) = cmd_status_output(cmd).await?;
     match code == 0 {
         true => Ok(()),
@@ -264,7 +266,11 @@ pub async fn cargo_fmt(manifest_path: &str) -> Result<()> {
 }
 
 // target platform: https://doc.rust-lang.org/cargo/commands/cargo-build.html#compilation-options
-pub async fn cargo_build(cargo_workdir: &str, target_platform: &str, log_path: &str) -> Result<()> {
+pub async fn cargo_build<P, S>(cargo_workdir: P, target_platform: S, log_path: P) -> Result<()>
+where
+    P: AsRef<std::path::Path>,
+    S: AsRef<std::ffi::OsStr>,
+{
     let log_file = fs::File::create(log_path).await?.into_std().await;
     let mut cmd = Command::new(cargo_binary());
     cmd.arg("build")

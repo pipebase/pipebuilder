@@ -1,7 +1,7 @@
 use chrono::Utc;
 use flurry::HashMap;
 use pipebuilder_common::{
-    self, app_workspace, datetime_utc_to_prost_timestamp,
+    self, datetime_utc_to_prost_timestamp,
     grpc::{
         build::{
             builder_server::Builder, BuildCacheMetadata as RpcBuildCacheMetadata, BuildMetadataKey,
@@ -10,8 +10,8 @@ use pipebuilder_common::{
         },
         repository::repository_client::RepositoryClient,
     },
-    remove_directory, reset_directory, sub_path, Build, BuildCacheMetadata, BuildMetadata,
-    BuildSnapshot, BuildStatus, LocalBuildContext, Register, PATH_APP,
+    remove_directory, reset_directory, Build, BuildCacheMetadata, BuildMetadata, BuildSnapshot,
+    BuildStatus, LocalBuildContext, PathBuilder, Register, PATH_APP,
 };
 use std::sync::Arc;
 use tonic::{transport::Channel, Response};
@@ -184,9 +184,14 @@ impl Builder for BuilderService {
             )));
         }
         // cleanup local build workspace
-        let app_directory = app_workspace(workspace, namespace.as_str(), id.as_str(), version);
-        let app_path = sub_path(app_directory.as_str(), PATH_APP);
-        if remove_directory(app_path.as_str()).await.is_err() {
+        let app_path = PathBuilder::default()
+            .push(workspace)
+            .push(namespace.as_str())
+            .push(id.as_str())
+            .push(version.to_string())
+            .push(PATH_APP)
+            .build();
+        if remove_directory(app_path.as_path()).await.is_err() {
             error!(
                 namespace = namespace.as_str(),
                 id = id.as_str(),

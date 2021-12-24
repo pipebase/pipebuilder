@@ -6,9 +6,9 @@ use pipebuilder_common::{
         GetCatalogsResponse, GetManifestResponse, PostAppResponse, PutCatalogSchemaResponse,
         PutCatalogsResponse, PutManifestResponse,
     },
-    read_file, reset_directory, rpc_internal_error, rpc_not_found, sub_path, write_file,
-    AppMetadata, CatalogSchemaMetadata, CatalogSchemaSnapshot, CatalogsMetadata, CatalogsSnapshot,
-    ManifestMetadata, ManifestSnapshot, Register,
+    read_file, reset_directory, rpc_internal_error, rpc_not_found, write_file, AppMetadata,
+    CatalogSchemaMetadata, CatalogSchemaSnapshot, CatalogsMetadata, CatalogsSnapshot,
+    ManifestMetadata, ManifestSnapshot, PathBuilder, Register,
 };
 use std::fs::remove_dir_all;
 use tonic::Response;
@@ -938,8 +938,13 @@ async fn read_target_from_repo(
     version: u64,
     target_name: &str,
 ) -> pipebuilder_common::Result<Vec<u8>> {
-    let directory = get_target_directory(repository, namespace, id, version);
-    let path = sub_path(directory.as_str(), target_name);
+    let path = PathBuilder::default()
+        .push(repository)
+        .push(namespace)
+        .push(id)
+        .push(version.to_string())
+        .push(target_name)
+        .build();
     let buffer = read_file(path).await?;
     Ok(buffer)
 }
@@ -952,10 +957,17 @@ async fn write_target_into_repo(
     buffer: &[u8],
     target_name: &str,
 ) -> pipebuilder_common::Result<()> {
-    let directory = get_target_directory(repository, namespace, id, version);
-    let path = sub_path(directory.as_str(), target_name);
-    create_directory(directory).await?;
-    write_file(path, buffer).await?;
+    let directory = PathBuilder::default()
+        .push(repository)
+        .push(namespace)
+        .push(id)
+        .push(version.to_string())
+        .build();
+    let path = PathBuilder::clone_from(&directory)
+        .push(target_name)
+        .build();
+    create_directory(directory.as_path()).await?;
+    write_file(path.as_path(), buffer).await?;
     // TODO S3 backup
     Ok(())
 }
@@ -966,11 +978,12 @@ fn delete_target_from_repo(
     id: &str,
     version: u64,
 ) -> pipebuilder_common::Result<()> {
-    let directory = get_target_directory(repository, namespace, id, version);
-    remove_dir_all(directory)?;
+    let directory = PathBuilder::default()
+        .push(repository)
+        .push(namespace)
+        .push(id)
+        .push(version.to_string())
+        .build();
+    remove_dir_all(directory.as_path())?;
     Ok(())
-}
-
-fn get_target_directory(repository: &str, namespace: &str, id: &str, version: u64) -> String {
-    format!("{}/{}/{}/{}", repository, namespace, id, version)
 }
