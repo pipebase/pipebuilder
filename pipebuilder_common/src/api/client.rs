@@ -580,7 +580,7 @@ impl ApiClient {
     }
 
     pub fn validate_manifest(manifest: &[u8]) -> Result<()> {
-        let app = pipegen::models::App::read_from_buffer(manifest)?;
+        let app = pipegen::models::App::from_buffer(manifest)?;
         app.validate()?;
         Ok(())
     }

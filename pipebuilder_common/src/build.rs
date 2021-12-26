@@ -393,7 +393,7 @@ impl Build {
             .await?
             .into_inner();
         let buffer = response.buffer;
-        let app = App::read_from_buffer(buffer.as_slice())?;
+        let app = App::from_buffer(buffer.as_slice())?;
         self.app = Some(app);
         Ok(Some(BuildStatus::Validate))
     }
