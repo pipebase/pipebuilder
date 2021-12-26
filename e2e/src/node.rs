@@ -4,12 +4,15 @@ mod tests {
 
     use crate::utils::{
         build_api_client, list_api_state, list_builder_state, list_repository_state,
-        list_scheduler_state, shutdown_ci,
+        list_scheduler_state, shutdown_ci, wait,
     };
     use pipebuilder_common::NodeRole;
 
+    const TEST_CLUSTER_READY_MILLIS: u64 = 30000;
+
     #[tokio::test]
     async fn test_node() {
+        wait(TEST_CLUSTER_READY_MILLIS).await;
         let client = build_api_client("resources/cli.yml").await.unwrap();
         // validate api
         let node_states = list_api_state(&client).await.unwrap();
