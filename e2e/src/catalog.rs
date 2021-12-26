@@ -5,16 +5,18 @@ mod tests {
     use crate::utils::{
         build_api_client, create_namespace, create_project, list_catalog_schema_metadata,
         list_catalogs_metadata, list_namespace, list_project, pull_catalog_schema, pull_catalogs,
-        push_catalog_schema, push_catalogs,
+        push_catalog_schema, push_catalogs, wait,
     };
     use pipebuilder_common::read_file;
 
+    const TEST_CLUSTER_READY_MILLIS: u64 = 30000;
     const TEST_NAMESPACE: &str = "dev";
     const TEST_PROJECT: &str = "timer";
     const TEST_CATALOG_SCHEMA: &str = "timer_schema";
 
     #[tokio::test]
     async fn test_catalog() {
+        wait(TEST_CLUSTER_READY_MILLIS).await;
         let client = build_api_client("resources/cli.yml").await.unwrap();
         // create namespace
         let expected_namespace = create_namespace(&client, String::from(TEST_NAMESPACE))

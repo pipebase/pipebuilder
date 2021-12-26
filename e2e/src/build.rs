@@ -9,6 +9,7 @@ mod tests {
     };
     use pipebuilder_common::{read_file, BuildStatus};
 
+    const TEST_CLUSTER_READY_MILLIS: u64 = 30000;
     const TEST_NAMESPACE: &str = "dev";
     const TEST_PROJECT: &str = "timer";
     const TEST_BUILD_COUNT: u64 = 3;
@@ -19,6 +20,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_build() {
+        wait(TEST_CLUSTER_READY_MILLIS).await;
         let client = build_api_client("resources/cli.yml").await.unwrap();
         // create namespace
         let expected_namespace = create_namespace(&client, String::from(TEST_NAMESPACE))
