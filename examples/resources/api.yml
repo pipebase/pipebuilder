@@ -11,6 +11,8 @@ base:
 api:
   clients:
     repository:
-      endpoint: http://repository0:17000
+      protocol: Http
+      address: repository0:17000
     scheduler:
-      endpoint: http://scheduler0:18000
+      protocol: Http
+      address: scheduler0:18000

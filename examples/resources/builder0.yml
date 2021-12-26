@@ -9,7 +9,9 @@ base:
   register:
     endpoints: ["etcd1:2379"]
 builder:
-  repository_endpoint: http://repository0:17000
+  repository_client: 
+    protocol: Http
+    address: repository0:17000
   workspace: /opt/builder/builds/apps
   restore_directory: /opt/builder/builds/restores
   log_directory: /opt/builder/builds/logs
