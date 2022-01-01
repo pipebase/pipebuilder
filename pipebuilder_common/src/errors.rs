@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 use std::{env, io, net, result, string::FromUtf8Error};
 use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub struct Error(Box<ErrorImpl>);
 
 impl Display for Error {
