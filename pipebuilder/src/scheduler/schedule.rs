@@ -3,36 +3,39 @@ use flurry::HashMap;
 use pipebuilder_common::{
     deserialize_event,
     grpc::schedule::{scheduler_server::Scheduler, BuilderInfo, ScheduleResponse},
-    hash_distance, log_event, remove_resource, NodeRole, NodeState, Register,
+    hash_distance, log_event, remove_resource, NodeRole, NodeState, Register, ScheduleDescriptor,
+    ScheduleHash,
 };
 use std::sync::Arc;
 use tonic::Response;
 use tracing::{error, info, warn};
 
-use crate::config::SchedulerConfig;
+#[derive(Default)]
+pub struct ScheduleManagerBuilder {}
 
-pub struct SchedulerService {
+impl ScheduleManagerBuilder {
+    pub fn build(self) -> ScheduleManager {
+        ScheduleManager {
+            builders: Arc::new(HashMap::new()),
+        }
+    }
+}
+
+pub struct ScheduleManager {
     builders: Arc<HashMap<String, NodeState>>,
 }
 
-#[tonic::async_trait]
-impl Scheduler for SchedulerService {
-    async fn schedule(
+impl ScheduleManager {
+    pub fn builder() -> ScheduleManagerBuilder {
+        ScheduleManagerBuilder::default()
+    }
+
+    pub fn schedule(
         &self,
-        request: tonic::Request<pipebuilder_common::grpc::schedule::ScheduleRequest>,
-    ) -> Result<tonic::Response<pipebuilder_common::grpc::schedule::ScheduleResponse>, tonic::Status>
-    {
-        // select builder using consistent hash, build of same app (namespace, id) landed on same builder for compilcation cache hit
-        let request = request.into_inner();
-        let namespace = request.namespace;
-        let id = request.id;
-        let target_platform = request.target_platform;
-        info!(
-            namespace = namespace.as_str(),
-            id = id.as_str(),
-            "schedule build"
-        );
-        let request_key = format!("{}/{}", namespace, id);
+        schedule: ScheduleDescriptor<'_>,
+        target_platform: Option<&str>,
+    ) -> Option<BuilderInfo> {
+        let request_key = schedule.schedule_hash();
         let builders_ref = self.builders.pin();
         let mut selected_builder_info: Option<BuilderInfo> = None;
         let mut min_hash_distance: u64 = u64::MAX;
@@ -40,7 +43,7 @@ impl Scheduler for SchedulerService {
             if !builder.is_active() {
                 continue;
             }
-            if let Some(ref target_platform) = target_platform {
+            if let Some(target_platform) = target_platform {
                 if !builder.accept_target_platform(target_platform) {
                     continue;
                 }
@@ -54,17 +57,7 @@ impl Scheduler for SchedulerService {
                 }
             }
         }
-        Ok(Response::new(ScheduleResponse {
-            builder_info: selected_builder_info,
-        }))
-    }
-}
-
-impl SchedulerService {
-    pub fn new(_config: SchedulerConfig) -> Self {
-        SchedulerService {
-            builders: Arc::new(HashMap::new()),
-        }
+        selected_builder_info
     }
 
     pub fn run(&self, mut register: Register) {
@@ -141,5 +134,40 @@ impl SchedulerService {
                 address,
                 target_platform,
             })
+    }
+}
+
+pub struct SchedulerService {
+    manager: ScheduleManager,
+}
+
+#[tonic::async_trait]
+impl Scheduler for SchedulerService {
+    async fn schedule(
+        &self,
+        request: tonic::Request<pipebuilder_common::grpc::schedule::ScheduleRequest>,
+    ) -> Result<tonic::Response<pipebuilder_common::grpc::schedule::ScheduleResponse>, tonic::Status>
+    {
+        // select builder using consistent hash, build of same app (namespace, id) landed on same builder for compilcation cache hit
+        let request = request.into_inner();
+        let namespace = request.namespace;
+        let id = request.id;
+        let target_platform = request.target_platform;
+        info!(
+            namespace = namespace.as_str(),
+            id = id.as_str(),
+            "schedule build"
+        );
+        let schedule = ScheduleDescriptor(namespace.as_str(), id.as_str());
+        let selected_builder_info = self.manager.schedule(schedule, target_platform.as_deref());
+        Ok(Response::new(ScheduleResponse {
+            builder_info: selected_builder_info,
+        }))
+    }
+}
+
+impl SchedulerService {
+    pub fn new(manager: ScheduleManager) -> Self {
+        SchedulerService { manager }
     }
 }
