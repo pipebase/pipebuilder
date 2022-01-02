@@ -162,6 +162,7 @@ where
 // snapshot resource
 pub trait Snapshot: Default {
     fn incr_version(&mut self);
+    fn get_version(&self) -> u64;
 }
 
 pub trait Resource {

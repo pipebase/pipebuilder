@@ -11,6 +11,9 @@ impl Snapshot for ManifestSnapshot {
     fn incr_version(&mut self) {
         self.latest_version += 1;
     }
+    fn get_version(&self) -> u64 {
+        self.latest_version
+    }
 }
 
 impl Resource for ManifestSnapshot {

@@ -1,14 +1,14 @@
 use pipebuilder_common::{Register, Result};
 
 use crate::config::RepositoryConfig;
-use crate::repository::RepositoryService;
+use crate::repository::{RepositoryManager, RepositoryService};
 
 pub async fn bootstrap(
     config: RepositoryConfig,
     register: Register,
     lease_id: i64,
 ) -> Result<RepositoryService> {
-    let svc = RepositoryService::builder()
+    let manager = RepositoryManager::builder()
         .register(register)
         .lease_id(lease_id)
         .app_directory(config.app)
@@ -17,6 +17,6 @@ pub async fn bootstrap(
         .catalogs_directory(config.catalogs)
         .build();
     let reset = config.reset.unwrap_or(false);
-    svc.init(reset).await?;
-    Ok(svc)
+    manager.init(reset).await?;
+    Ok(RepositoryService::new(manager))
 }

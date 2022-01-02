@@ -6,10 +6,11 @@ use pipebuilder_common::{
         GetCatalogsResponse, GetManifestResponse, PostAppResponse, PutCatalogSchemaResponse,
         PutCatalogsResponse, PutManifestResponse,
     },
-    read_file, reset_directory, rpc_internal_error, rpc_not_found, write_file, AppMetadata,
-    CatalogSchemaMetadata, CatalogSchemaSnapshot, CatalogsMetadata, CatalogsSnapshot,
-    ManifestMetadata, ManifestSnapshot, PathBuilder, Register,
+    read_file, repository_error, reset_directory, rpc_internal_error, write_file, AppMetadata,
+    BlobResource, CatalogSchemaMetadata, CatalogSchemaSnapshot, CatalogsMetadata, CatalogsSnapshot,
+    ManifestMetadata, ManifestSnapshot, PathBuilder, Register, Resource, Snapshot,
 };
+use serde::{de::DeserializeOwned, Serialize};
 use std::fs::remove_dir_all;
 use tonic::Response;
 use tracing::{error, info};
@@ -20,7 +21,7 @@ pub const TARGET_CATALOG_SCHEMA: &str = "schema.json";
 pub const TARGET_CATALOGS: &str = "catalogs.yml";
 
 #[derive(Default)]
-pub struct RepositoryServiceBuilder {
+pub struct RepositoryManagerBuilder {
     register: Option<Register>,
     lease_id: Option<i64>,
     // app binary directory
@@ -33,7 +34,7 @@ pub struct RepositoryServiceBuilder {
     catalogs_directory: Option<String>,
 }
 
-impl RepositoryServiceBuilder {
+impl RepositoryManagerBuilder {
     pub fn register(mut self, register: Register) -> Self {
         self.register = Some(register);
         self
@@ -64,8 +65,8 @@ impl RepositoryServiceBuilder {
         self
     }
 
-    pub fn build(self) -> RepositoryService {
-        RepositoryService {
+    pub fn build(self) -> RepositoryManager {
+        RepositoryManager {
             register: self.register.expect("register undefined"),
             lease_id: self.lease_id.expect("lease id undefined"),
             app_directory: self.app_directory.expect("app directory undefined"),
@@ -82,7 +83,7 @@ impl RepositoryServiceBuilder {
     }
 }
 
-pub struct RepositoryService {
+pub struct RepositoryManager {
     register: Register,
     lease_id: i64,
     // app binary directory
@@ -96,9 +97,9 @@ pub struct RepositoryService {
     catalogs_directory: String,
 }
 
-impl RepositoryService {
-    pub fn builder() -> RepositoryServiceBuilder {
-        RepositoryServiceBuilder::default()
+impl RepositoryManager {
+    pub fn builder() -> RepositoryManagerBuilder {
+        RepositoryManagerBuilder::default()
     }
 
     pub async fn init(&self, reset: bool) -> pipebuilder_common::Result<()> {
@@ -127,6 +128,469 @@ impl RepositoryService {
         }
         Ok(())
     }
+
+    pub async fn get_manifest(
+        &self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> pipebuilder_common::Result<Vec<u8>> {
+        let repository = self.manifest_directory.as_str();
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        Self::read_resource::<ManifestMetadata>(
+            repository,
+            (namespace, id, version),
+            TARGET_MANIFEST,
+            &mut register,
+            lease_id,
+        )
+        .await
+    }
+
+    pub async fn get_app(
+        &self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> pipebuilder_common::Result<Vec<u8>> {
+        let repository = self.app_directory.as_str();
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        Self::read_resource::<AppMetadata>(
+            repository,
+            (namespace, id, version),
+            TARGET_APP,
+            &mut register,
+            lease_id,
+        )
+        .await
+    }
+
+    pub async fn get_catalog_schema(
+        &self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> pipebuilder_common::Result<Vec<u8>> {
+        let repository = self.catalog_schema_directory.as_str();
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        Self::read_resource::<CatalogSchemaMetadata>(
+            repository,
+            (namespace, id, version),
+            TARGET_CATALOG_SCHEMA,
+            &mut register,
+            lease_id,
+        )
+        .await
+    }
+
+    pub async fn get_catalogs(
+        &self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> pipebuilder_common::Result<Vec<u8>> {
+        let repository = self.catalogs_directory.as_str();
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        Self::read_resource::<CatalogsMetadata>(
+            repository,
+            (namespace, id, version),
+            TARGET_CATALOGS,
+            &mut register,
+            lease_id,
+        )
+        .await
+    }
+
+    pub async fn put_manifest(
+        &self,
+        namespace: &str,
+        id: &str,
+        buffer: &[u8],
+    ) -> pipebuilder_common::Result<u64> {
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        let latest_version = Self::update_resource_snapshot::<ManifestSnapshot>(
+            namespace,
+            id,
+            &mut register,
+            lease_id,
+        )
+        .await?;
+        let repository = self.manifest_directory.as_str();
+        Self::write_resource::<ManifestMetadata>(
+            repository,
+            (namespace, id, latest_version),
+            TARGET_MANIFEST,
+            buffer,
+            &mut register,
+            lease_id,
+        )
+        .await?;
+        Ok(latest_version)
+    }
+
+    pub async fn post_app(
+        &self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+        buffer: &[u8],
+    ) -> pipebuilder_common::Result<()> {
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        let repository = self.app_directory.as_str();
+        Self::write_resource::<AppMetadata>(
+            repository,
+            (namespace, id, version),
+            TARGET_APP,
+            buffer,
+            &mut register,
+            lease_id,
+        )
+        .await
+    }
+
+    pub async fn put_catalog_schema(
+        &self,
+        namespace: &str,
+        id: &str,
+        buffer: &[u8],
+    ) -> pipebuilder_common::Result<u64> {
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        let latest_version = Self::update_resource_snapshot::<CatalogSchemaSnapshot>(
+            namespace,
+            id,
+            &mut register,
+            lease_id,
+        )
+        .await?;
+        let repository = self.catalog_schema_directory.as_str();
+        Self::write_resource::<CatalogSchemaMetadata>(
+            repository,
+            (namespace, id, latest_version),
+            TARGET_CATALOG_SCHEMA,
+            buffer,
+            &mut register,
+            lease_id,
+        )
+        .await?;
+        Ok(latest_version)
+    }
+
+    pub async fn put_catalogs(
+        &self,
+        namespace: &str,
+        id: &str,
+        buffer: &[u8],
+    ) -> pipebuilder_common::Result<u64> {
+        let mut register = self.register.clone();
+        let lease_id = self.lease_id;
+        let latest_version = Self::update_resource_snapshot::<CatalogsSnapshot>(
+            namespace,
+            id,
+            &mut register,
+            lease_id,
+        )
+        .await?;
+        let repository = self.catalogs_directory.as_str();
+        Self::write_resource::<CatalogsMetadata>(
+            repository,
+            (namespace, id, latest_version),
+            TARGET_CATALOGS,
+            buffer,
+            &mut register,
+            lease_id,
+        )
+        .await?;
+        Ok(latest_version)
+    }
+
+    pub async fn delete_manifest(
+        &self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> pipebuilder_common::Result<()> {
+        let mut register = self.register.clone();
+        let repository = self.manifest_directory.as_str();
+        Self::delete_resource::<ManifestMetadata>(
+            repository,
+            (namespace, id, version),
+            &mut register,
+        )
+        .await
+    }
+
+    pub async fn delete_app(
+        &self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> pipebuilder_common::Result<()> {
+        let mut register = self.register.clone();
+        let repository = self.app_directory.as_str();
+        Self::delete_resource::<AppMetadata>(repository, (namespace, id, version), &mut register)
+            .await
+    }
+
+    pub async fn delete_catalog_schema(
+        &self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> pipebuilder_common::Result<()> {
+        let mut register = self.register.clone();
+        let repository = self.catalog_schema_directory.as_str();
+        Self::delete_resource::<CatalogSchemaMetadata>(
+            repository,
+            (namespace, id, version),
+            &mut register,
+        )
+        .await
+    }
+
+    pub async fn delete_catalogs(
+        &self,
+        namespace: &str,
+        id: &str,
+        version: u64,
+    ) -> pipebuilder_common::Result<()> {
+        let mut register = self.register.clone();
+        let repository = self.catalogs_directory.as_str();
+        Self::delete_resource::<CatalogsMetadata>(
+            repository,
+            (namespace, id, version),
+            &mut register,
+        )
+        .await
+    }
+
+    async fn read_resource<R>(
+        repository: &str,
+        resource: (&str, &str, u64),
+        target_name: &str,
+        register: &mut Register,
+        lease_id: i64,
+    ) -> pipebuilder_common::Result<Vec<u8>>
+    where
+        R: Resource + BlobResource + Serialize + DeserializeOwned,
+    {
+        let (namespace, id, version) = resource;
+        let buffer = match Self::read_target_from_repo(repository, resource, target_name).await {
+            Ok(buffer) => buffer,
+            Err(err) => {
+                return Err(repository_error(
+                    format!("read {}", R::ty()),
+                    format!(
+                        "read {} failed for (namespace = {}, id = {}, version = {}), error: {:#?}",
+                        R::ty(),
+                        namespace,
+                        id,
+                        version,
+                        err
+                    ),
+                ))
+            }
+        };
+        let size = buffer.len();
+        match register
+            .update_blob_resource::<R>(
+                namespace,
+                id,
+                version,
+                size,
+                lease_id,
+            )
+            .await {
+                Ok(_) => Ok(buffer),
+                Err(err) => Err(repository_error(format!("update {} metadata", R::ty()), format!("update {} metadata failed for (namespace = {}, id = {}, version = {}), error: {:#?}", R::ty(), namespace, id, version, err))),
+            }
+    }
+
+    // TODO: too many arguments
+    async fn write_resource<R>(
+        repository: &str,
+        resource: (&str, &str, u64),
+        target_name: &str,
+        buffer: &[u8],
+        register: &mut Register,
+        lease_id: i64,
+    ) -> pipebuilder_common::Result<()>
+    where
+        R: Resource + BlobResource + Serialize + DeserializeOwned,
+    {
+        let (namespace, id, version) = resource;
+        match Self::write_target_into_repo(repository, resource, buffer, target_name).await {
+            Ok(_) => (),
+            Err(err) => {
+                return Err(repository_error(
+                    format!("write {}", R::ty()),
+                    format!(
+                        "write {} failed for (namespace = {}, id = {}, version = {}), error: {:#?}",
+                        R::ty(),
+                        namespace,
+                        id,
+                        version,
+                        err
+                    ),
+                ))
+            }
+        };
+        let size = buffer.len();
+        match register
+            .update_blob_resource::<R>(
+                namespace,
+                id,
+                version,
+                size,
+                lease_id,
+            )
+            .await {
+                Ok(_) => Ok(()),
+                Err(err) => Err(repository_error(format!("update {} metadata", R::ty()), format!("update {} metadata failed for (namespace = {}, id = {}, version = {}), error: {:#?}", R::ty(), namespace, id, version, err))),
+            }
+    }
+
+    async fn delete_resource<R>(
+        repository: &str,
+        resource: (&str, &str, u64),
+        register: &mut Register,
+    ) -> pipebuilder_common::Result<()>
+    where
+        R: Resource,
+    {
+        let (namespace, id, version) = resource;
+        match Self::delete_target_from_repo(repository, resource) {
+            Ok(_) => (),
+            Err(err) => {
+                return Err(repository_error(
+                    format!("delete {}", R::ty()),
+                    format!(
+                    "delete {} failed for (namespace = {}, id = {}, version = {}), error: {:#?}",
+                    R::ty(),
+                    namespace,
+                    id,
+                    version,
+                    err
+                ),
+                ))
+            }
+        };
+        let (namespace, id, version) = resource;
+        match register
+            .delete_resource::<R>(Some(namespace), id, Some(version))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) => Err(repository_error(
+                format!("delete {} metadata", R::ty()),
+                format!(
+                    "delete {} failed for (namespace = {}, id = {}, version = {}), error: {:#?}",
+                    R::ty(),
+                    namespace,
+                    id,
+                    version,
+                    err
+                ),
+            )),
+        }
+    }
+
+    async fn update_resource_snapshot<S>(
+        namespace: &str,
+        id: &str,
+        register: &mut Register,
+        lease_id: i64,
+    ) -> pipebuilder_common::Result<u64>
+    where
+        S: Resource + Snapshot + Serialize + DeserializeOwned,
+    {
+        match register
+            .update_snapshot_resource::<S>(namespace, id, lease_id)
+            .await
+        {
+            Ok((_, snapshot)) => Ok(snapshot.get_version()),
+            Err(err) => Err(repository_error(
+                format!("update {} snapshot", S::ty()),
+                format!(
+                    "update {} snapshot failed for (namespace = {}, id = {}), error: {:#?}",
+                    S::ty(),
+                    namespace,
+                    id,
+                    err
+                ),
+            )),
+        }
+    }
+
+    async fn read_target_from_repo(
+        repository: &str,
+        resource: (&str, &str, u64),
+        target_name: &str,
+    ) -> pipebuilder_common::Result<Vec<u8>> {
+        let (namespace, id, version) = resource;
+        let path = PathBuilder::default()
+            .push(repository)
+            .push(namespace)
+            .push(id)
+            .push(version.to_string())
+            .push(target_name)
+            .build();
+        let buffer = read_file(path).await?;
+        Ok(buffer)
+    }
+
+    async fn write_target_into_repo(
+        repository: &str,
+        resource: (&str, &str, u64),
+        buffer: &[u8],
+        target_name: &str,
+    ) -> pipebuilder_common::Result<()> {
+        let (namespace, id, version) = resource;
+        let directory = PathBuilder::default()
+            .push(repository)
+            .push(namespace)
+            .push(id)
+            .push(version.to_string())
+            .build();
+        let path = PathBuilder::clone_from(&directory)
+            .push(target_name)
+            .build();
+        create_directory(directory.as_path()).await?;
+        write_file(path.as_path(), buffer).await?;
+        // TODO S3 backup
+        Ok(())
+    }
+
+    fn delete_target_from_repo(
+        repository: &str,
+        resource: (&str, &str, u64),
+    ) -> pipebuilder_common::Result<()> {
+        let (namespace, id, version) = resource;
+        let directory = PathBuilder::default()
+            .push(repository)
+            .push(namespace)
+            .push(id)
+            .push(version.to_string())
+            .build();
+        remove_dir_all(directory.as_path())?;
+        Ok(())
+    }
+}
+
+pub struct RepositoryService {
+    manager: RepositoryManager,
+}
+
+impl RepositoryService {
+    pub fn new(manager: RepositoryManager) -> Self {
+        RepositoryService { manager }
+    }
 }
 
 #[tonic::async_trait]
@@ -148,49 +612,18 @@ impl Repository for RepositoryService {
             manifest_version = version,
             "get manifest"
         );
-        let repository = self.manifest_directory.as_str();
-        let buffer = match read_target_from_repo(
-            repository,
-            namespace.as_str(),
-            id.as_str(),
-            version,
-            TARGET_MANIFEST,
-        )
-        .await
-        {
-            Ok(buffer) => buffer,
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    manifest_version = version,
-                    "read manifest fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_not_found("manifest not found"));
-            }
-        };
-        // update manifest metadata
-        let mut register = self.register.clone();
-        let lease_id = self.lease_id;
-        let size = buffer.len();
-        match register
-            .update_blob_resource::<ManifestMetadata>(
-                namespace.as_str(),
-                id.as_str(),
-                version,
-                size,
-                lease_id,
-            )
+        match self
+            .manager
+            .get_manifest(namespace.as_str(), id.as_str(), version)
             .await
         {
-            Ok(_) => Ok(Response::new(GetManifestResponse { buffer })),
+            Ok(buffer) => Ok(Response::new(GetManifestResponse { buffer })),
             Err(err) => {
                 error!(
                     namespace = namespace.as_str(),
                     id = id.as_str(),
                     manifest_version = version,
-                    "update manifest metadata fail, error '{:#?}'",
+                    "get manifest fail, error '{:#?}'",
                     err
                 );
                 Err(rpc_internal_error(err))
@@ -211,68 +644,20 @@ impl Repository for RepositoryService {
         info!(
             namespace = namespace.as_str(),
             id = id.as_str(),
-            "get manifest"
+            "put manifest"
         );
-        let mut register = self.register.clone();
-        let lease_id = self.lease_id;
-        let version = match register
-            .update_snapshot_resource::<ManifestSnapshot>(namespace.as_str(), id.as_str(), lease_id)
-            .await
-        {
-            Ok((_, snapshot)) => snapshot.latest_version,
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    "increase manifest snapshot version fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_internal_error(err));
-            }
-        };
-        let repository = self.manifest_directory.as_str();
         let buffer = request.buffer.as_slice();
-        match write_target_into_repo(
-            repository,
-            namespace.as_str(),
-            id.as_str(),
-            version,
-            buffer,
-            TARGET_MANIFEST,
-        )
-        .await
-        {
-            Ok(_) => (),
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    manifest_version = version,
-                    "write manifest fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_internal_error(err));
-            }
-        };
-        // update manifest metadata
-        let size = buffer.len();
-        match register
-            .update_blob_resource::<ManifestMetadata>(
-                namespace.as_str(),
-                id.as_str(),
-                version,
-                size,
-                lease_id,
-            )
+        match self
+            .manager
+            .put_manifest(namespace.as_str(), id.as_str(), buffer)
             .await
         {
-            Ok(_) => Ok(Response::new(PutManifestResponse { version })),
+            Ok(version) => Ok(Response::new(PutManifestResponse { version })),
             Err(err) => {
                 error!(
                     namespace = namespace.as_str(),
                     id = id.as_str(),
-                    manifest_version = version,
-                    "update manifest metadata fail, error '{:#?}'",
+                    "put manifest fail, error '{:#?}'",
                     err
                 );
                 Err(rpc_internal_error(err))
@@ -297,27 +682,9 @@ impl Repository for RepositoryService {
             manifest_version = version,
             "delete manifest"
         );
-        let repository = self.manifest_directory.as_str();
-        match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
-            Ok(_) => (),
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    manifest_version = version,
-                    "delete manifest fail, error: '{:#?}'",
-                    err
-                );
-                // return error ?
-            }
-        };
-        let mut register = self.register.clone();
-        match register
-            .delete_resource::<ManifestMetadata>(
-                Some(namespace.as_str()),
-                id.as_str(),
-                Some(version),
-            )
+        match self
+            .manager
+            .delete_manifest(namespace.as_str(), id.as_str(), version)
             .await
         {
             Ok(_) => (),
@@ -326,12 +693,12 @@ impl Repository for RepositoryService {
                     namespace = namespace.as_str(),
                     id = id.as_str(),
                     manifest_version = version,
-                    "delete manifest metadata fail, error: '{:#?}'",
+                    "delete manifest fail, error: '{:#?}'",
                     err
                 )
                 // return error ?
             }
-        }
+        };
         Ok(Response::new(DeleteManifestResponse {}))
     }
 
@@ -350,49 +717,18 @@ impl Repository for RepositoryService {
             build_version = version,
             "get app"
         );
-        let repository = self.app_directory.as_str();
-        let buffer = match read_target_from_repo(
-            repository,
-            namespace.as_str(),
-            id.as_str(),
-            version,
-            TARGET_APP,
-        )
-        .await
-        {
-            Ok(buffer) => buffer,
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    build_version = version,
-                    "read app fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_not_found("app not found"));
-            }
-        };
-        // update app metadata
-        let mut register = self.register.clone();
-        let lease_id = self.lease_id;
-        let size = buffer.len();
-        match register
-            .update_blob_resource::<AppMetadata>(
-                namespace.as_str(),
-                id.as_str(),
-                version,
-                size,
-                lease_id,
-            )
+        match self
+            .manager
+            .get_app(namespace.as_str(), id.as_str(), version)
             .await
         {
-            Ok(_) => Ok(Response::new(GetAppResponse { buffer })),
+            Ok(buffer) => Ok(Response::new(GetAppResponse { buffer })),
             Err(err) => {
                 error!(
                     namespace = namespace.as_str(),
                     id = id.as_str(),
                     build_version = version,
-                    "update app metadata fail, error '{}'",
+                    "get app fail, error '{}'",
                     err
                 );
                 Err(rpc_internal_error(err))
@@ -416,41 +752,9 @@ impl Repository for RepositoryService {
             "post app"
         );
         let buffer = request.buffer.as_slice();
-        let repository = self.app_directory.as_str();
-        match write_target_into_repo(
-            repository,
-            namespace.as_str(),
-            id.as_str(),
-            version,
-            buffer,
-            TARGET_APP,
-        )
-        .await
-        {
-            Ok(_) => (),
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    build_version = version,
-                    "post app fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_internal_error(err));
-            }
-        };
-        // update app metadata
-        let mut register = self.register.clone();
-        let lease_id = self.lease_id;
-        let size = buffer.len();
-        match register
-            .update_blob_resource::<AppMetadata>(
-                namespace.as_str(),
-                id.as_str(),
-                version,
-                size,
-                lease_id,
-            )
+        match self
+            .manager
+            .post_app(namespace.as_str(), id.as_str(), version, buffer)
             .await
         {
             Ok(_) => Ok(Response::new(PostAppResponse {})),
@@ -459,7 +763,7 @@ impl Repository for RepositoryService {
                     namespace = namespace.as_str(),
                     id = id.as_str(),
                     build_version = version,
-                    "update app metadata fail, error '{:#?}'",
+                    "post app fail, error '{:#?}'",
                     err
                 );
                 Err(rpc_internal_error(err))
@@ -484,23 +788,9 @@ impl Repository for RepositoryService {
             build_version = version,
             "delete app"
         );
-        let repository = self.app_directory.as_str();
-        match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
-            Ok(_) => (),
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    build_version = version,
-                    "delete app fail, error: '{:#?}'",
-                    err
-                );
-                // return error ?
-            }
-        };
-        let mut register = self.register.clone();
-        match register
-            .delete_resource::<AppMetadata>(Some(namespace.as_str()), id.as_str(), Some(version))
+        match self
+            .manager
+            .delete_app(namespace.as_str(), id.as_str(), version)
             .await
         {
             Ok(_) => (),
@@ -509,12 +799,12 @@ impl Repository for RepositoryService {
                     namespace = namespace.as_str(),
                     id = id.as_str(),
                     build_version = version,
-                    "delete app metadata fail, error: '{:#?}'",
+                    "delete app fail, error: '{:#?}'",
                     err
                 )
                 // return error ?
             }
-        }
+        };
         Ok(Response::new(DeleteAppResponse {}))
     }
 
@@ -535,49 +825,18 @@ impl Repository for RepositoryService {
             catalog_schema_version = version,
             "get catalog schema"
         );
-        let repository = self.catalog_schema_directory.as_str();
-        let buffer = match read_target_from_repo(
-            repository,
-            namespace.as_str(),
-            id.as_str(),
-            version,
-            TARGET_CATALOG_SCHEMA,
-        )
-        .await
-        {
-            Ok(buffer) => buffer,
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    catalog_schema_version = version,
-                    "read catalog schema fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_not_found("catalog schema not found"));
-            }
-        };
-        // update catalog schema metadata
-        let mut register = self.register.clone();
-        let lease_id = self.lease_id;
-        let size = buffer.len();
-        match register
-            .update_blob_resource::<CatalogSchemaMetadata>(
-                namespace.as_str(),
-                id.as_str(),
-                version,
-                size,
-                lease_id,
-            )
+        match self
+            .manager
+            .get_catalog_schema(namespace.as_str(), id.as_str(), version)
             .await
         {
-            Ok(_) => Ok(Response::new(GetCatalogSchemaResponse { buffer })),
+            Ok(buffer) => Ok(Response::new(GetCatalogSchemaResponse { buffer })),
             Err(err) => {
                 error!(
                     namespace = namespace.as_str(),
                     id = id.as_str(),
                     catalog_schema_version = version,
-                    "update catalog schema metadata fail, error '{:#?}'",
+                    "get catalog schema fail, error '{:#?}'",
                     err
                 );
                 Err(rpc_internal_error(err))
@@ -600,70 +859,18 @@ impl Repository for RepositoryService {
             id = id.as_str(),
             "get catalog schema"
         );
-        let mut register = self.register.clone();
-        let lease_id = self.lease_id;
-        let version = match register
-            .update_snapshot_resource::<CatalogSchemaSnapshot>(
-                namespace.as_str(),
-                id.as_str(),
-                lease_id,
-            )
-            .await
-        {
-            Ok((_, snapshot)) => snapshot.latest_version,
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    "increase catalog schema snapshot version fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_internal_error(err));
-            }
-        };
-        let repository = self.catalog_schema_directory.as_str();
         let buffer = request.buffer.as_slice();
-        match write_target_into_repo(
-            repository,
-            namespace.as_str(),
-            id.as_str(),
-            version,
-            buffer,
-            TARGET_CATALOG_SCHEMA,
-        )
-        .await
-        {
-            Ok(_) => (),
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    catalog_schema_version = version,
-                    "write catalog schema fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_internal_error(err));
-            }
-        };
-        // update catalog schema metadata
-        let size = buffer.len();
-        match register
-            .update_blob_resource::<CatalogSchemaMetadata>(
-                namespace.as_str(),
-                id.as_str(),
-                version,
-                size,
-                lease_id,
-            )
+        match self
+            .manager
+            .put_catalog_schema(namespace.as_str(), id.as_str(), buffer)
             .await
         {
-            Ok(_) => Ok(Response::new(PutCatalogSchemaResponse { version })),
+            Ok(version) => Ok(Response::new(PutCatalogSchemaResponse { version })),
             Err(err) => {
                 error!(
                     namespace = namespace.as_str(),
                     id = id.as_str(),
-                    catalog_schema_version = version,
-                    "update catalog schema metadata fail, error '{:#?}'",
+                    "put catalog schema fail, error '{:#?}'",
                     err
                 );
                 Err(rpc_internal_error(err))
@@ -688,27 +895,9 @@ impl Repository for RepositoryService {
             catalog_schema_version = version,
             "delete catalog schema"
         );
-        let repository = self.catalog_schema_directory.as_str();
-        match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
-            Ok(_) => (),
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    catalog_schema_version = version,
-                    "delete catalog schema fail, error: '{:#?}'",
-                    err
-                );
-                // return error ?
-            }
-        };
-        let mut register = self.register.clone();
-        match register
-            .delete_resource::<CatalogSchemaMetadata>(
-                Some(namespace.as_str()),
-                id.as_str(),
-                Some(version),
-            )
+        match self
+            .manager
+            .delete_catalog_schema(namespace.as_str(), id.as_str(), version)
             .await
         {
             Ok(_) => (),
@@ -717,12 +906,12 @@ impl Repository for RepositoryService {
                     namespace = namespace.as_str(),
                     id = id.as_str(),
                     catalog_schema_version = version,
-                    "delete catalog schema metadata fail, error: '{:#?}'",
+                    "delete catalog schema fail, error: '{:#?}'",
                     err
                 )
                 // return error ?
             }
-        }
+        };
         Ok(Response::new(DeleteCatalogSchemaResponse {}))
     }
 
@@ -743,49 +932,18 @@ impl Repository for RepositoryService {
             catalogs_version = version,
             "get catalogs"
         );
-        let repository = self.catalogs_directory.as_str();
-        let buffer = match read_target_from_repo(
-            repository,
-            namespace.as_str(),
-            id.as_str(),
-            version,
-            TARGET_CATALOGS,
-        )
-        .await
-        {
-            Ok(buffer) => buffer,
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    catalogs_version = version,
-                    "read catalogs fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_not_found("catalogs not found"));
-            }
-        };
-        // update catalogs metadata
-        let mut register = self.register.clone();
-        let lease_id = self.lease_id;
-        let size = buffer.len();
-        match register
-            .update_blob_resource::<CatalogsMetadata>(
-                namespace.as_str(),
-                id.as_str(),
-                version,
-                size,
-                lease_id,
-            )
+        match self
+            .manager
+            .get_catalogs(namespace.as_str(), id.as_str(), version)
             .await
         {
-            Ok(_) => Ok(Response::new(GetCatalogsResponse { buffer })),
+            Ok(buffer) => Ok(Response::new(GetCatalogsResponse { buffer })),
             Err(err) => {
                 error!(
                     namespace = namespace.as_str(),
                     id = id.as_str(),
                     catalogs_version = version,
-                    "update catalogs metadata fail, error '{:#?}'",
+                    "get catalogs fail, error '{:#?}'",
                     err
                 );
                 Err(rpc_internal_error(err))
@@ -808,66 +966,18 @@ impl Repository for RepositoryService {
             id = id.as_str(),
             "get catalogs"
         );
-        let mut register = self.register.clone();
-        let lease_id = self.lease_id;
-        let version = match register
-            .update_snapshot_resource::<CatalogsSnapshot>(namespace.as_str(), id.as_str(), lease_id)
-            .await
-        {
-            Ok((_, snapshot)) => snapshot.latest_version,
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    "increase catalogs snapshot version fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_internal_error(err));
-            }
-        };
-        let repository = self.catalogs_directory.as_str();
         let buffer = request.buffer.as_slice();
-        match write_target_into_repo(
-            repository,
-            namespace.as_str(),
-            id.as_str(),
-            version,
-            buffer,
-            TARGET_CATALOGS,
-        )
-        .await
-        {
-            Ok(_) => (),
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    catalogs_version = version,
-                    "write catalogs fail, error '{:#?}'",
-                    err
-                );
-                return Err(rpc_internal_error(err));
-            }
-        };
-        // update catalogs metadata
-        let size = buffer.len();
-        match register
-            .update_blob_resource::<CatalogsMetadata>(
-                namespace.as_str(),
-                id.as_str(),
-                version,
-                size,
-                lease_id,
-            )
+        match self
+            .manager
+            .put_catalogs(namespace.as_str(), id.as_str(), buffer)
             .await
         {
-            Ok(_) => Ok(Response::new(PutCatalogsResponse { version })),
+            Ok(version) => Ok(Response::new(PutCatalogsResponse { version })),
             Err(err) => {
                 error!(
                     namespace = namespace.as_str(),
                     id = id.as_str(),
-                    catalogs_version = version,
-                    "update catalogs metadata fail, error '{:#?}'",
+                    "put catalogs fail, error '{:#?}'",
                     err
                 );
                 Err(rpc_internal_error(err))
@@ -890,29 +1000,11 @@ impl Repository for RepositoryService {
             namespace = namespace.as_str(),
             id = id.as_str(),
             catalogs_version = version,
-            "delete catalog schema"
+            "delete catalogs"
         );
-        let repository = self.catalogs_directory.as_str();
-        match delete_target_from_repo(repository, namespace.as_str(), id.as_str(), version) {
-            Ok(_) => (),
-            Err(err) => {
-                error!(
-                    namespace = namespace.as_str(),
-                    id = id.as_str(),
-                    catalogs_version = version,
-                    "delete catalogs fail, error: '{:#?}'",
-                    err
-                );
-                // return error ?
-            }
-        };
-        let mut register = self.register.clone();
-        match register
-            .delete_resource::<CatalogsMetadata>(
-                Some(namespace.as_str()),
-                id.as_str(),
-                Some(version),
-            )
+        match self
+            .manager
+            .delete_catalogs(namespace.as_str(), id.as_str(), version)
             .await
         {
             Ok(_) => (),
@@ -921,69 +1013,12 @@ impl Repository for RepositoryService {
                     namespace = namespace.as_str(),
                     id = id.as_str(),
                     catalogs_version = version,
-                    "delete catalogs metadata fail, error: '{:#?}'",
+                    "delete catalogs fail, error: '{:#?}'",
                     err
                 )
                 // return error ?
             }
-        }
+        };
         Ok(Response::new(DeleteCatalogsResponse {}))
     }
-}
-
-async fn read_target_from_repo(
-    repository: &str,
-    namespace: &str,
-    id: &str,
-    version: u64,
-    target_name: &str,
-) -> pipebuilder_common::Result<Vec<u8>> {
-    let path = PathBuilder::default()
-        .push(repository)
-        .push(namespace)
-        .push(id)
-        .push(version.to_string())
-        .push(target_name)
-        .build();
-    let buffer = read_file(path).await?;
-    Ok(buffer)
-}
-
-async fn write_target_into_repo(
-    repository: &str,
-    namespace: &str,
-    id: &str,
-    version: u64,
-    buffer: &[u8],
-    target_name: &str,
-) -> pipebuilder_common::Result<()> {
-    let directory = PathBuilder::default()
-        .push(repository)
-        .push(namespace)
-        .push(id)
-        .push(version.to_string())
-        .build();
-    let path = PathBuilder::clone_from(&directory)
-        .push(target_name)
-        .build();
-    create_directory(directory.as_path()).await?;
-    write_file(path.as_path(), buffer).await?;
-    // TODO S3 backup
-    Ok(())
-}
-
-fn delete_target_from_repo(
-    repository: &str,
-    namespace: &str,
-    id: &str,
-    version: u64,
-) -> pipebuilder_common::Result<()> {
-    let directory = PathBuilder::default()
-        .push(repository)
-        .push(namespace)
-        .push(id)
-        .push(version.to_string())
-        .build();
-    remove_dir_all(directory.as_path())?;
-    Ok(())
 }

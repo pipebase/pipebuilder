@@ -74,6 +74,8 @@ pub enum ErrorImpl {
     ApiRequest { message: String },
     #[error("build error, operation: {operation:?}, message: {message:?}")]
     Build { operation: String, message: String },
+    #[error("repository error, operation: {operation:?}, message: {message:?}")]
+    Repository { operation: String, message: String },
 }
 
 impl From<std::io::Error> for Error {
@@ -215,6 +217,10 @@ pub fn invalid_catalog_name(reason: String, message: String) -> Error {
 
 pub fn build_error(operation: String, message: String) -> Error {
     Error(Box::new(ErrorImpl::Build { operation, message }))
+}
+
+pub fn repository_error(operation: String, message: String) -> Error {
+    Error(Box::new(ErrorImpl::Repository { operation, message }))
 }
 
 // rpc status
