@@ -1,11 +1,12 @@
 [package]
 name = "pipebuilder"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Li Yu <li.yu.sh0211@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0"
 repository = "https://github.com/pipebase/pipebuilder"
 homepage = "https://github.com/pipebase/pipebuilder"
+readme = "../README.md"
 description = "CI for pipebase application"
 keywords = ["pipebase", "CI"]
 
@@ -36,7 +37,7 @@ etcd-client = "0.7.2"
 flurry = "0.3.1"
 futures-util = "0.3"
 http = "0.2.5"
-pipebuilder_common = { version = "0.2.0", path = "../pipebuilder_common" }
+pipebuilder_common = { version = "0.2.1", path = "../pipebuilder_common" }
 prost = "0.9"
 reqwest = "0.11.4"
 serde = { version = "1.0", features = ["derive"] }
