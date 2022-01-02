@@ -11,7 +11,7 @@ use pipebuilder_common::{
         repository::repository_client::RepositoryClient,
     },
     remove_directory, reset_directory, Build, BuildCacheMetadata, BuildMetadata, BuildSnapshot,
-    BuildStatus, LocalBuildContext, PathBuilder, Register, PATH_APP,
+    BuildStatus, LocalBuildContext, PathBuilder, Register, Snapshot, PATH_APP,
 };
 use std::sync::Arc;
 use tonic::{transport::Channel, Response};
@@ -100,11 +100,14 @@ impl BuildManager {
         // update latest build version
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
-        let (_, snapshot) = register
+        let snapshot = match register
             .update_snapshot_resource::<BuildSnapshot>(namespace, id, lease_id)
-            .await?;
+            .await {
+                Ok((_, snapshot)) => snapshot,
+                Err(err) => return Err(build_error(String::from("update snapshot"), format!("update snapshot failed for (namespace = {}, id = {}, manifest_version = {}, error: {:#?})", namespace, id, manifest_version, err))),
+            };
         // prepare build contexts
-        let build_version = snapshot.latest_version;
+        let build_version = snapshot.get_version();
         let manifest_client = self.repository_client.clone();
         let build_context = self.context.to_owned();
         // start build
@@ -169,7 +172,10 @@ impl BuildManager {
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         // update metadata
-        Self::cancel_build_metadata(&mut register, lease_id, namespace, id, build_version).await
+        match Self::cancel_build_metadata(&mut register, lease_id, namespace, id, build_version).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(build_error(String::from("update build metadata"), format!("update build metadata failed for (namespace = {}, id = {}, version = {}), error: {:#?}", namespace, id, build_version, err))),
+        }
     }
 
     pub fn scan_build(&self) -> Vec<BuildMetadataKey> {
@@ -192,7 +198,10 @@ impl BuildManager {
         build_version: u64,
     ) -> pipebuilder_common::Result<Vec<u8>> {
         let log_directory = self.context.log_directory.as_str();
-        Build::read_log(log_directory, namespace, id, build_version).await
+        match Build::read_log(log_directory, namespace, id, build_version).await {
+            Ok(buffer) => Ok(buffer),
+            Err(err) => Err(build_error(String::from("get build log"), format!("get build log failed for (namespace = {}, id = {}, version = {}), error: {:#?}", namespace, id, build_version, err)))
+        }
     }
 
     pub async fn delete_build_cache(
