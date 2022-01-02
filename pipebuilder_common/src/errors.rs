@@ -72,6 +72,8 @@ pub enum ErrorImpl {
     },
     #[error("invalid api request, message: {message:?}")]
     ApiRequest { message: String },
+    #[error("build error, operation: {operation:?}, message: {message:?}")]
+    Build { operation: String, message: String },
 }
 
 impl From<std::io::Error> for Error {
@@ -209,6 +211,10 @@ pub fn json_schema_error(operation: String, messages: Vec<String>) -> Error {
 
 pub fn invalid_catalog_name(reason: String, message: String) -> Error {
     Error(Box::new(ErrorImpl::CatalogName { reason, message }))
+}
+
+pub fn build_error(operation: String, message: String) -> Error {
+    Error(Box::new(ErrorImpl::Build { operation, message }))
 }
 
 // rpc status
