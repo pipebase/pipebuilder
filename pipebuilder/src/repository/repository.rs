@@ -7,8 +7,9 @@ use pipebuilder_common::{
         PutCatalogsResponse, PutManifestResponse,
     },
     read_file, repository_error, reset_directory, rpc_internal_error, write_file, AppMetadata,
-    BlobResource, CatalogSchemaMetadata, CatalogSchemaSnapshot, CatalogsMetadata, CatalogsSnapshot,
-    ManifestMetadata, ManifestSnapshot, PathBuilder, Register, Resource, Snapshot,
+    BlobDescriptor, BlobResource, CatalogSchemaMetadata, CatalogSchemaSnapshot, CatalogsMetadata,
+    CatalogsSnapshot, ManifestMetadata, ManifestSnapshot, PathBuilder, Register, Resource,
+    Snapshot, SnapshotDescriptor,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::fs::remove_dir_all;
@@ -131,16 +132,14 @@ impl RepositoryManager {
 
     pub async fn get_manifest(
         &self,
-        namespace: &str,
-        id: &str,
-        version: u64,
+        resource: BlobDescriptor<'_>,
     ) -> pipebuilder_common::Result<Vec<u8>> {
         let repository = self.manifest_directory.as_str();
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         Self::read_resource::<ManifestMetadata>(
             repository,
-            (namespace, id, version),
+            resource,
             TARGET_MANIFEST,
             &mut register,
             lease_id,
@@ -150,16 +149,14 @@ impl RepositoryManager {
 
     pub async fn get_app(
         &self,
-        namespace: &str,
-        id: &str,
-        version: u64,
+        resource: BlobDescriptor<'_>,
     ) -> pipebuilder_common::Result<Vec<u8>> {
         let repository = self.app_directory.as_str();
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         Self::read_resource::<AppMetadata>(
             repository,
-            (namespace, id, version),
+            resource,
             TARGET_APP,
             &mut register,
             lease_id,
@@ -169,16 +166,14 @@ impl RepositoryManager {
 
     pub async fn get_catalog_schema(
         &self,
-        namespace: &str,
-        id: &str,
-        version: u64,
+        resource: BlobDescriptor<'_>,
     ) -> pipebuilder_common::Result<Vec<u8>> {
         let repository = self.catalog_schema_directory.as_str();
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         Self::read_resource::<CatalogSchemaMetadata>(
             repository,
-            (namespace, id, version),
+            resource,
             TARGET_CATALOG_SCHEMA,
             &mut register,
             lease_id,
@@ -188,16 +183,14 @@ impl RepositoryManager {
 
     pub async fn get_catalogs(
         &self,
-        namespace: &str,
-        id: &str,
-        version: u64,
+        resource: BlobDescriptor<'_>,
     ) -> pipebuilder_common::Result<Vec<u8>> {
         let repository = self.catalogs_directory.as_str();
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         Self::read_resource::<CatalogsMetadata>(
             repository,
-            (namespace, id, version),
+            resource,
             TARGET_CATALOGS,
             &mut register,
             lease_id,
@@ -207,23 +200,20 @@ impl RepositoryManager {
 
     pub async fn put_manifest(
         &self,
-        namespace: &str,
-        id: &str,
+        resource: SnapshotDescriptor<'_>,
         buffer: &[u8],
     ) -> pipebuilder_common::Result<u64> {
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
-        let latest_version = Self::update_resource_snapshot::<ManifestSnapshot>(
-            namespace,
-            id,
-            &mut register,
-            lease_id,
-        )
-        .await?;
+        let latest_version =
+            Self::update_resource_snapshot::<ManifestSnapshot>(resource, &mut register, lease_id)
+                .await?;
         let repository = self.manifest_directory.as_str();
+        let (namespace, id) = resource.into_tuple();
+        let resource = BlobDescriptor(namespace, id, latest_version);
         Self::write_resource::<ManifestMetadata>(
             repository,
-            (namespace, id, latest_version),
+            resource,
             TARGET_MANIFEST,
             buffer,
             &mut register,
@@ -235,9 +225,7 @@ impl RepositoryManager {
 
     pub async fn post_app(
         &self,
-        namespace: &str,
-        id: &str,
-        version: u64,
+        resource: BlobDescriptor<'_>,
         buffer: &[u8],
     ) -> pipebuilder_common::Result<()> {
         let mut register = self.register.clone();
@@ -245,7 +233,7 @@ impl RepositoryManager {
         let repository = self.app_directory.as_str();
         Self::write_resource::<AppMetadata>(
             repository,
-            (namespace, id, version),
+            resource,
             TARGET_APP,
             buffer,
             &mut register,
@@ -256,23 +244,23 @@ impl RepositoryManager {
 
     pub async fn put_catalog_schema(
         &self,
-        namespace: &str,
-        id: &str,
+        resource: SnapshotDescriptor<'_>,
         buffer: &[u8],
     ) -> pipebuilder_common::Result<u64> {
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
         let latest_version = Self::update_resource_snapshot::<CatalogSchemaSnapshot>(
-            namespace,
-            id,
+            resource,
             &mut register,
             lease_id,
         )
         .await?;
         let repository = self.catalog_schema_directory.as_str();
+        let (namespace, id) = resource.into_tuple();
+        let resource = BlobDescriptor(namespace, id, latest_version);
         Self::write_resource::<CatalogSchemaMetadata>(
             repository,
-            (namespace, id, latest_version),
+            resource,
             TARGET_CATALOG_SCHEMA,
             buffer,
             &mut register,
@@ -284,23 +272,20 @@ impl RepositoryManager {
 
     pub async fn put_catalogs(
         &self,
-        namespace: &str,
-        id: &str,
+        resource: SnapshotDescriptor<'_>,
         buffer: &[u8],
     ) -> pipebuilder_common::Result<u64> {
         let mut register = self.register.clone();
         let lease_id = self.lease_id;
-        let latest_version = Self::update_resource_snapshot::<CatalogsSnapshot>(
-            namespace,
-            id,
-            &mut register,
-            lease_id,
-        )
-        .await?;
+        let latest_version =
+            Self::update_resource_snapshot::<CatalogsSnapshot>(resource, &mut register, lease_id)
+                .await?;
         let repository = self.catalogs_directory.as_str();
+        let (namespace, id) = resource.into_tuple();
+        let resource = BlobDescriptor(namespace, id, latest_version);
         Self::write_resource::<CatalogsMetadata>(
             repository,
-            (namespace, id, latest_version),
+            resource,
             TARGET_CATALOGS,
             buffer,
             &mut register,
@@ -312,67 +297,40 @@ impl RepositoryManager {
 
     pub async fn delete_manifest(
         &self,
-        namespace: &str,
-        id: &str,
-        version: u64,
+        resource: BlobDescriptor<'_>,
     ) -> pipebuilder_common::Result<()> {
         let mut register = self.register.clone();
         let repository = self.manifest_directory.as_str();
-        Self::delete_resource::<ManifestMetadata>(
-            repository,
-            (namespace, id, version),
-            &mut register,
-        )
-        .await
+        Self::delete_resource::<ManifestMetadata>(repository, resource, &mut register).await
     }
 
-    pub async fn delete_app(
-        &self,
-        namespace: &str,
-        id: &str,
-        version: u64,
-    ) -> pipebuilder_common::Result<()> {
+    pub async fn delete_app(&self, resource: BlobDescriptor<'_>) -> pipebuilder_common::Result<()> {
         let mut register = self.register.clone();
         let repository = self.app_directory.as_str();
-        Self::delete_resource::<AppMetadata>(repository, (namespace, id, version), &mut register)
-            .await
+        Self::delete_resource::<AppMetadata>(repository, resource, &mut register).await
     }
 
     pub async fn delete_catalog_schema(
         &self,
-        namespace: &str,
-        id: &str,
-        version: u64,
+        resource: BlobDescriptor<'_>,
     ) -> pipebuilder_common::Result<()> {
         let mut register = self.register.clone();
         let repository = self.catalog_schema_directory.as_str();
-        Self::delete_resource::<CatalogSchemaMetadata>(
-            repository,
-            (namespace, id, version),
-            &mut register,
-        )
-        .await
+        Self::delete_resource::<CatalogSchemaMetadata>(repository, resource, &mut register).await
     }
 
     pub async fn delete_catalogs(
         &self,
-        namespace: &str,
-        id: &str,
-        version: u64,
+        resource: BlobDescriptor<'_>,
     ) -> pipebuilder_common::Result<()> {
         let mut register = self.register.clone();
         let repository = self.catalogs_directory.as_str();
-        Self::delete_resource::<CatalogsMetadata>(
-            repository,
-            (namespace, id, version),
-            &mut register,
-        )
-        .await
+        Self::delete_resource::<CatalogsMetadata>(repository, resource, &mut register).await
     }
 
     async fn read_resource<R>(
         repository: &str,
-        resource: (&str, &str, u64),
+        resource: BlobDescriptor<'_>,
         target_name: &str,
         register: &mut Register,
         lease_id: i64,
@@ -380,7 +338,7 @@ impl RepositoryManager {
     where
         R: Resource + BlobResource + Serialize + DeserializeOwned,
     {
-        let (namespace, id, version) = resource;
+        let (namespace, id, version) = resource.into_tuple();
         let buffer = match Self::read_target_from_repo(repository, resource, target_name).await {
             Ok(buffer) => buffer,
             Err(err) => {
@@ -415,7 +373,7 @@ impl RepositoryManager {
     // TODO: too many arguments
     async fn write_resource<R>(
         repository: &str,
-        resource: (&str, &str, u64),
+        resource: BlobDescriptor<'_>,
         target_name: &str,
         buffer: &[u8],
         register: &mut Register,
@@ -424,7 +382,7 @@ impl RepositoryManager {
     where
         R: Resource + BlobResource + Serialize + DeserializeOwned,
     {
-        let (namespace, id, version) = resource;
+        let (namespace, id, version) = resource.into_tuple();
         match Self::write_target_into_repo(repository, resource, buffer, target_name).await {
             Ok(_) => (),
             Err(err) => {
@@ -458,13 +416,13 @@ impl RepositoryManager {
 
     async fn delete_resource<R>(
         repository: &str,
-        resource: (&str, &str, u64),
+        resource: BlobDescriptor<'_>,
         register: &mut Register,
     ) -> pipebuilder_common::Result<()>
     where
         R: Resource,
     {
-        let (namespace, id, version) = resource;
+        let (namespace, id, version) = resource.into_tuple();
         match Self::delete_target_from_repo(repository, resource) {
             Ok(_) => (),
             Err(err) => {
@@ -481,7 +439,7 @@ impl RepositoryManager {
                 ))
             }
         };
-        let (namespace, id, version) = resource;
+        let (namespace, id, version) = resource.into_tuple();
         match register
             .delete_resource::<R>(Some(namespace), id, Some(version))
             .await
@@ -502,14 +460,14 @@ impl RepositoryManager {
     }
 
     async fn update_resource_snapshot<S>(
-        namespace: &str,
-        id: &str,
+        resource: SnapshotDescriptor<'_>,
         register: &mut Register,
         lease_id: i64,
     ) -> pipebuilder_common::Result<u64>
     where
         S: Resource + Snapshot + Serialize + DeserializeOwned,
     {
+        let (namespace, id) = resource.into_tuple();
         match register
             .update_snapshot_resource::<S>(namespace, id, lease_id)
             .await
@@ -530,10 +488,10 @@ impl RepositoryManager {
 
     async fn read_target_from_repo(
         repository: &str,
-        resource: (&str, &str, u64),
+        resource: BlobDescriptor<'_>,
         target_name: &str,
     ) -> pipebuilder_common::Result<Vec<u8>> {
-        let (namespace, id, version) = resource;
+        let (namespace, id, version) = resource.into_tuple();
         let path = PathBuilder::default()
             .push(repository)
             .push(namespace)
@@ -547,11 +505,11 @@ impl RepositoryManager {
 
     async fn write_target_into_repo(
         repository: &str,
-        resource: (&str, &str, u64),
+        resource: BlobDescriptor<'_>,
         buffer: &[u8],
         target_name: &str,
     ) -> pipebuilder_common::Result<()> {
-        let (namespace, id, version) = resource;
+        let (namespace, id, version) = resource.into_tuple();
         let directory = PathBuilder::default()
             .push(repository)
             .push(namespace)
@@ -569,9 +527,9 @@ impl RepositoryManager {
 
     fn delete_target_from_repo(
         repository: &str,
-        resource: (&str, &str, u64),
+        resource: BlobDescriptor<'_>,
     ) -> pipebuilder_common::Result<()> {
-        let (namespace, id, version) = resource;
+        let (namespace, id, version) = resource.into_tuple();
         let directory = PathBuilder::default()
             .push(repository)
             .push(namespace)
@@ -612,11 +570,8 @@ impl Repository for RepositoryService {
             manifest_version = version,
             "get manifest"
         );
-        match self
-            .manager
-            .get_manifest(namespace.as_str(), id.as_str(), version)
-            .await
-        {
+        let resource = BlobDescriptor(namespace.as_str(), id.as_str(), version);
+        match self.manager.get_manifest(resource).await {
             Ok(buffer) => Ok(Response::new(GetManifestResponse { buffer })),
             Err(err) => {
                 error!(
@@ -647,11 +602,8 @@ impl Repository for RepositoryService {
             "put manifest"
         );
         let buffer = request.buffer.as_slice();
-        match self
-            .manager
-            .put_manifest(namespace.as_str(), id.as_str(), buffer)
-            .await
-        {
+        let resource = SnapshotDescriptor(namespace.as_str(), id.as_str());
+        match self.manager.put_manifest(resource, buffer).await {
             Ok(version) => Ok(Response::new(PutManifestResponse { version })),
             Err(err) => {
                 error!(
@@ -682,11 +634,8 @@ impl Repository for RepositoryService {
             manifest_version = version,
             "delete manifest"
         );
-        match self
-            .manager
-            .delete_manifest(namespace.as_str(), id.as_str(), version)
-            .await
-        {
+        let resource = BlobDescriptor(namespace.as_str(), id.as_str(), version);
+        match self.manager.delete_manifest(resource).await {
             Ok(_) => (),
             Err(err) => {
                 error!(
@@ -717,11 +666,8 @@ impl Repository for RepositoryService {
             build_version = version,
             "get app"
         );
-        match self
-            .manager
-            .get_app(namespace.as_str(), id.as_str(), version)
-            .await
-        {
+        let resource = BlobDescriptor(namespace.as_str(), id.as_str(), version);
+        match self.manager.get_app(resource).await {
             Ok(buffer) => Ok(Response::new(GetAppResponse { buffer })),
             Err(err) => {
                 error!(
@@ -752,11 +698,8 @@ impl Repository for RepositoryService {
             "post app"
         );
         let buffer = request.buffer.as_slice();
-        match self
-            .manager
-            .post_app(namespace.as_str(), id.as_str(), version, buffer)
-            .await
-        {
+        let resource = BlobDescriptor(namespace.as_str(), id.as_str(), version);
+        match self.manager.post_app(resource, buffer).await {
             Ok(_) => Ok(Response::new(PostAppResponse {})),
             Err(err) => {
                 error!(
@@ -788,11 +731,8 @@ impl Repository for RepositoryService {
             build_version = version,
             "delete app"
         );
-        match self
-            .manager
-            .delete_app(namespace.as_str(), id.as_str(), version)
-            .await
-        {
+        let resource = BlobDescriptor(namespace.as_str(), id.as_str(), version);
+        match self.manager.delete_app(resource).await {
             Ok(_) => (),
             Err(err) => {
                 error!(
@@ -825,11 +765,8 @@ impl Repository for RepositoryService {
             catalog_schema_version = version,
             "get catalog schema"
         );
-        match self
-            .manager
-            .get_catalog_schema(namespace.as_str(), id.as_str(), version)
-            .await
-        {
+        let resource = BlobDescriptor(namespace.as_str(), id.as_str(), version);
+        match self.manager.get_catalog_schema(resource).await {
             Ok(buffer) => Ok(Response::new(GetCatalogSchemaResponse { buffer })),
             Err(err) => {
                 error!(
@@ -860,11 +797,8 @@ impl Repository for RepositoryService {
             "get catalog schema"
         );
         let buffer = request.buffer.as_slice();
-        match self
-            .manager
-            .put_catalog_schema(namespace.as_str(), id.as_str(), buffer)
-            .await
-        {
+        let resource = SnapshotDescriptor(namespace.as_str(), id.as_str());
+        match self.manager.put_catalog_schema(resource, buffer).await {
             Ok(version) => Ok(Response::new(PutCatalogSchemaResponse { version })),
             Err(err) => {
                 error!(
@@ -895,11 +829,8 @@ impl Repository for RepositoryService {
             catalog_schema_version = version,
             "delete catalog schema"
         );
-        match self
-            .manager
-            .delete_catalog_schema(namespace.as_str(), id.as_str(), version)
-            .await
-        {
+        let resource = BlobDescriptor(namespace.as_str(), id.as_str(), version);
+        match self.manager.delete_catalog_schema(resource).await {
             Ok(_) => (),
             Err(err) => {
                 error!(
@@ -932,11 +863,8 @@ impl Repository for RepositoryService {
             catalogs_version = version,
             "get catalogs"
         );
-        match self
-            .manager
-            .get_catalogs(namespace.as_str(), id.as_str(), version)
-            .await
-        {
+        let resource = BlobDescriptor(namespace.as_str(), id.as_str(), version);
+        match self.manager.get_catalogs(resource).await {
             Ok(buffer) => Ok(Response::new(GetCatalogsResponse { buffer })),
             Err(err) => {
                 error!(
@@ -967,11 +895,8 @@ impl Repository for RepositoryService {
             "get catalogs"
         );
         let buffer = request.buffer.as_slice();
-        match self
-            .manager
-            .put_catalogs(namespace.as_str(), id.as_str(), buffer)
-            .await
-        {
+        let resource = SnapshotDescriptor(namespace.as_str(), id.as_str());
+        match self.manager.put_catalogs(resource, buffer).await {
             Ok(version) => Ok(Response::new(PutCatalogsResponse { version })),
             Err(err) => {
                 error!(
@@ -1002,11 +927,8 @@ impl Repository for RepositoryService {
             catalogs_version = version,
             "delete catalogs"
         );
-        match self
-            .manager
-            .delete_catalogs(namespace.as_str(), id.as_str(), version)
-            .await
-        {
+        let resource = BlobDescriptor(namespace.as_str(), id.as_str(), version);
+        match self.manager.delete_catalogs(resource).await {
             Ok(_) => (),
             Err(err) => {
                 error!(
