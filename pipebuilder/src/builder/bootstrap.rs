@@ -1,4 +1,7 @@
-use crate::{build::BuilderService, config::BuilderConfig};
+use crate::{
+    build::{BuildManager, BuilderService},
+    config::BuilderConfig,
+};
 use pipebuilder_common::{
     grpc::client::RepositoryClientBuilder, LocalBuildContextBuilder, Register, Result,
 };
@@ -35,12 +38,12 @@ pub async fn bootstrap(
         .restore_directory(restore_directory)
         .log_directory(log_directory)
         .build();
-    let builder_svc = BuilderService::builder()
+    let manager = BuildManager::builder()
         .lease_id(lease_id)
         .register(register)
         .repository_client(repository_client)
         .context(build_context)
         .build();
-    builder_svc.init(reset).await?;
-    Ok(builder_svc)
+    manager.init(reset).await?;
+    Ok(BuilderService::new(manager))
 }

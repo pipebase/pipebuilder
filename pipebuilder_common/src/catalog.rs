@@ -61,6 +61,9 @@ impl Snapshot for CatalogSchemaSnapshot {
     fn incr_version(&mut self) {
         self.latest_version += 1
     }
+    fn get_version(&self) -> u64 {
+        self.latest_version
+    }
 }
 
 impl Resource for CatalogSchemaSnapshot {
@@ -335,6 +338,9 @@ impl Default for CatalogsSnapshot {
 impl Snapshot for CatalogsSnapshot {
     fn incr_version(&mut self) {
         self.latest_version += 1
+    }
+    fn get_version(&self) -> u64 {
+        self.latest_version
     }
 }
 

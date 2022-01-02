@@ -159,9 +159,28 @@ where
         .unwrap_or_else(|| panic!("key '{}' not start with '/{}/'", origin_key, R::ty()))
 }
 
+#[derive(Clone, Copy)]
+pub struct BlobDescriptor<'a>(pub &'a str, pub &'a str, pub u64);
+
+impl<'a> BlobDescriptor<'a> {
+    pub fn into_tuple(self) -> (&'a str, &'a str, u64) {
+        (self.0, self.1, self.2)
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct SnapshotDescriptor<'a>(pub &'a str, pub &'a str);
+
+impl<'a> SnapshotDescriptor<'a> {
+    pub fn into_tuple(self) -> (&'a str, &'a str) {
+        (self.0, self.1)
+    }
+}
+
 // snapshot resource
 pub trait Snapshot: Default {
     fn incr_version(&mut self);
+    fn get_version(&self) -> u64;
 }
 
 pub trait Resource {
