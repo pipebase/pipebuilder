@@ -4,4 +4,5 @@ members = [
     "e2e",
     "pipebuilder",
     "pipebuilder_common",
+    "pipebuilder_mock",
 ]
