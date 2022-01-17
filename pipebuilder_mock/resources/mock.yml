@@ -1,0 +1,4 @@
+address: 127.0.0.1:16000
+repository:
+  app: pipebuilder_mock/data/apps
+  catalogs: pipebuilder_mock/data/catalogs
