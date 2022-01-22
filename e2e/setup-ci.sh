@@ -12,7 +12,7 @@ repository="repository.yml"
 scheduler="scheduler.yml"
 builder="builder.yml"
 api="api.yml"
-sleep_period=30
+sleep_period=5
 
 function usage() { 
 cat <<EOF
@@ -88,19 +88,19 @@ function run_etcd() {
 }
 
 function run_repository() {
-    RUST_LOG=info PIPEBUILDER_CONFIG_FILE=${repository} cargo run --bin repository &
+    RUST_LOG=info PIPEBUILDER_CONFIG_FILE=${repository} repository &
 }
 
 function run_scheduler() {
-    RUST_LOG=info PIPEBUILDER_CONFIG_FILE=${scheduler} cargo run --bin scheduler &
+    RUST_LOG=info PIPEBUILDER_CONFIG_FILE=${scheduler} scheduler &
 }
 
 function run_builder() {
-    RUST_LOG=info PIPEBUILDER_CONFIG_FILE=${builder} cargo run --bin builder &
+    RUST_LOG=info PIPEBUILDER_CONFIG_FILE=${builder} builder &
 }
 
 function run_api() {
-    RUST_LOG=info PIPEBUILDER_CONFIG_FILE=${api} cargo run --bin api &
+    RUST_LOG=info PIPEBUILDER_CONFIG_FILE=${api} api &
 }
 
 function run_ci() {

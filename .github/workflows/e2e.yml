@@ -19,6 +19,8 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - name: install binaries
+        run: cargo install --path pipebuilder
       - name: setup data volume
         run: ./e2e/setup-data-volume.sh
       - name: setup CI
@@ -37,6 +39,8 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - name: install binaries
+        run: cargo install --path pipebuilder
       - name: setup data volume
         run: ./e2e/setup-data-volume.sh
       - name: setup CI
@@ -55,6 +59,8 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - name: install binaries
+        run: cargo install --path pipebuilder
       - name: setup data volume
         run: ./e2e/setup-data-volume.sh
       - name: setup CI
